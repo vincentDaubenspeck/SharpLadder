@@ -8,7 +8,7 @@
 #   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
-#   g. Licence allowlist cases, and a disallowed licence through check.sh and check.ps1
+#   g. Licence allowlist and override record cases, and a disallowed licence through check.sh and check.ps1
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
 # Usage: sh tools/tests/run.sh
@@ -187,6 +187,11 @@ else
           got=pass
         fi
         ;;
+      ovr)
+        if (cd "$tmp/fx/ovr/$file" && "$node" "$src/web/dependency-overrides-check.js") > "$tmp/fx.out" 2>&1; then
+          got=pass
+        fi
+        ;;
       ps)
         if [ -z "$ps" ]; then
           no_ps "$lang $want: $label"
@@ -209,6 +214,12 @@ else
     pass "lic pass: current tree"
   else
     fail "lic pass: current tree"
+    cat "$tmp/fx.out"
+  fi
+  if (cd "$src/web" && "$node" dependency-overrides-check.js) > "$tmp/fx.out" 2>&1; then
+    pass "ovr pass: current tree"
+  else
+    fail "ovr pass: current tree"
     cat "$tmp/fx.out"
   fi
   if [ -z "$ps" ]; then

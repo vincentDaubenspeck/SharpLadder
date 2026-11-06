@@ -166,6 +166,55 @@ lic("fail", "range", "exception for a version range", gpl, { "fx-gpl": "^1.0.0" 
   "fx-gpl@^1.0.0": "Test fixture; not shipped.",
 });
 
+// Override records, through web/dependency-overrides-check.js run in each case directory.
+function ovr(want, file, label, overrides, records) {
+  const d = join(dir, "ovr", file);
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, "package.json"), `${JSON.stringify({ name: `case-${file}`, overrides })}\n`);
+  const text = typeof records === "string" ? records : `${JSON.stringify(records, null, 2)}\n`;
+  writeFileSync(join(d, "dependency-overrides.json"), text);
+  cases.push(["ovr", want, file, label].join("\t"));
+}
+const entry = (spec, extra = {}) => ({
+  spec,
+  reason: "Test fixture; not shipped.",
+  removeWhen: "Never; test fixture.",
+  addedOn: "2026-11-06",
+  references: ["https://example.invalid/advisory"],
+  ...extra,
+});
+const flat = { "fx-a": "1.0.0" };
+const nested = { "fx-parent": { "fx-child": "2.0.0" } };
+const scoped = { "@fx/parent": { "@fx/child": "3.0.0" } };
+ovr("pass", "valid", "flat, nested and scoped records", { ...flat, ...nested, ...scoped }, {
+  "fx-a": entry("1.0.0"),
+  "fx-parent": { "fx-child": entry("2.0.0") },
+  "@fx/parent": { "@fx/child": entry("3.0.0") },
+});
+ovr("pass", "none", "no overrides and no records", {}, {});
+ovr("fail", "missing", "override without a record", { ...flat, ...nested }, { "fx-a": entry("1.0.0") });
+ovr("fail", "orphan", "record without an override", flat, { "fx-a": entry("1.0.0"), "fx-b": entry("1.0.0") });
+ovr("fail", "spec", "changed spec", flat, { "fx-a": entry("1.0.1") });
+ovr("fail", "flattened", "nested selector with a flat record", nested, { "fx-parent": entry("2.0.0") });
+ovr("pass", "spec-child", "nested package named spec", { "fx-parent": { spec: "1.0.0" } }, {
+  "fx-parent": { spec: entry("1.0.0") },
+});
+ovr("fail", "nested-orphan", "nested record without an override", nested, {
+  "fx-parent": { "fx-child": entry("2.0.0"), "fx-other": entry("2.0.0") },
+});
+ovr("fail", "scoped-missing", "scoped package without a record", scoped, { "@fx/parent": {} });
+ovr("fail", "blank", "blank reason", flat, { "fx-a": entry("1.0.0", { reason: " " }) });
+ovr("fail", "multi-line", "multi-line removeWhen", flat, {
+  "fx-a": entry("1.0.0", { removeWhen: "First line.\nSecond line." }),
+});
+ovr("fail", "date", "impossible addedOn", flat, { "fx-a": entry("1.0.0", { addedOn: "2026-02-30" }) });
+ovr("fail", "references", "references not an array", flat, {
+  "fx-a": entry("1.0.0", { references: "https://example.invalid/advisory" }),
+});
+ovr("fail", "field", "unknown field", flat, { "fx-a": entry("1.0.0", { note: "extra" }) });
+ovr("fail", "type", "unsupported override value type", { "fx-a": 1 }, { "fx-a": entry("1.0.0") });
+ovr("fail", "malformed", "malformed records file", flat, "{\n");
+
 // C#, through tools/SharpLadder.Policy, run by tools/tests/csharp-cases.mjs; the fifth column
 // is the start of the expected problem. Each case is its own project in one solution, because
 // the check reads real project compilations.

@@ -21,8 +21,9 @@
     "lint:spell": "cd .. && git ls-files | cspell --no-progress --no-must-find-files --file-list stdin",
     "lint:comments": "cd .. && node web/lint-comments.js web tools",
     "license:check": "node license-check.js",
+    "overrides:check": "node dependency-overrides-check.js",
     "knip": "knip",
-    "check": "npm run lint:lockfile && npm run license:check && npm run lint && npm run lint:comments && npm run format:check && npm run typecheck && npm test && npm run knip && npm run lint:md && npm run lint:spell"
+    "check": "npm run lint:lockfile && npm run license:check && npm run overrides:check && npm run lint && npm run lint:comments && npm run format:check && npm run typecheck && npm test && npm run knip && npm run lint:md && npm run lint:spell"
   },
   "dependencies": {
     "react": "19.3.1",
@@ -57,6 +58,9 @@
   },
   "overrides": {
     "glob": "14.0.3",
+    "micromark-extension-math": {
+      "katex": "0.18.2"
+    },
     "minimatch": "11.0.5",
     "re2js": "2.8.8"
   },

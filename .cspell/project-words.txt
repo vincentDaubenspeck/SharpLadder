@@ -1,5 +1,6 @@
 advisoryurl
 analyzerpolicy
+cacache
 cgrep
 cyclonedx
 Daubenspeck
@@ -9,6 +10,7 @@ extensionless
 globalconfig
 gnueabihf
 healthz
+katex
 LASTEXITCODE
 lightningcss
 Meziantou

@@ -7,7 +7,7 @@
 #   d. tools/checks/text.ps1 and text.sh give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
-#   g. Licence allowlist cases, and a disallowed licence through check.ps1 and check.sh
+#   g. Licence allowlist and override record cases, and a disallowed licence through check.ps1 and check.sh
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
@@ -196,6 +196,10 @@ try {
           $r = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'web/license-check.js')) -dir (Join-Path -Path $dir -ChildPath $file)
           $got = if ($r.Code -eq 0) { 'pass' } else { 'fail' }
         }
+        'ovr' {
+          $r = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'web/dependency-overrides-check.js')) -dir (Join-Path -Path $dir -ChildPath $file)
+          $got = if ($r.Code -eq 0) { 'pass' } else { 'fail' }
+        }
       }
       if ($got -eq $want) { Write-Pass "$lang ${want}: $label" }
       else { Write-Fail "$lang ${want}: $label (got $got)"; Write-Output $r.All }
@@ -203,6 +207,9 @@ try {
     $r = Invoke-Program $node @('license-check.js') -dir (Join-Path -Path $src -ChildPath 'web')
     if ($r.Code -eq 0) { Write-Pass 'lic pass: current tree' }
     else { Write-Fail 'lic pass: current tree'; Write-Output $r.All }
+    $r = Invoke-Program $node @('dependency-overrides-check.js') -dir (Join-Path -Path $src -ChildPath 'web')
+    if ($r.Code -eq 0) { Write-Pass 'ovr pass: current tree' }
+    else { Write-Fail 'ovr pass: current tree'; Write-Output $r.All }
     foreach ($case in @(@('pass', 'good.ps1'), @('fail', 'missing.ps1'))) {
       $want, $file = $case
       $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',

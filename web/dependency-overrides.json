@@ -1,0 +1,32 @@
+{
+  "glob": {
+    "spec": "14.0.3",
+    "reason": "cacache, @npmcli/map-workspaces and @npmcli/package-json (via licensee) declare glob ^13.0.0, and every 13.x release is in the range of the advisory in references (>=9.0.0 <=14.0.1).",
+    "removeWhen": "cacache, @npmcli/map-workspaces, @npmcli/package-json, and every other package that pulls glob in, declares a range that resolves above 14.0.1 without the override.",
+    "addedOn": "2026-11-06",
+    "references": ["https://github.com/advisories/GHSA-3g3m-2fjr-6pw4"]
+  },
+  "micromark-extension-math": {
+    "katex": {
+      "spec": "0.18.2",
+      "reason": "micromark-extension-math (via markdownlint-cli2 and markdownlint) declares katex ^0.16.0, inside the range of the advisory in references (>=0.11.0 <0.18.2).",
+      "removeWhen": "micromark-extension-math, or whatever pulls it in, declares a katex range that resolves to 0.18.2 or later without the override.",
+      "addedOn": "2026-11-06",
+      "references": ["https://github.com/advisories/GHSA-238p-pmpm-9mq7"]
+    }
+  },
+  "minimatch": {
+    "spec": "11.0.5",
+    "reason": "eslint declares minimatch ^10.2.6, and every 10.x release is in the range of the advisory in references (>=7.0.0 <11.0.1).",
+    "removeWhen": "eslint, and every other package that pulls minimatch in, declares a range that resolves to 11.0.1 or later without the override.",
+    "addedOn": "2026-11-05",
+    "references": ["https://github.com/advisories/GHSA-g3hv-75wg-m249"]
+  },
+  "re2js": {
+    "spec": "2.8.8",
+    "reason": "markdownlint pins re2js 2.8.6, inside the range of the advisory in references (>=2.2.0 <2.8.7).",
+    "removeWhen": "markdownlint, or whatever pulls re2js in, depends on re2js 2.8.7 or later without the override.",
+    "addedOn": "2026-11-05",
+    "references": ["https://github.com/advisories/GHSA-gg6h-894w-4m9c"]
+  }
+}

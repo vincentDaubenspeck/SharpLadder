@@ -27,6 +27,7 @@ const web = join(root, "web");
 const webStages = [
   ["lockfile-lint", "lint:lockfile"],
   ["licence allowlist", "license:check"],
+  ["dependency overrides", "overrides:check"],
   ["ESLint", "lint"],
   ["ESLint comment policy", "lint:comments"],
   ["Prettier", "format:check"],
