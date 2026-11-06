@@ -9,8 +9,9 @@
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
 #   g. Licence allowlist cases, and a disallowed licence through check.sh and check.ps1
+#   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 # Usage: sh tools/tests/run.sh
-# Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Part h needs the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
 
 started=$(date +%s)
@@ -215,9 +216,10 @@ fi
 mkdir -p "$repo/web"
 cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$repo/tools/"
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
-  "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
+  "$src/tools/checks/dotnet.mjs" "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
 cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"
+cp "$src/global.json" "$src/Directory.Build.props" "$src/Directory.Packages.props" "$repo/"
 # An unavailable PSScriptAnalyzer version stands in for a missing module.
 sed -e 's/"version": "1\.25\.0"/"version": "0.0.0"/' "$src/tools/tool-pins.json" > "$repo/tools/tool-pins.json"
 cp "$tmp/fx/sh/missing.sh" "$repo/bad.sh"
@@ -234,11 +236,22 @@ if [ -n "$node" ]; then
     fail "missing shfmt fails"
     cat "$tmp/out"
   fi
+  # This repository has no .tools, so an empty PATH leaves no SDK at all.
+  (PATH=$(to_posix "$tmp/empty") "$node" tools/checks/dotnet.mjs) > "$tmp/out" 2>&1 || :
+  if grep -qxF '  dotnet not found; install the pinned tools with: node tools/install-tools.mjs' \
+    "$tmp/out" && grep -qxF 'FAIL .NET config' "$tmp/out"; then
+    pass "missing .NET SDK fails"
+  else
+    fail "missing .NET SDK fails"
+    cat "$tmp/out"
+  fi
 fi
+sed -e 's/"10\.0\.403"/"10.0.402"/' "$src/global.json" > global.json
 
 rc=0
 sh tools/check.sh > "$tmp/out" 2>&1 || rc=$?
 for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run npm ci in web/' \
+  '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403' \
   '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
   '  web/x.sh:2: shellcheck directive needs a reason comment on the line above'; do
   if [ "$rc" -ne 0 ] && grep -qxF "$want" "$tmp/out"; then
@@ -256,6 +269,7 @@ else
 fi
 if [ -z "$ps" ]; then
   no_ps "check.ps1 propagates a failure"
+  no_ps "check.ps1 fails a global.json that differs from the SDK pin"
 else
   rc=0
   "$ps" -NoProfile -ExecutionPolicy Bypass -File tools/check.ps1 > "$tmp/out" 2>&1 || rc=$?
@@ -263,6 +277,12 @@ else
     pass "check.ps1 propagates a failure (exit $rc)"
   else
     fail "check.ps1 propagates a failure (exit $rc)"
+  fi
+  if [ "$rc" -ne 0 ] && tr -d '\r' < "$tmp/out" |
+    grep -qxF '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403'; then
+    pass "check.ps1 fails a global.json that differs from the SDK pin (exit $rc)"
+  else
+    fail "check.ps1 fails a global.json that differs from the SDK pin (exit $rc)"
   fi
 fi
 
@@ -291,6 +311,50 @@ if [ -n "$node" ]; then
       cat "$tmp/out.lf"
     fi
   fi
+fi
+
+# count_lines <label> <exit code> <output file>: adds a Node case script's PASS and FAIL lines.
+count_lines() {
+  p=$(grep -c '^PASS ' "$3" || :)
+  f=$(grep -c '^FAIL ' "$3" || :)
+  grep -E '^(PASS|FAIL|  )' "$3" || :
+  passed=$((passed + p))
+  failed=$((failed + f))
+  if [ "$2" -ne 0 ] && [ "$f" -eq 0 ]; then fail "$1 (exit $2)"; fi
+  if [ "$p" -eq 0 ] && [ "$f" -eq 0 ]; then fail "$1 (no cases ran)"; fi
+}
+
+if [ -z "$node" ]; then
+  fail ".NET config (no node)"
+else
+  rc=0
+  "$node" "$src/tools/tests/digest-cases.mjs" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "digest cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/checks/dotnet.mjs" "$src" > "$tmp/out" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ] && grep -qxF 'PASS .NET config' "$tmp/out"; then
+    pass ".NET config passes on the repository"
+  else
+    fail ".NET config passes on the repository"
+    cat "$tmp/out"
+  fi
+
+  mkdir "$tmp/malformed"
+  cp "$src/global.json" "$src/Directory.Packages.props" "$tmp/malformed/"
+  sed -e 's#</Project>##' "$src/Directory.Build.props" > "$tmp/malformed/Directory.Build.props"
+  rc=0
+  "$node" "$src/tools/checks/dotnet.mjs" "$tmp/malformed" > "$tmp/out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ] && grep -qxF '  Directory.Build.props does not evaluate' "$tmp/out"; then
+    pass ".NET config fails a malformed Directory.Build.props (exit $rc)"
+  else
+    fail ".NET config fails a malformed Directory.Build.props (exit $rc)"
+    cat "$tmp/out"
+  fi
+
+  rc=0
+  "$node" "$src/tools/tests/dotnet-probe.mjs" "$tmp/dn" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "dotnet probe" "$rc" "$tmp/out"
 fi
 
 echo "$passed passed, $failed failed, $skipped skipped in $(($(date +%s) - started))s"

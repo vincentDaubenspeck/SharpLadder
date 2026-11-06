@@ -20,9 +20,18 @@ function toolEnv() {
   const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
   env[key] = [...dirs, env[key] ?? ""].join(delimiter);
   delete env.SHELLCHECK_OPTS;
+  env.DOTNET_CLI_TELEMETRY_OPTOUT = "1";
+  env.DOTNET_NOLOGO = "1";
+  env.DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1";
+  if (existsSync(dotnetHome)) env.DOTNET_ROOT = dotnetHome;
   return env;
 }
+const dotnetHome = join(scriptRoot, ".tools", "dotnet");
 export const env = toolEnv();
+// Named by path so an SDK installed elsewhere on PATH is never picked up instead.
+export const dotnet = existsSync(join(dotnetHome, win ? "dotnet.exe" : "dotnet"))
+  ? join(dotnetHome, win ? "dotnet.exe" : "dotnet")
+  : "dotnet";
 
 // The npm bundled with the running Node, started without a shell (npm is a batch file on Windows).
 const nodeDir = dirname(process.execPath);

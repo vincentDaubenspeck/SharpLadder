@@ -1,0 +1,30 @@
+is_global = true
+
+# AnalyzerPolicy SA1101: members are not prefixed with this | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.SA1101.severity = none
+
+# AnalyzerPolicy SA1200: usings sit outside the namespace, as in file-scoped templates | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.SA1200.severity = none
+
+# AnalyzerPolicy SA1309: private fields use the underscore prefix | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.SA1309.severity = none
+
+# AnalyzerPolicy SA1600: documentation comments are not required on every element | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.SA1600.severity = none
+
+# AnalyzerPolicy SA1633: no file header; the licence is stated once at the root | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.SA1633.severity = none
+
+# AnalyzerPolicy CS1591: documentation comments are optional, as with SA1600 | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.CS1591.severity = none
+
+# AnalyzerPolicy CS1573: duplicates SA1611, which is the enforcing rule, so the compiler copy is off to avoid two diagnostics for one fault | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.CS1573.severity = none
+
+# AnalyzerPolicy AsyncFixer01: eliding a single await hides the method from stack traces | Scope: all projects | Guard: commit 7 guard test | Decision: off
+dotnet_diagnostic.AsyncFixer01.severity = none
+
+# A suppression without a justification is invisible drift.
+dotnet_diagnostic.SA1404.severity = error
+
+dotnet_diagnostic.RS0030.severity = error

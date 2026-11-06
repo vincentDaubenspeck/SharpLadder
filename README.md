@@ -23,8 +23,8 @@ git config core.hooksPath tools/hooks
 
 The web app lives in `web/`; run `npm ci` and `npm run dev` there.
 
-The checks need these tools, at exactly these versions (pins and SHA-256
-digests in `tools/tool-pins.json`):
+The checks need these tools, at exactly these versions (pins and the
+publishers' SHA-256 or SHA-512 digests in `tools/tool-pins.json`):
 
 - Node 26.13.0 (`web/.nvmrc`) with its bundled npm 11.20.0
   (`packageManager` in `web/package.json`), then `npm ci` in `web/`
@@ -33,10 +33,11 @@ digests in `tools/tool-pins.json`):
   `tools/requirements-yamllint.txt` with hash checking)
 - PowerShell with PSScriptAnalyzer 1.25.0
   (`Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`)
+- .NET SDK 10.0.403, pinned in `global.json` with roll-forward disabled
 
 `node tools/install-tools.mjs` downloads Node, shfmt, editorconfig-checker,
-ShellCheck and the CycloneDX CLI 0.33.1 into `.tools/`, verifies each against
-its pinned digest, and sets up yamllint in `.tools/venv`. yamllint
+ShellCheck, the CycloneDX CLI 0.33.1 and the .NET SDK into `.tools/`, verifies
+each against its pinned digest, and sets up yamllint in `.tools/venv`. yamllint
 (GPL-3.0-or-later) and its dependency pathspec (MPL-2.0) are development tools
 only; nothing from them ships.
 
@@ -57,6 +58,12 @@ dependencies included, and fails on any licence outside the allowlist in
 exception without a reason or a reason without an exception. CI also produces a
 CycloneDX SBOM of the full npm inventory, validates it with the CycloneDX CLI
 and keeps it as a build artifact for 14 days.
+
+The .NET build settings live in `Directory.Build.props`, analyzer versions in
+`Directory.Packages.props` (central package management), rule severities in
+`.globalconfig` and banned APIs in `BannedSymbols.txt`. Until the first C#
+project exists, the check evaluates these files and the test suites build a
+throwaway probe project against them.
 
 OpenSSF Scorecard runs weekly and on every push to `main`.
 

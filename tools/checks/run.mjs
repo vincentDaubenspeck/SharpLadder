@@ -12,6 +12,7 @@ import {
   toolProblem,
   win,
 } from "./lib.mjs";
+import { dotnetChecks } from "./dotnet.mjs";
 import { shellChecks, trackedShellFiles } from "./shell.mjs";
 
 const top = exec("git", ["rev-parse", "--show-toplevel"]);
@@ -100,5 +101,7 @@ else {
   const r = exec("yamllint", ["--strict", "-f", "parsable", ...files], { cwd: root });
   report("YAML (yamllint)", r.code === 0 ? [] : [r.out]);
 }
+
+dotnetChecks(root);
 
 process.exitCode = anyFailed() ? 1 : 0;

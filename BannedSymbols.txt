@@ -1,0 +1,6 @@
+P:System.DateTime.Now;Wall-clock read; use TimeProvider so time can be controlled in tests
+P:System.DateTime.UtcNow;Wall-clock read; use TimeProvider so time can be controlled in tests
+P:System.DateTime.Today;Wall-clock read; use TimeProvider so time can be controlled in tests
+P:System.DateTimeOffset.Now;Wall-clock read; use TimeProvider so time can be controlled in tests
+P:System.DateTimeOffset.UtcNow;Wall-clock read; use TimeProvider so time can be controlled in tests
+T:System.Runtime.Serialization.Formatters.Binary.BinaryFormatter;Insecure legacy serializer; use System.Text.Json

@@ -8,8 +8,9 @@
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
 #   g. Licence allowlist cases, and a disallowed licence through check.ps1 and check.sh
+#   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
-# Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Part h needs the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
 
 $started = Get-Date
@@ -198,8 +199,9 @@ try {
 
   New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web') | Out-Null
   Copy-FromSource @('tools/check.sh', 'tools/check.ps1', 'tools/checks/lib.mjs', 'tools/checks/run.mjs',
-    'tools/checks/shell.mjs', 'tools/checks/ps-suppressions.ps1', 'tools/checks/pssa.ps1',
-    'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc', 'web/.licensee.json')
+    'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/ps-suppressions.ps1',
+    'tools/checks/pssa.ps1', 'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc',
+    'web/.licensee.json', 'global.json', 'Directory.Build.props', 'Directory.Packages.props')
   # An unavailable PSScriptAnalyzer version stands in for a missing module.
   $pins = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'tools/tool-pins.json'))
   Write-Text 'tools/tool-pins.json' ($pins -replace '"version": "1\.25\.0"', '"version": "0.0.0"')
@@ -215,11 +217,20 @@ try {
     if ($r.All -cmatch '(?m)^  shfmt not found' -and $r.All -cmatch '(?m)^FAIL shell suppression reasons$') {
       Write-Pass 'missing shfmt fails'
     } else { Write-Fail 'missing shfmt fails'; Write-Output $r.All }
+    # This repository has no .tools, so an empty PATH leaves no SDK at all.
+    $r = Invoke-Program $node @('tools/checks/dotnet.mjs') -dir $repo -path $empty
+    $lines = $r.All -split "`n"
+    if ($lines -ccontains '  dotnet not found; install the pinned tools with: node tools/install-tools.mjs' -and
+      $lines -ccontains 'FAIL .NET config') { Write-Pass 'missing .NET SDK fails' }
+    else { Write-Fail 'missing .NET SDK fails'; Write-Output $r.All }
   }
+  $sdkPin = '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403'
+  $globalJson = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'global.json'))
+  Write-Text 'global.json' ($globalJson -replace '"10\.0\.403"', '"10.0.402"')
 
   $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/check.ps1')
   foreach ($want in @('FAIL shell suppression reasons', '  web/node_modules not found; run npm ci in web/',
-      '  PSScriptAnalyzer 0.0.0 not found; install it with:',
+      $sdkPin, '  PSScriptAnalyzer 0.0.0 not found; install it with:',
       '  web/x.sh:2: shellcheck directive needs a reason comment on the line above')) {
     $lines = $r.All -split "`n"
     if ($r.Code -ne 0 -and $lines -ccontains $want) { Write-Pass "check.ps1 exit $($r.Code) with: $want" }
@@ -227,12 +238,16 @@ try {
   }
   if (-not $sh) {
     Write-NoSh 'check.sh propagates a failure'
+    Write-NoSh 'check.sh fails a global.json that differs from the SDK pin'
     Write-NoSh 'pre-push blocks on a failed check'
   } else {
     $s = Invoke-Program $sh @('tools/check.sh')
     if ($s.Code -ne 0 -and ($s.All -split "`n") -ccontains 'FAIL shell suppression reasons') {
       Write-Pass "check.sh propagates a failure (exit $($s.Code))"
     } else { Write-Fail "check.sh propagates a failure (exit $($s.Code))" }
+    if ($s.Code -ne 0 -and ($s.All -split "`n") -ccontains $sdkPin) {
+      Write-Pass "check.sh fails a global.json that differs from the SDK pin (exit $($s.Code))"
+    } else { Write-Fail "check.sh fails a global.json that differs from the SDK pin (exit $($s.Code))" }
     $h = Invoke-Program $sh @('tools/hooks/pre-push')
     if ($h.Code -ne 0 -and $h.All -cmatch '(?m)^pre-push: tools/check\.sh failed; push blocked$') {
       Write-Pass "pre-push blocks on a failed check (exit $($h.Code))"
@@ -255,6 +270,44 @@ try {
         Write-Pass "check.sh fails a disallowed licence (exit $($s.Code))"
       } else { Write-Fail "check.sh fails a disallowed licence (exit $($s.Code))"; Write-Output $s.All }
     }
+  }
+
+  # Adds a Node case script's PASS and FAIL lines to the totals.
+  function Add-CaseLine([string]$label, $result) {
+    $lines = $result.All -split "`n"
+    $p = @($lines | Where-Object { $_ -clike 'PASS *' }).Count
+    $f = @($lines | Where-Object { $_ -clike 'FAIL *' }).Count
+    $lines | Where-Object { $_ -cmatch '^(PASS|FAIL|  )' } | Write-Output
+    $script:passed += $p
+    $script:failed += $f
+    if ($result.Code -ne 0 -and $f -eq 0) { Write-Fail "$label (exit $($result.Code))" }
+    if ($p -eq 0 -and $f -eq 0) { Write-Fail "$label (no cases ran)" }
+  }
+
+  if (-not $node) { Write-Fail '.NET config (no node)' }
+  else {
+    Add-CaseLine 'digest cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/digest-cases.mjs')) -dir $src)
+
+    $r = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/checks/dotnet.mjs'), $src) -dir $src
+    if ($r.Code -eq 0 -and ($r.All -split "`n") -ccontains 'PASS .NET config') {
+      Write-Pass '.NET config passes on the repository'
+    } else { Write-Fail '.NET config passes on the repository'; Write-Output $r.All }
+
+    $malformedProps = Join-Path -Path $tmp -ChildPath 'malformed'
+    New-Item -ItemType Directory -Path $malformedProps | Out-Null
+    foreach ($f in @('global.json', 'Directory.Packages.props')) {
+      Copy-Item -LiteralPath (Join-Path -Path $src -ChildPath $f) -Destination $malformedProps
+    }
+    $props = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'Directory.Build.props'))
+    [IO.File]::WriteAllText((Join-Path -Path $malformedProps -ChildPath 'Directory.Build.props'),
+      ($props -replace '</Project>', ''), $noBom)
+    $r = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/checks/dotnet.mjs'), $malformedProps) -dir $src
+    if ($r.Code -ne 0 -and ($r.All -split "`n") -ccontains '  Directory.Build.props does not evaluate') {
+      Write-Pass ".NET config fails a malformed Directory.Build.props (exit $($r.Code))"
+    } else { Write-Fail ".NET config fails a malformed Directory.Build.props (exit $($r.Code))"; Write-Output $r.All }
+
+    Add-CaseLine 'dotnet probe' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/dotnet-probe.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'dn')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

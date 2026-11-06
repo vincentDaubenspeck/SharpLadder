@@ -1,8 +1,7 @@
 // Installs the pinned check tools into .tools/ after verifying each download.
 // Usage: node tools/install-tools.mjs [--python <python executable>]
-// Pins and SHA-256 digests live in tools/tool-pins.json; nothing is fetched to learn them.
+// Pins and digests live in tools/tool-pins.json; nothing is fetched to learn them.
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   chmodSync,
   copyFileSync,
@@ -15,6 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { checkDigest, digestOf } from "./digest.mjs";
 
 const root = join(import.meta.dirname, "..");
 const pins = JSON.parse(readFileSync(join(root, "tools/tool-pins.json"), "utf8"));
@@ -30,19 +30,22 @@ function run(cmd, args) {
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
 }
 
-function stampOk(name, sha) {
-  const stamp = join(dest, `${name}.sha256`);
-  return existsSync(stamp) && readFileSync(stamp, "utf8").trim() === sha;
+function stampOk(name, asset) {
+  const { algo, value } = digestOf(asset);
+  const stamp = join(dest, `${name}.${algo}`);
+  return existsSync(stamp) && readFileSync(stamp, "utf8").trim() === value;
+}
+
+function writeStamp(name, asset) {
+  const { algo, value } = digestOf(asset);
+  writeFileSync(join(dest, `${name}.${algo}`), `${value}\n`);
 }
 
 async function download(name, asset) {
   const res = await fetch(asset.url);
   if (!res.ok) throw new Error(`${name}: HTTP ${res.status} for ${asset.url}`);
   const data = Buffer.from(await res.arrayBuffer());
-  const got = createHash("sha256").update(data).digest("hex");
-  if (got !== asset.sha256) {
-    throw new Error(`${name}: SHA-256 mismatch (expected ${asset.sha256}, got ${got})`);
-  }
+  checkDigest(name, asset, data);
   // Inside .tools, so moving the extracted Node never crosses file systems.
   const work = mkdtempSync(join(dest, `tmp-${name}-`));
   const file = join(work, asset.url.split("/").pop());
@@ -54,7 +57,7 @@ async function installBinary(name) {
   const tool = pins[name];
   const asset = tool.assets[platform];
   if (!asset) throw new Error(`${name}: no pinned build for ${platform}`);
-  if (stampOk(name, asset.sha256)) return;
+  if (stampOk(name, asset)) return;
   const { work, file } = await download(name, asset);
   const target = join(bin, win ? `${name}.exe` : name);
   // Staged beside the target so the rename that replaces it never leaves a partial file.
@@ -68,7 +71,7 @@ async function installBinary(name) {
     rmSync(staged, { force: true });
     rmSync(work, { recursive: true, force: true });
   }
-  writeFileSync(join(dest, `${name}.sha256`), `${asset.sha256}\n`);
+  writeStamp(name, asset);
   console.log(`installed ${name} ${tool.version}`);
 }
 
@@ -79,7 +82,7 @@ async function installNode() {
   }
   const asset = pins.node.assets[platform];
   if (!asset) throw new Error(`node: no pinned build for ${platform}`);
-  if (stampOk("node", asset.sha256)) return;
+  if (stampOk("node", asset)) return;
   const { work, file } = await download("node", asset);
   const target = join(dest, "node");
   // Outside the work directory, so a failed restore never deletes the previous install.
@@ -97,8 +100,34 @@ async function installNode() {
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
-  writeFileSync(join(dest, "node.sha256"), `${asset.sha256}\n`);
+  writeStamp("node", asset);
   console.log(`installed node ${pins.node.version}`);
+}
+
+// The SDK archive has no top-level folder, so the whole work directory becomes .tools/dotnet.
+async function installDotnet() {
+  const asset = pins.dotnet.assets[platform];
+  if (!asset) throw new Error(`dotnet: no pinned build for ${platform}`);
+  if (stampOk("dotnet", asset)) return;
+  const { work, file } = await download("dotnet", asset);
+  const target = join(dest, "dotnet");
+  const aside = join(dest, `tmp-dotnet-old-${process.pid}`);
+  try {
+    run(tar, ["-xf", file, "-C", work]);
+    rmSync(file);
+    if (existsSync(target)) renameSync(target, aside);
+    try {
+      renameSync(work, target);
+    } catch (err) {
+      if (existsSync(aside)) renameSync(aside, target);
+      throw err;
+    }
+    rmSync(aside, { recursive: true, force: true });
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  writeStamp("dotnet", asset);
+  console.log(`installed dotnet SDK ${pins.dotnet.version}`);
 }
 
 function installYamllint(python) {
@@ -117,6 +146,7 @@ try {
   await installNode();
   for (const name of ["shfmt", "shellcheck", "ec", "cyclonedx"]) await installBinary(name);
   installYamllint(python);
+  await installDotnet();
 } catch (err) {
   console.error(`install-tools: ${err.message}`);
   process.exit(1);
