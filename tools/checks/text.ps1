@@ -101,7 +101,9 @@ foreach ($entry in @(& git -c core.quotepath=off ls-files --eol)) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
   $bytes = [IO.File]::ReadAllBytes($path)
   if ($bytes.Length -eq 0) { continue }
-  if ($bytes[$bytes.Length - 1] -ne 10) { Write-Output "  ${f}: no final newline"; $bad++ }
+  # NuGet writes lock files without a final newline; they are committed exactly as written.
+  $lockFile = ($f -split '/')[-1] -ceq 'packages.lock.json'
+  if (-not $lockFile -and $bytes[$bytes.Length - 1] -ne 10) { Write-Output "  ${f}: no final newline"; $bad++ }
   try { [void]$utf8.GetString($bytes) }
   catch { Write-Output "  ${f}: not valid UTF-8"; $bad++ }
 }

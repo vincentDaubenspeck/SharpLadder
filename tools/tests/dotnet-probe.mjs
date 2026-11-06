@@ -4,7 +4,7 @@
 // Needs nuget.org. The lock file it generates is a test artefact, never a committed lock.
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { dotnet, env, exec, win } from "../checks/lib.mjs";
+import { ciEnv, dotnet, exec, localEnv, win } from "../checks/lib.mjs";
 
 const src = join(import.meta.dirname, "..", "..");
 const probe = join(resolve(process.argv[2] ?? "."), "probe");
@@ -15,6 +15,7 @@ const configFiles = [
   ".globalconfig",
   "BannedSymbols.txt",
   ".editorconfig",
+  "nuget.config",
 ];
 
 const analyzers = {
@@ -27,7 +28,16 @@ const analyzers = {
   "StyleCop.Analyzers": "1.3.171-beta",
 };
 // Central package management also lists every global reference as a package version.
-const packageVersions = { "xunit.analyzers": "2.2.0", ...analyzers };
+const packageVersions = {
+  "Microsoft.AspNetCore.Mvc.Testing": "10.0.14",
+  "Microsoft.Build.Locator": "1.11.2",
+  "Microsoft.CodeAnalysis.CSharp": "5.6.0",
+  "Microsoft.CodeAnalysis.CSharp.Workspaces": "5.6.0",
+  "Microsoft.CodeAnalysis.Workspaces.MSBuild": "5.6.0",
+  "xunit.analyzers": "2.2.0",
+  "xunit.v3": "4.0.2",
+  ...analyzers,
+};
 const properties = {
   Nullable: "enable",
   TreatWarningsAsErrors: "true",
@@ -61,26 +71,10 @@ function check(label, problems, detail = "") {
   failed++;
 }
 
-const localEnv = { ...env };
-for (const k of Object.keys(localEnv)) if (k.toUpperCase() === "GITHUB_ACTIONS") delete localEnv[k];
-const ciEnv = { ...localEnv, GITHUB_ACTIONS: "true" };
 const run = (args, ci) => exec(dotnet, args, { cwd: probe, env: ci ? ciEnv : localEnv });
 
 mkdirSync(probe, { recursive: true });
 for (const f of configFiles) copyFileSync(join(src, f), join(probe, f));
-writeFileSync(
-  join(probe, "nuget.config"),
-  [
-    '<?xml version="1.0" encoding="utf-8"?>',
-    "<configuration>",
-    "  <packageSources>",
-    "    <clear />",
-    '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />',
-    "  </packageSources>",
-    "</configuration>",
-    "",
-  ].join("\n"),
-);
 writeFileSync(
   join(probe, "SharpLadder.Probe.csproj"),
   [

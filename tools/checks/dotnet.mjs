@@ -75,7 +75,9 @@ function propsProblems(root) {
 
 export function dotnetChecks(root) {
   const sdk = sdkProblems(root);
-  report(name, sdk.length > 0 ? sdk : propsProblems(root));
+  const problems = sdk.length > 0 ? sdk : propsProblems(root);
+  report(name, problems);
+  return problems.length === 0;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

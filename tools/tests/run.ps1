@@ -3,14 +3,15 @@
 # Builds a throwaway git repository, installs the tracked hooks there and checks:
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
-#   c. CRLF line endings and a missing final newline fail the encoding check
+#   c. CRLF line endings and a missing final newline fail the encoding check; lock files are exempt
 #   d. tools/checks/text.ps1 and text.sh give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
 #   g. Licence allowlist cases, and a disallowed licence through check.ps1 and check.sh
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
+#   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
-# Part h needs the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts h and i need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
 
 $started = Get-Date
@@ -153,6 +154,20 @@ try {
   [void](Invoke-Program 'git' @('rm', '-q', '--cached', 'tail.txt'))
   Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'tail.txt')
 
+  # Only a file named exactly packages.lock.json may end without a newline.
+  New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'lock') | Out-Null
+  Write-Text 'lock/packages.lock.json' '{}'
+  [void](Invoke-Program 'git' @('add', 'lock/packages.lock.json'))
+  Test-Check 'lock file without a final newline' 0
+  Write-Text 'lock/other.lock.json' '{}'
+  [void](Invoke-Program 'git' @('add', 'lock/other.lock.json'))
+  Test-Check 'other name without a final newline' 1
+  if ($script:out -cmatch '(?m)^  lock/other\.lock\.json: no final newline$') {
+    Write-Pass 'text.ps1 exempts only packages.lock.json'
+  } else { Write-Fail 'text.ps1 exempts only packages.lock.json' }
+  [void](Invoke-Program 'git' @('rm', '-q', '-r', '--cached', 'lock'))
+  Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'lock') -Recurse
+
   # Shell and PowerShell report a named stage; ESLint reports by exit code.
   $fx = Join-Path -Path $tmp -ChildPath 'fx'
   if (-not $node) { Write-Fail 'suppression fixtures (no node)' }
@@ -160,6 +175,8 @@ try {
     $m = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/fixtures.mjs'), $fx)
     foreach ($line in ($m.Out -split "`r?`n" | Where-Object { $_ -ne '' })) {
       $lang, $want, $file, $label = $line -split "`t"
+      # The C# fixtures need a build; tools/tests/csharp-cases.mjs runs them.
+      if ($lang -eq 'cs') { continue }
       $dir = Join-Path -Path $fx -ChildPath $lang
       switch ($lang) {
         'js' {
@@ -199,7 +216,7 @@ try {
 
   New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web') | Out-Null
   Copy-FromSource @('tools/check.sh', 'tools/check.ps1', 'tools/checks/lib.mjs', 'tools/checks/run.mjs',
-    'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/ps-suppressions.ps1',
+    'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/csharp.mjs', 'tools/checks/ps-suppressions.ps1',
     'tools/checks/pssa.ps1', 'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc',
     'web/.licensee.json', 'global.json', 'Directory.Build.props', 'Directory.Packages.props')
   # An unavailable PSScriptAnalyzer version stands in for a missing module.
@@ -231,7 +248,8 @@ try {
   $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/check.ps1')
   foreach ($want in @('FAIL shell suppression reasons', '  web/node_modules not found; run npm ci in web/',
       $sdkPin, '  PSScriptAnalyzer 0.0.0 not found; install it with:',
-      '  web/x.sh:2: shellcheck directive needs a reason comment on the line above')) {
+      '  web/x.sh:2: shellcheck directive needs a reason comment on the line above',
+      '  needs .NET config (see above)', 'FAIL nuget vulnerabilities')) {
     $lines = $r.All -split "`n"
     if ($r.Code -ne 0 -and $lines -ccontains $want) { Write-Pass "check.ps1 exit $($r.Code) with: $want" }
     else { Write-Fail "check.ps1 exit $($r.Code) with: $want" }
@@ -308,6 +326,9 @@ try {
 
     Add-CaseLine 'dotnet probe' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/dotnet-probe.mjs'),
         (Join-Path -Path $tmp -ChildPath 'dn')) -dir $src)
+
+    Add-CaseLine 'C# cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/csharp-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'csharp')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

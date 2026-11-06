@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn and MSBuild are libraries here; their packages must not add build logic to this build. -->
+    <PackageReference Include="Microsoft.Build.Locator" ExcludeAssets="analyzers;build;buildTransitive" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" ExcludeAssets="analyzers;build;buildTransitive" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" ExcludeAssets="analyzers;build;buildTransitive" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" ExcludeAssets="analyzers;build;buildTransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpLadder.Policy.Tests" />
+  </ItemGroup>
+</Project>

@@ -138,10 +138,16 @@ while IFS= read -r line; do
   esac
   [ -f "$f" ] || continue
   [ -s "$f" ] || continue
-  if [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -ne 1 ]; then
-    echo "  $f: no final newline"
-    bad=$((bad + 1))
-  fi
+  # NuGet writes lock files without a final newline; they are committed exactly as written.
+  case "$f" in
+    packages.lock.json | */packages.lock.json) ;;
+    *)
+      if [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "  $f: no final newline"
+        bad=$((bad + 1))
+      fi
+      ;;
+  esac
   if ! valid_utf8 "$f"; then
     echo "  $f: not valid UTF-8"
     bad=$((bad + 1))

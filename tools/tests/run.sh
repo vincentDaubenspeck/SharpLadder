@@ -4,14 +4,15 @@
 # Builds a throwaway git repository, installs the tracked hooks there and checks:
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
-#   c. CRLF line endings and a missing final newline fail the encoding check
+#   c. CRLF line endings and a missing final newline fail the encoding check; lock files are exempt
 #   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
 #   g. Licence allowlist cases, and a disallowed licence through check.sh and check.ps1
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
+#   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
 # Usage: sh tools/tests/run.sh
-# Part h needs the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts h and i need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
 
 started=$(date +%s)
@@ -146,6 +147,21 @@ else
 fi
 git rm -q --cached tail.txt && rm tail.txt
 
+# Only a file named exactly packages.lock.json may end without a newline.
+mkdir lock
+printf '{}' > lock/packages.lock.json
+git add lock/packages.lock.json
+run_checks "lock file without a final newline" 0
+printf '{}' > lock/other.lock.json
+git add lock/other.lock.json
+run_checks "other name without a final newline" 1
+if grep -q '^  lock/other.lock.json: no final newline$' "$tmp/out.sh"; then
+  pass "text.sh exempts only packages.lock.json"
+else
+  fail "text.sh exempts only packages.lock.json"
+fi
+git rm -q -r --cached lock && rm -r lock
+
 # Shell and PowerShell report a named stage; ESLint reports by exit code.
 if [ -z "$node" ]; then
   fail "suppression fixtures (no node)"
@@ -153,6 +169,8 @@ else
   "$node" "$src/tools/tests/fixtures.mjs" "$tmp/fx" > "$tmp/manifest"
   tab=$(printf '\t')
   while IFS="$tab" read -r lang want file label; do
+    # The C# fixtures need a build; tools/tests/csharp-cases.mjs runs them.
+    if [ "$lang" = cs ]; then continue; fi
     got=fail
     case "$lang" in
       js)
@@ -216,7 +234,8 @@ fi
 mkdir -p "$repo/web"
 cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$repo/tools/"
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
-  "$src/tools/checks/dotnet.mjs" "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
+  "$src/tools/checks/dotnet.mjs" "$src/tools/checks/csharp.mjs" "$src/tools/checks/ps-suppressions.ps1" \
+  "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
 cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"
 cp "$src/global.json" "$src/Directory.Build.props" "$src/Directory.Packages.props" "$repo/"
@@ -253,7 +272,8 @@ sh tools/check.sh > "$tmp/out" 2>&1 || rc=$?
 for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run npm ci in web/' \
   '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403' \
   '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
-  '  web/x.sh:2: shellcheck directive needs a reason comment on the line above'; do
+  '  web/x.sh:2: shellcheck directive needs a reason comment on the line above' \
+  '  needs .NET config (see above)' 'FAIL nuget vulnerabilities'; do
   if [ "$rc" -ne 0 ] && grep -qxF "$want" "$tmp/out"; then
     pass "check.sh exit $rc with: $want"
   else
@@ -355,6 +375,10 @@ else
   rc=0
   "$node" "$src/tools/tests/dotnet-probe.mjs" "$tmp/dn" > "$tmp/out" 2>&1 || rc=$?
   count_lines "dotnet probe" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/csharp-cases.mjs" "$tmp/csharp" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "C# cases" "$rc" "$tmp/out"
 fi
 
 echo "$passed passed, $failed failed, $skipped skipped in $(($(date +%s) - started))s"

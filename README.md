@@ -61,9 +61,48 @@ and keeps it as a build artifact for 14 days.
 
 The .NET build settings live in `Directory.Build.props`, analyzer versions in
 `Directory.Packages.props` (central package management), rule severities in
-`.globalconfig` and banned APIs in `BannedSymbols.txt`. Until the first C#
-project exists, the check evaluates these files and the test suites build a
-throwaway probe project against them.
+`.globalconfig` and banned APIs in `BannedSymbols.txt`. The test suites also
+build a throwaway probe project against them.
+
+The solution is `SharpLadder.sln`: the API in `api/SharpLadder.Api` and its
+xUnit v3 tests in `api/SharpLadder.Api.Tests`, and the policy tool in
+`tools/SharpLadder.Policy` with its tests in `tools/SharpLadder.Policy.Tests`.
+`dotnet test` runs in
+Microsoft.Testing.Platform mode (the `test` entry in `global.json`):
+
+```sh
+dotnet build SharpLadder.sln
+dotnet test --solution SharpLadder.sln
+```
+
+Packages restore from nuget.org only (`nuget.config`). Each project's
+`packages.lock.json` is committed: after changing a version in
+`Directory.Packages.props`, restore normally and commit the updated lock files.
+CI restores in locked mode and fails if a lock file no longer matches. Lock
+files are committed exactly as NuGet writes them, without a final newline; the
+EditorConfig and text checks exempt that one file name.
+
+A malformed `Directory.Packages.props` fails every restore and build, but a
+restore or build outside CI also rewrites each `packages.lock.json` to an empty
+lock file; restore the lock files from Git after fixing the props file. The
+locked restore on CI leaves them untouched.
+
+Every rule lowered below warning in `.globalconfig` carries an
+`AnalyzerPolicy` record on the line directly above it:
+
+```text
+# AnalyzerPolicy <ID>: <reason> | Scope: <scope> | Guard: <guard> | Decision: <decision>
+```
+
+`AnalyzerPolicyGuardTests` fails on a lowered rule without a record and on a
+stale, duplicate, orphaned, misplaced or malformed record; severities never go
+in `.editorconfig`. Each `#pragma warning disable` names one ID, carries the
+same record as a trailing `//` comment and has a later `restore`; each
+`[SuppressMessage]` or `[UnconditionalSuppressMessage]` holds the record in its
+`Justification`. Code under `#if` must stay compiled. The full check runs the
+.NET build and tests, this suppression check (`C# suppression reasons`) and
+`nuget vulnerabilities`, which fails on any moderate, high or critical advisory
+for a direct or transitive package, and on a report it cannot read.
 
 OpenSSF Scorecard runs weekly and on every push to `main`.
 

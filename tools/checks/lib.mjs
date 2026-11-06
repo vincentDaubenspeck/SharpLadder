@@ -85,3 +85,8 @@ export function gitFiles(root, patterns) {
   if (r.code !== 0) throw new Error(`git ls-files failed: ${r.out}`);
   return r.out.split("\0").filter((f) => f !== "");
 }
+
+// Locked restore and the CI build properties follow GITHUB_ACTIONS, so both modes are explicit.
+export const localEnv = { ...env };
+for (const k of Object.keys(localEnv)) if (k.toUpperCase() === "GITHUB_ACTIONS") delete localEnv[k];
+export const ciEnv = { ...localEnv, GITHUB_ACTIONS: "true" };

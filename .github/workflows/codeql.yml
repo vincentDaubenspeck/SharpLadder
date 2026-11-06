@@ -16,19 +16,65 @@ concurrency:
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       actions: read # CodeQL reads the workflow run it reports against.
       contents: read # Checkout only.
       security-events: write # Uploads the results to code scanning.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: csharp
+            build-mode: manual
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      # The pinned SDK must be on PATH before init, or the extractor downloads one unverified.
+      - name: Install pinned tools (checksum verified)
+        if: matrix.language == 'csharp'
+        shell: bash
+        run: |
+          node tools/install-tools.mjs
+          printf '%s\n' "$GITHUB_WORKSPACE/.tools/dotnet" >> "$GITHUB_PATH"
+          printf 'DOTNET_ROOT=%s\n' "$GITHUB_WORKSPACE/.tools/dotnet" >> "$GITHUB_ENV"
+      - name: Prove the pinned SDK is the one in use
+        if: matrix.language == 'csharp'
+        shell: bash
+        run: |
+          found=$(command -v dotnet)
+          echo "dotnet: $found"
+          case "$found" in
+            "$GITHUB_WORKSPACE/.tools/dotnet/"*) ;;
+            *) echo "dotnet does not resolve to the pinned SDK" >&2; exit 1 ;;
+          esac
+          version=$(dotnet --version)
+          want=$(node -p 'require("./global.json").sdk.version')
+          echo "SDK $version, pinned $want"
+          [ "$version" = "$want" ]
+      - id: init
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
-          languages: javascript-typescript
-          build-mode: none
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - name: Build the solution
+        if: matrix.language == 'csharp'
+        run: dotnet build SharpLadder.sln -nologo
+      - name: Prove C# was extracted
+        if: matrix.language == 'csharp'
+        shell: bash
+        env:
+          CODEQL: ${{ steps.init.outputs.codeql-path }}
+        run: |
+          baseline=$("$CODEQL" database print-baseline "$RUNNER_TEMP/codeql_databases/csharp")
+          echo "$baseline"
+          if ! printf '%s\n' "$baseline" | grep -Eq '[1-9][0-9]* lines of code'; then
+            echo "no C# lines extracted" >&2
+            exit 1
+          fi
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
-          category: /language:javascript-typescript
+          category: /language:${{ matrix.language }}

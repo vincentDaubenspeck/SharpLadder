@@ -1,3 +1,5 @@
+advisoryurl
+analyzerpolicy
 cgrep
 cyclonedx
 Daubenspeck
@@ -6,6 +8,7 @@ esac
 extensionless
 globalconfig
 gnueabihf
+healthz
 LASTEXITCODE
 lightningcss
 Meziantou
@@ -16,6 +19,7 @@ nologo
 norc
 NOSYSTEM
 ntwo
+Newtonsoft
 nvmrc
 OPTOUT
 ossf
@@ -32,6 +36,7 @@ sarif
 SharpLadder
 ShellCheck
 shfmt
+slnx
 SYSLIB
 toplevel
 venv
