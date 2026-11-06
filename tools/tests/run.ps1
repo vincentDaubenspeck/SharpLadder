@@ -7,8 +7,9 @@
 #   d. tools/checks/text.ps1 and text.sh give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
+#   g. Licence allowlist cases, and a disallowed licence through check.ps1 and check.sh
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
-# Parts d and f need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
 
 $started = Get-Date
@@ -173,10 +174,17 @@ try {
             (Join-Path -Path $src -ChildPath 'tools/checks/ps-suppressions.ps1'), $file) -dir $dir
           $got = if ($r.Code -eq 0) { 'pass' } else { 'fail' }
         }
+        'lic' {
+          $r = Invoke-Program $node @((Join-Path -Path $src -ChildPath 'web/license-check.js')) -dir (Join-Path -Path $dir -ChildPath $file)
+          $got = if ($r.Code -eq 0) { 'pass' } else { 'fail' }
+        }
       }
       if ($got -eq $want) { Write-Pass "$lang ${want}: $label" }
       else { Write-Fail "$lang ${want}: $label (got $got)"; Write-Output $r.All }
     }
+    $r = Invoke-Program $node @('license-check.js') -dir (Join-Path -Path $src -ChildPath 'web')
+    if ($r.Code -eq 0) { Write-Pass 'lic pass: current tree' }
+    else { Write-Fail 'lic pass: current tree'; Write-Output $r.All }
     foreach ($case in @(@('pass', 'good.ps1'), @('fail', 'missing.ps1'))) {
       $want, $file = $case
       $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
@@ -191,7 +199,7 @@ try {
   New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web') | Out-Null
   Copy-FromSource @('tools/check.sh', 'tools/check.ps1', 'tools/checks/lib.mjs', 'tools/checks/run.mjs',
     'tools/checks/shell.mjs', 'tools/checks/ps-suppressions.ps1', 'tools/checks/pssa.ps1',
-    'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc')
+    'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc', 'web/.licensee.json')
   # An unavailable PSScriptAnalyzer version stands in for a missing module.
   $pins = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'tools/tool-pins.json'))
   Write-Text 'tools/tool-pins.json' ($pins -replace '"version": "1\.25\.0"', '"version": "0.0.0"')
@@ -229,6 +237,24 @@ try {
     if ($h.Code -ne 0 -and $h.All -cmatch '(?m)^pre-push: tools/check\.sh failed; push blocked$') {
       Write-Pass "pre-push blocks on a failed check (exit $($h.Code))"
     } else { Write-Fail "pre-push blocks on a failed check (exit $($h.Code))" }
+  }
+
+  # With web/node_modules present the web stages run, so a disallowed licence reaches both entry points.
+  if ($node) {
+    Copy-Item -Path (Join-Path -Path $fx -ChildPath 'prop/*') -Destination $repo -Recurse -Force
+    $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/check.ps1')
+    $lines = $r.All -split "`n"
+    if ($r.Code -ne 0 -and $lines -ccontains 'FAIL licence allowlist' -and $lines -ccontains '  fx-gpl@1.0.0') {
+      Write-Pass "check.ps1 fails a disallowed licence (exit $($r.Code))"
+    } else { Write-Fail "check.ps1 fails a disallowed licence (exit $($r.Code))"; Write-Output $r.All }
+    if (-not $sh) { Write-NoSh 'check.sh fails a disallowed licence' }
+    else {
+      $s = Invoke-Program $sh @('tools/check.sh')
+      $lines = $s.All -split "`n"
+      if ($s.Code -ne 0 -and $lines -ccontains 'FAIL licence allowlist' -and $lines -ccontains '  fx-gpl@1.0.0') {
+        Write-Pass "check.sh fails a disallowed licence (exit $($s.Code))"
+      } else { Write-Fail "check.sh fails a disallowed licence (exit $($s.Code))"; Write-Output $s.All }
+    }
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

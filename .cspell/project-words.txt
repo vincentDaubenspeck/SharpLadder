@@ -1,13 +1,19 @@
 cgrep
+cyclonedx
 Daubenspeck
+docopt
 esac
 extensionless
+gnueabihf
 LASTEXITCODE
+lightningcss
 mktemp
+msvc
 norc
 NOSYSTEM
 ntwo
 nvmrc
+ossf
 pathspec
 pipefail
 pscustomobject
@@ -16,6 +22,7 @@ PSScriptAnalyzer
 pyyaml
 quotepath
 rsuser
+sarif
 SharpLadder
 ShellCheck
 shfmt

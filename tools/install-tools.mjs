@@ -115,7 +115,7 @@ const python = pyFlag > 0 ? process.argv[pyFlag + 1] : win ? "python" : "python3
 mkdirSync(bin, { recursive: true });
 try {
   await installNode();
-  for (const name of ["shfmt", "shellcheck", "ec"]) await installBinary(name);
+  for (const name of ["shfmt", "shellcheck", "ec", "cyclonedx"]) await installBinary(name);
   installYamllint(python);
 } catch (err) {
   console.error(`install-tools: ${err.message}`);

@@ -76,6 +76,23 @@
       }
     }
   },
+  "cyclonedx": {
+    "version": "0.33.1",
+    "assets": {
+      "linux-x64": {
+        "url": "https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-linux-x64",
+        "sha256": "bfc8b2538da86fe239bc53658bbb63c1c8c510a293c1e6891aa5bea5d3c58746"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-osx-arm64",
+        "sha256": "750c148780154833f6401f9067d08c5a4c31567b6ee3c26c062c3a95c62d741c"
+      },
+      "win32-x64": {
+        "url": "https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-win-x64.exe",
+        "sha256": "9b360974c41a5d612eb026fb5e3bb1fa28e08865f7a4f915665b8bc94bd3bc31"
+      }
+    }
+  },
   "yamllint": {
     "version": "1.38.0",
     "requirements": "tools/requirements-yamllint.txt"

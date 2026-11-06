@@ -34,10 +34,11 @@ digests in `tools/tool-pins.json`):
 - PowerShell with PSScriptAnalyzer 1.25.0
   (`Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`)
 
-`node tools/install-tools.mjs` downloads Node, shfmt, editorconfig-checker and
-ShellCheck into `.tools/`, verifies each against its pinned digest, and sets up
-yamllint in `.tools/venv`. yamllint (GPL-3.0-or-later) and its dependency
-pathspec (MPL-2.0) are development tools only; nothing from them ships.
+`node tools/install-tools.mjs` downloads Node, shfmt, editorconfig-checker,
+ShellCheck and the CycloneDX CLI 0.33.1 into `.tools/`, verifies each against
+its pinned digest, and sets up yamllint in `.tools/venv`. yamllint
+(GPL-3.0-or-later) and its dependency pathspec (MPL-2.0) are development tools
+only; nothing from them ships.
 
 Run every check with one command:
 
@@ -47,6 +48,17 @@ sh tools/check.sh
 
 (`powershell -File tools/check.ps1` on Windows runs the same checks.) A
 missing or wrong-version tool fails the check with install guidance.
+
+The licence allowlist check (`npm run license:check` in `web/`, also part of
+the full check) runs licensee over every installed package, development
+dependencies included, and fails on any licence outside the allowlist in
+`web/.licensee.json`. Exceptions are listed there by exact version under
+`packages`, each with a one-line reason under `reasons`; the check fails on an
+exception without a reason or a reason without an exception. CI also produces a
+CycloneDX SBOM of the full npm inventory, validates it with the CycloneDX CLI
+and keeps it as a build artifact for 14 days.
+
+OpenSSF Scorecard runs weekly and on every push to `main`.
 
 ## Licence
 

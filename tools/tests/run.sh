@@ -8,8 +8,9 @@
 #   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
+#   g. Licence allowlist cases, and a disallowed licence through check.sh and check.ps1
 # Usage: sh tools/tests/run.sh
-# Parts d to f need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
 
 started=$(date +%s)
@@ -162,6 +163,11 @@ else
         (cd "$tmp/fx/sh" && "$node" "$src/tools/checks/shell.mjs" "$file") > "$tmp/fx.out" 2>&1 || :
         if grep -q '^PASS shell suppression reasons$' "$tmp/fx.out"; then got=pass; fi
         ;;
+      lic)
+        if (cd "$tmp/fx/lic/$file" && "$node" "$src/web/license-check.js") > "$tmp/fx.out" 2>&1; then
+          got=pass
+        fi
+        ;;
       ps)
         if [ -z "$ps" ]; then
           no_ps "$lang $want: $label"
@@ -180,6 +186,12 @@ else
       cat "$tmp/fx.out"
     fi
   done < "$tmp/manifest"
+  if (cd "$src/web" && "$node" license-check.js) > "$tmp/fx.out" 2>&1; then
+    pass "lic pass: current tree"
+  else
+    fail "lic pass: current tree"
+    cat "$tmp/fx.out"
+  fi
   if [ -z "$ps" ]; then
     no_ps "ps: absolute paths"
   else
@@ -205,7 +217,7 @@ cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$re
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
   "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
-cp "$src/web/package.json" "$src/web/.nvmrc" "$repo/web/"
+cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"
 # An unavailable PSScriptAnalyzer version stands in for a missing module.
 sed -e 's/"version": "1\.25\.0"/"version": "0.0.0"/' "$src/tools/tool-pins.json" > "$repo/tools/tool-pins.json"
 cp "$tmp/fx/sh/missing.sh" "$repo/bad.sh"
@@ -251,6 +263,33 @@ else
     pass "check.ps1 propagates a failure (exit $rc)"
   else
     fail "check.ps1 propagates a failure (exit $rc)"
+  fi
+fi
+
+# With web/node_modules present the web stages run, so a disallowed licence reaches both entry points.
+if [ -n "$node" ]; then
+  cp -R "$tmp/fx/prop/." "$repo/"
+  rc=0
+  sh tools/check.sh > "$tmp/out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ] && grep -qxF 'FAIL licence allowlist' "$tmp/out" && grep -qxF '  fx-gpl@1.0.0' "$tmp/out"; then
+    pass "check.sh fails a disallowed licence (exit $rc)"
+  else
+    fail "check.sh fails a disallowed licence (exit $rc)"
+    cat "$tmp/out"
+  fi
+  if [ -z "$ps" ]; then
+    no_ps "check.ps1 fails a disallowed licence"
+  else
+    rc=0
+    "$ps" -NoProfile -ExecutionPolicy Bypass -File tools/check.ps1 > "$tmp/out" 2>&1 || rc=$?
+    tr -d '\r' < "$tmp/out" > "$tmp/out.lf"
+    if [ "$rc" -ne 0 ] && grep -qxF 'FAIL licence allowlist' "$tmp/out.lf" &&
+      grep -qxF '  fx-gpl@1.0.0' "$tmp/out.lf"; then
+      pass "check.ps1 fails a disallowed licence (exit $rc)"
+    else
+      fail "check.ps1 fails a disallowed licence (exit $rc)"
+      cat "$tmp/out.lf"
+    fi
   fi
 fi
 

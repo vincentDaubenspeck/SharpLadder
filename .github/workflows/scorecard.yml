@@ -1,0 +1,36 @@
+name: scorecard
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "41 4 * * 2"
+  workflow_dispatch:
+
+# The published-results API rejects workflows with write permissions at this level.
+permissions: read-all
+
+concurrency:
+  group: scorecard-${{ github.ref }}
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read # Scorecard reads workflow runs.
+      contents: read # Checkout only.
+      id-token: write # Signs the results published to the Scorecard API.
+      security-events: write # Uploads the results to code scanning.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: results.sarif

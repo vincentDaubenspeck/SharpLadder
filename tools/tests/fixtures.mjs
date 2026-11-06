@@ -3,6 +3,7 @@
 // Directive text is assembled here so no tracked file carries a live directive.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const dir = process.argv[2];
 const cases = [];
@@ -130,5 +131,46 @@ for (const [file, label, prefix, name] of [
 ]) {
   add("ps", "pass", file, `not the framework attribute: ${label}`, prefix + ps(`[${name}()]`));
 }
+
+// Licence allowlist, through web/license-check.js run in each case directory.
+function pkg(dir, name, license) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify({ name, version: "1.0.0", license })}\n`);
+}
+function lic(want, file, label, installed, packages, reasons) {
+  const d = join(dir, "lic", file);
+  pkg(d, `case-${file}`, "MIT");
+  pkg(join(d, "node_modules", installed[0]), installed[0], installed[1]);
+  const config = { licenses: { spdx: ["MIT"] }, packages, reasons };
+  writeFileSync(join(d, ".licensee.json"), `${JSON.stringify(config, null, 2)}\n`);
+  cases.push(["lic", want, file, label].join("\t"));
+}
+const gpl = ["fx-gpl", "MIT AND GPL-3.0-only"];
+const why1 = { "fx-gpl@1.0.0": "Test fixture; not shipped." };
+lic("pass", "approved", "allowed licence", ["fx-mit", "MIT"], {}, {});
+lic("fail", "disallowed", "disallowed licence", gpl, {}, {});
+lic("pass", "excepted", "exception with a reason", gpl, { "fx-gpl": "1.0.0" }, why1);
+lic("fail", "no-reason", "exception without a reason", gpl, { "fx-gpl": "1.0.0" }, {});
+lic("fail", "blank-reason", "blank reason", gpl, { "fx-gpl": "1.0.0" }, { "fx-gpl@1.0.0": " " });
+for (const [file, label, end] of [
+  ["lf-reason", "multi-line reason (LF)", "\n"],
+  ["cr-reason", "multi-line reason (CR)", "\r"],
+]) {
+  lic("fail", file, label, gpl, { "fx-gpl": "1.0.0" }, { "fx-gpl@1.0.0": `First line.${end}Second line.` });
+}
+lic("fail", "orphan", "reason without an exception", ["fx-mit", "MIT"], {}, why1);
+lic("fail", "other-version", "exception for another version", gpl, { "fx-gpl": "2.0.0" }, {
+  "fx-gpl@2.0.0": "Test fixture; not shipped.",
+});
+lic("fail", "range", "exception for a version range", gpl, { "fx-gpl": "^1.0.0" }, {
+  "fx-gpl@^1.0.0": "Test fixture; not shipped.",
+});
+
+// Files for web/ in the propagation repository: a disallowed package, and a script that defers
+// to the tracked one, because licensee is installed only beside the tracked script.
+const prop = join(dir, "prop", "web");
+pkg(join(prop, "node_modules", gpl[0]), gpl[0], gpl[1]);
+const script = pathToFileURL(join(import.meta.dirname, "..", "..", "web", "license-check.js"));
+writeFileSync(join(prop, "license-check.js"), `import ${JSON.stringify(script.href)};\n`);
 
 console.log(cases.join("\n"));
