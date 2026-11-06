@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Repository checks
         run: |
           command -v iconv
@@ -34,6 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Install Gitleaks (checksum verified)
         run: |
           set -eu
@@ -55,6 +58,8 @@ jobs:
       SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install ShellCheck (checksum verified)
         run: |
           set -eu
@@ -76,6 +81,8 @@ jobs:
       PSSA_VERSION: 1.25.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install PSScriptAnalyzer (exact version)
         shell: pwsh
         run: |
@@ -99,6 +106,8 @@ jobs:
       REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Hook and check tests (sh, parity with pwsh)
         run: sh tools/tests/run.sh
 
@@ -109,5 +118,92 @@ jobs:
       REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Hook and check tests (Windows PowerShell, parity with sh)
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
+
+  workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      ZIZMOR_VERSION: 1.32.0
+      ZIZMOR_SHA256: bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install actionlint (checksum verified)
+        run: |
+          set -eu
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          file="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$file" "$base/$file"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - name: Install zizmor (checksum verified)
+        run: |
+          set -eu
+          base="https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}"
+          file="zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$file" "$base/$file"
+          echo "${ZIZMOR_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/zizmor"
+          tar -xzf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP/zizmor"
+          echo "$RUNNER_TEMP/zizmor" >> "$GITHUB_PATH"
+      - name: actionlint
+        run: |
+          actionlint -version
+          actionlint .github/workflows/*.yml
+      - name: zizmor (offline)
+        run: |
+          zizmor --version
+          zizmor --offline .github/workflows/
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Update both with web/.nvmrc; the install step fails on a mismatch.
+      NODE_HASH_VERSION: 26.13.0
+      NODE_SHA256: d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Node (checksum verified)
+        # A pinned digest checked before extraction, which setup-node does not do.
+        run: |
+          set -eu
+          ver=$(cat .nvmrc)
+          [ "$ver" = "$NODE_HASH_VERSION" ]
+          file="node-v${ver}-linux-x64.tar.xz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$file" "https://nodejs.org/dist/v${ver}/$file"
+          echo "${NODE_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/node-v${ver}-linux-x64/bin" >> "$GITHUB_PATH"
+      - name: Check Node and npm match the pins
+        run: |
+          set -eu
+          node_pin=$(cat .nvmrc)
+          npm_pin=$(node -p 'require("./package.json").packageManager.replace(/^npm@/, "")')
+          echo "node $(node --version) (pin v$node_pin), npm $(npm --version) (pin $npm_pin)"
+          [ "$(node --version)" = "v$node_pin" ]
+          [ "$(npm --version)" = "$npm_pin" ]
+      - run: npm ci
+      - run: npm run lint:lockfile
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run lint:md
+      - run: npm run lint:spell
+      - run: npm run audit

@@ -1,6 +1,7 @@
 # SharpLadder
 
-A C# study site for fundamentals, reference and practice problems, with hints for when you get stuck mid-problem.
+A C# study site for fundamentals, reference and practice problems, with hints
+for when you get stuck mid-problem.
 
 ## Status
 
@@ -20,6 +21,12 @@ git config core.hooksPath tools/hooks
 
 Run the repository checks with `sh tools/check.sh` (or
 `powershell -File tools/check.ps1` on Windows).
+
+## Development
+
+The web app lives in `web/`. Use the Node version in `web/.nvmrc`, then run
+`npm ci` and `npm run dev` inside `web/`; `package.json` lists the lint, test,
+build and audit scripts that CI runs.
 
 ## Licence
 
