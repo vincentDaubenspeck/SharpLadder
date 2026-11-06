@@ -13,7 +13,7 @@ if (args.Length == 0)
 var problems = tracked is null ? ["git ls-files failed"] : PinnedSdk.Register(solution);
 if (problems.Count == 0)
 {
-    problems = await SuppressionCheck.RunAsync(solution, tracked!).ConfigureAwait(false);
+    problems = await SuppressionCheck.RunAsync(Environment.ProcessPath!, solution, tracked!).ConfigureAwait(false);
 }
 
 foreach (var problem in problems)

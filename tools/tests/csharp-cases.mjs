@@ -4,7 +4,7 @@
 // Needs the pinned .NET SDK and nuget.org.
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { vulnerabilityProblems } from "../checks/csharp.mjs";
+import { restoreSolution, vulnerabilityProblems } from "../checks/csharp.mjs";
 import { dotnet, env, exec, localEnv } from "../checks/lib.mjs";
 
 const src = join(import.meta.dirname, "..", "..");
@@ -59,7 +59,52 @@ check(
   broken.code !== 0 && broken.out.includes("project load failed: ") && lines(broken.out).includes(`FAIL ${stage}`),
   broken.out,
 );
-const tracked = exec(dotnet, [dll], { cwd: src });
+// A project's restore state, in a solution whose tracked files the tool must account for.
+const rs = join(work, "restore-state");
+mkdirSync(join(rs, "Fx"), { recursive: true });
+for (const f of ["global.json", "nuget.config"]) copyFileSync(join(src, f), join(rs, f));
+writeFileSync(
+  join(rs, "Fx", "SharpLadder.Fx.csproj"),
+  `<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n` +
+    `  </PropertyGroup>\n</Project>\n`,
+);
+writeFileSync(join(rs, "Fx", "Good.cs"), "namespace Fx;\n\ninternal static class Good\n{\n}\n");
+const rsSetup = [
+  exec("git", ["init", "-q"], { cwd: rs }),
+  exec(dotnet, ["new", "sln", "-n", "SharpLadder", "--format", "sln"], { cwd: rs, env: localEnv }),
+  exec(dotnet, ["sln", "SharpLadder.sln", "add", "Fx/SharpLadder.Fx.csproj"], { cwd: rs, env: localEnv }),
+  exec("git", ["add", "-A"], { cwd: rs }),
+];
+check("restore-state fixture created", rsSetup.every((r) => r.code === 0), rsSetup.map((r) => r.out).join("\n"));
+const noAssets = exec(dotnet, [dll], { cwd: rs });
+check(
+  "cs fail: project that is not restored",
+  noAssets.code !== 0 &&
+    lines(noAssets.out).includes("  Fx/SharpLadder.Fx.csproj: not restored; run dotnet restore") &&
+    lines(noAssets.out).includes(`FAIL ${stage}`) &&
+    !/does not compile|in no project/.test(noAssets.out),
+  noAssets.out,
+);
+const rsRestore = exec(dotnet, ["restore", "SharpLadder.sln", "-nologo"], { cwd: rs, env: localEnv });
+check("restore-state fixture restores", rsRestore.code === 0, rsRestore.out);
+const restored = exec(dotnet, [dll], { cwd: rs });
+check("cs pass: restored project", restored.code === 0 && lines(restored.out).includes(`PASS ${stage}`), restored.out);
+writeFileSync(join(rs, "Fx", "Broken.cs"), "namespace Fx;\n\ninternal static class Broken\n{\n    private static Missing? unused;\n}\n");
+const addBroken = exec("git", ["add", "Fx/Broken.cs"], { cwd: rs });
+check("restore-state compile failure added", addBroken.code === 0, addBroken.out);
+const noCompile = exec(dotnet, [dll], { cwd: rs });
+check(
+  "cs fail: restored project that does not compile",
+  noCompile.code !== 0 &&
+    /^ {2}Fx\/Broken\.cs:5: does not compile: CS0246 /m.test(noCompile.out) &&
+    !noCompile.out.includes("not restored"),
+  noCompile.out,
+);
+// The tool only reads a prepared tree, so the solution is restored first, as the check's build does.
+const solutionRestore = restoreSolution(src);
+check("solution restores", solutionRestore.code === 0, solutionRestore.out);
+const tracked =
+  solutionRestore.code === 0 ? exec(dotnet, [dll], { cwd: src }) : { code: null, out: "needs the solution restore (see above)" };
 check("cs pass: tracked C# files", tracked.code === 0 && lines(tracked.out).includes(`PASS ${stage}`), tracked.out);
 
 // The report reader, on reports the scan could produce.

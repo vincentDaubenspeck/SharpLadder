@@ -92,6 +92,9 @@ export function vulnerabilityProblems(code, out, projects) {
   return [...shape.map((s) => `vulnerability report: ${s}`), ...problems];
 }
 
+// Locked restore as CI runs it, so a lock file that does not match fails here.
+export const restoreSolution = (root) => exec(dotnet, ["restore", solution, "-nologo"], { cwd: root, env: ciEnv });
+
 export function nugetVulnerabilities(root) {
   const run = (args) => exec(dotnet, args, { cwd: root, env: ciEnv });
   const list = exec(dotnet, ["sln", solution, "list"], { cwd: root });
@@ -102,7 +105,7 @@ export function nugetVulnerabilities(root) {
     .filter((l) => /\.csproj$/i.test(l))
     .map((l) => resolve(root, l));
   if (projects.length === 0) return [`${solution} lists no projects`];
-  const restore = run(["restore", solution, "-nologo"]);
+  const restore = restoreSolution(root);
   if (restore.code !== 0) return ["locked restore failed", restore.out];
   const scan = run([
     "list",

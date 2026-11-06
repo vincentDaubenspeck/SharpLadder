@@ -19,7 +19,7 @@ internal static class SuppressionCheck
         "System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessageAttribute",
     ];
 
-    internal static async Task<IReadOnlyList<string>> RunAsync(string solutionPath, IReadOnlyList<string> tracked)
+    internal static async Task<IReadOnlyList<string>> RunAsync(string host, string solutionPath, IReadOnlyList<string> tracked)
     {
         var root = Path.GetDirectoryName(solutionPath)!;
         var problems = new List<string>();
@@ -50,9 +50,18 @@ internal static class SuppressionCheck
         }
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var restore = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var project in solution.Projects)
         {
             var name = Relative(root, project.FilePath ?? project.Name);
+            if (Unrestored(host, project, name, restore) is { } unrestored)
+            {
+                // Its files belong to a project, so they fail through this line, not as unseen.
+                problems.Add(unrestored);
+                seen.UnionWith(project.Documents.Select(d => d.FilePath).OfType<string>().Select(Path.GetFullPath));
+                continue;
+            }
+
             if (await project.GetCompilationAsync().ConfigureAwait(false) is not CSharpCompilation compilation)
             {
                 problems.Add(name + ": no C# compilation");
@@ -67,6 +76,23 @@ internal static class SuppressionCheck
             .Where(t => !seen.Contains(Path.GetFullPath(Path.Combine(root, t))))
             .Select(t => t + ": in no project of " + Path.GetFileName(solutionPath) + "; the check cannot read it"));
         return problems.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    // Each target framework is its own project, so one project file is evaluated once.
+    private static string? Unrestored(string host, Project project, string name, Dictionary<string, string?> restore)
+    {
+        if (project.FilePath is not { } file)
+        {
+            return null;
+        }
+
+        if (!restore.TryGetValue(file, out var problem))
+        {
+            problem = ProjectAssets.Problem(name, ProjectAssets.Evaluate(host, file), File.Exists);
+            restore[file] = problem;
+        }
+
+        return problem;
     }
 
     private static void Scan(
