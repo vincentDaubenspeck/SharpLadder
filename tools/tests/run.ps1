@@ -10,6 +10,7 @@
 #   g. Licence allowlist and override record cases, and a disallowed licence through check.ps1 and check.sh
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
+#   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 # Parts h and i need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
@@ -336,6 +337,12 @@ try {
 
     Add-CaseLine 'C# cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/csharp-cases.mjs'),
         (Join-Path -Path $tmp -ChildPath 'csharp')) -dir $src)
+  }
+
+  if (-not $node) { Write-Fail 'npm audit cases (no node)' }
+  else {
+    Add-CaseLine 'npm audit cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/npm-audit-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'audit')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

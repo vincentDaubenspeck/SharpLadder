@@ -11,6 +11,7 @@
 #   g. Licence allowlist and override record cases, and a disallowed licence through check.sh and check.ps1
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
+#   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
 # Usage: sh tools/tests/run.sh
 # Parts h and i need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
@@ -390,6 +391,14 @@ else
   rc=0
   "$node" "$src/tools/tests/csharp-cases.mjs" "$tmp/csharp" > "$tmp/out" 2>&1 || rc=$?
   count_lines "C# cases" "$rc" "$tmp/out"
+fi
+
+if [ -z "$node" ]; then
+  fail "npm audit cases (no node)"
+else
+  rc=0
+  "$node" "$src/tools/tests/npm-audit-cases.mjs" "$tmp/audit" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "npm audit cases" "$rc" "$tmp/out"
 fi
 
 echo "$passed passed, $failed failed, $skipped skipped in $(($(date +%s) - started))s"

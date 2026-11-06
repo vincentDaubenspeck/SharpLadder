@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "audit": "npm audit --audit-level=moderate",
+    "audit": "npm audit --audit-level=low",
     "lint:lockfile": "lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity",
     "lint:md": "cd .. && markdownlint-cli2",
     "lint:spell": "cd .. && git ls-files | cspell --no-progress --no-must-find-files --file-list stdin",

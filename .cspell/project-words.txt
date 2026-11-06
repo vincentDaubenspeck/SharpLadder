@@ -41,6 +41,7 @@ shfmt
 slnx
 SYSLIB
 toplevel
+userconfig
 venv
 Vite
 xunit

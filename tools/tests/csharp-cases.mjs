@@ -129,7 +129,7 @@ const withVulnerabilities = (vulnerabilities) =>
   });
 for (const [label, code, out, want] of [
   ["clean report passes", 0, reportOf({}), null],
-  ["low advisory passes", 0, withPackages("topLevelPackages", "Low"), null],
+  ["low advisory fails", 0, withPackages("topLevelPackages", "Low"), "Fx.Package 1.0.0 Low"],
   ["moderate top-level advisory fails", 0, withPackages("topLevelPackages", "Moderate"), "Fx.Package 1.0.0 Moderate"],
   ["high transitive advisory fails", 0, withPackages("transitivePackages", "High"), "Fx.Package 1.0.0 High"],
   ["critical advisory fails", 0, withPackages("topLevelPackages", "Critical"), "Fx.Package 1.0.0 Critical"],

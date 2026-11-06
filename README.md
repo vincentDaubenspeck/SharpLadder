@@ -101,7 +101,7 @@ same record as a trailing `//` comment and has a later `restore`; each
 `[SuppressMessage]` or `[UnconditionalSuppressMessage]` holds the record in its
 `Justification`. Code under `#if` must stay compiled. The full check runs the
 .NET build and tests, this suppression check (`C# suppression reasons`) and
-`nuget vulnerabilities`, which fails on any moderate, high or critical advisory
+`nuget vulnerabilities`, which fails on any advisory of any severity
 for a direct or transitive package, and on a report it cannot read.
 
 OpenSSF Scorecard runs weekly and on every push to `main`.

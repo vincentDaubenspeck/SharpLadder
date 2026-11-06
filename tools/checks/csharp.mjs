@@ -80,7 +80,7 @@ export function vulnerabilityProblems(code, out, projects) {
           if (!complete) continue;
           if (!severities.has(v.severity)) {
             shape.push(`${vAt}.severity ${JSON.stringify(v.severity)} is not one of ${[...severities].join(", ")}`);
-          } else if (v.severity !== "Low") {
+          } else {
             problems.push(
               `${project.path} ${fw.framework}: ${pkg.id} ${pkg.resolvedVersion} ${v.severity} ${v.advisoryurl}`,
             );
