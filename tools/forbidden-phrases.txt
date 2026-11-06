@@ -1,0 +1,12 @@
+# Repository text validation patterns.
+# Lines starting with # are comments.
+# Plain lines match substrings, ignoring case.
+# ~ prefixes whole-word matches, ignoring case.
+# = prefixes case-sensitive whole-word matches.
+# Word boundaries are ASCII: any character outside A-Z, a-z, 0-9 and _ ends a word.
+~TODO
+~FIXME
+~XXX
+~HACK
+lorem ipsum
+~placeholder

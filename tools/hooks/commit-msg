@@ -1,0 +1,95 @@
+#!/bin/sh
+# commit-msg hook: enforces the repository's commit message rule.
+# Usage: commit-msg <message-file>   (also called by tools/check.sh)
+#
+# Rule: one printable ASCII subject, 20 to 72 characters, without a final period.
+set -eu
+(set -o pipefail) 2>/dev/null && set -o pipefail
+LC_ALL=C
+export LC_ALL
+
+fail() {
+  echo "commit-msg: $1" >&2
+  exit 1
+}
+
+# Run grep; exit 0 (match) and 1 (no match) are results, 2 or more is an error.
+grep_rc() {
+  rc=0
+  grep "$@" || rc=$?
+  [ "$rc" -le 1 ] || fail "grep error (exit $rc)"
+  return "$rc"
+}
+
+msg_file=${1:-}
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+  fail "message file not found"
+fi
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root=.
+phrases="$root/tools/forbidden-phrases.txt"
+[ -f "$phrases" ] && [ -r "$phrases" ] ||
+  fail "tools/forbidden-phrases.txt is missing or unreadable"
+
+# Strip one carriage return at end of line only, then drop comment lines and
+# blank lines. A carriage return anywhere else stays and is rejected below.
+# Command substitution would drop NUL bytes silently, so check the raw file first.
+size=$(wc -c < "$msg_file" | tr -d ' ')
+size_no_nul=$(tr -d '\000' < "$msg_file" | wc -c | tr -d ' ')
+[ "$size" -eq "$size_no_nul" ] || fail "message must not contain control characters"
+
+cr=$(printf '\r')
+lines=$(sed -e "s/$cr\$//" < "$msg_file" | sed -e '/^#/d' -e '/^[[:space:]]*$/d')
+count=$(printf '%s\n' "$lines" | sed -e '/^$/d' | wc -l | tr -d ' ')
+
+[ "$count" -ge 1 ] || fail "message is empty"
+[ "$count" -eq 1 ] || fail "message must be one line (found $count lines)"
+
+subject=$lines
+length=$(printf '%s' "$subject" | wc -c | tr -d ' ')
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+printf '%s\n' "$subject" > "$tmp/subject"
+
+ctl=$(printf '[\001-\037\177]')
+if grep_rc -q "$ctl" "$tmp/subject"; then
+  fail "message must not contain control characters"
+fi
+if grep_rc -q '[^ -~]' "$tmp/subject"; then
+  fail "message must be printable ASCII only (no emoji or symbols)"
+fi
+[ "$length" -ge 20 ] || fail "message is $length characters; minimum is 20"
+[ "$length" -le 72 ] || fail "message is $length characters; maximum is 72"
+case "$subject" in
+  *.) fail "message must not end with a period" ;;
+esac
+
+tr -d '\r' < "$phrases" | sed -e '/^#/d' -e '/^$/d' > "$tmp/phrases"
+[ -s "$tmp/phrases" ] || fail "tools/forbidden-phrases.txt has no phrases"
+# Plain lines match anywhere ignoring case; ~ whole word ignoring case;
+# = whole word, case-sensitive.
+# Word boundaries are ASCII: start or end of line, or any character outside
+# A-Z, a-z, 0-9 and _ (LC_ALL=C is set above). Same rule as tools/check.sh
+# and tools/check.ps1: (^|[^A-Za-z0-9_])(p1|p2)([^A-Za-z0-9_]|$).
+sed -e '/^[~=]/d' "$tmp/phrases" > "$tmp/p_any"
+word_regex() {
+  sed -n -e "s/^$1//p" "$tmp/phrases" |
+    sed -e 's/\\/\\\\/g' -e 's/[.[$()|*+?{^]/\\&/g' > "$tmp/p_list"
+  alt=
+  while IFS= read -r p; do
+    alt=${alt:+$alt|}$p
+  done < "$tmp/p_list"
+  [ -s "$tmp/p_list" ] || return 0
+  printf '(^|[^A-Za-z0-9_])(%s)([^A-Za-z0-9_]|$)' "$alt"
+}
+re_word=$(word_regex '~')
+re_case=$(word_regex '=')
+hit=0
+if [ -s "$tmp/p_any" ] && grep_rc -iqF -f "$tmp/p_any" "$tmp/subject"; then hit=1; fi
+if [ -n "$re_word" ] && grep_rc -iqE -e "$re_word" "$tmp/subject"; then hit=1; fi
+if [ -n "$re_case" ] && grep_rc -qE -e "$re_case" "$tmp/subject"; then hit=1; fi
+if [ "$hit" -eq 1 ]; then
+  fail "message contains a forbidden phrase (tools/forbidden-phrases.txt)"
+fi
+
+exit 0
