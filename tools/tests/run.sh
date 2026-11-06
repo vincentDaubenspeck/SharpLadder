@@ -10,7 +10,7 @@
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
 #   g. Licence allowlist and override record cases, and a disallowed licence through check.sh and check.ps1
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
-#   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities, no SDK
+#   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities and licences, no SDK
 #   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
 # Usage: sh tools/tests/run.sh
 # Parts h and i need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
@@ -285,7 +285,7 @@ for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run 
   '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403' \
   '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
   '  web/x.sh:2: shellcheck directive needs a reason comment on the line above' \
-  '  needs .NET config (see above)' 'FAIL nuget vulnerabilities'; do
+  '  needs .NET config (see above)' 'FAIL nuget vulnerabilities' 'FAIL nuget licences'; do
   if [ "$rc" -ne 0 ] && grep -qxF "$want" "$tmp/out"; then
     pass "check.sh exit $rc with: $want"
   else

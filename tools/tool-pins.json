@@ -100,6 +100,10 @@
   "psscriptanalyzer": {
     "version": "1.25.0"
   },
+  "nuget-license": {
+    "version": "4.0.18",
+    "sha512": "c2e895bad7954931b3573217bc1f70e2bf959e6f1919c2b17b35c2b848c280ea837485baad63be8090844c6ae4487b1122bcc42b30a951bd3c937461851cc60e"
+  },
   "dotnet": {
     "version": "10.0.403",
     "assets": {

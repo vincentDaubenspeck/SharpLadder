@@ -1,10 +1,11 @@
 // C# cases for both test suites: the suppression check on the fixtures from fixtures.mjs, the
-// nuget vulnerabilities stage, and every C# stage failing when no SDK is found.
+// nuget vulnerabilities and nuget licences stages, and every C# stage failing when no SDK is found.
 // Usage: node tools/tests/csharp-cases.mjs <empty work directory>
 // Needs the pinned .NET SDK and nuget.org.
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { restoreSolution, vulnerabilityProblems } from "../checks/csharp.mjs";
+import { licenceProblems, restoreSolution, toolPackageProblems, vulnerabilityProblems } from "../checks/csharp.mjs";
 import { dotnet, env, exec, localEnv } from "../checks/lib.mjs";
 
 const src = join(import.meta.dirname, "..", "..");
@@ -195,6 +196,104 @@ for (const [label, code, out, want] of [
   check(`nuget report: ${label}`, ok, problems.join("\n"));
 }
 
+// The licence report reader, on reports nuget-license could produce.
+const allowed = ["MIT", "Apache-2.0"];
+const entry = (id, license, errors) => ({
+  PackageId: id,
+  PackageVersion: "1.2.0",
+  License: license,
+  ...(errors ? { ValidationErrors: [{ Error: `License "${license}" not found`, Context: project }] } : {}),
+});
+const mixed = JSON.stringify([entry("Fx.Mit", "MIT"), entry("Fx.Apache", "Apache-2.0"), entry("Fx.Gpl", "GPL-3.0", true)]);
+const exception = (fields) => ({
+  package: "Fx.Gpl",
+  version: "1.2.0",
+  license: "GPL-3.0",
+  reason: "Build-only analyzer, never shipped.",
+  addedOn: "2026-11-06",
+  ...fields,
+});
+const notRange = '"version" must be an exact version, not a range or wildcard';
+const notCovered = 'Fx.Gpl 1.2.0: licence "GPL-3.0" is not allowed and no exception covers it';
+const badIdentity = "lacks a non-blank PackageId and PackageVersion";
+const identityCases = [
+  ["blank id", { PackageId: "" }],
+  ["whitespace id", { PackageId: "  " }],
+  ["whitespace version", { PackageVersion: "  " }],
+  ["missing version", { PackageVersion: undefined }],
+].flatMap(([what, fields]) => [
+  [`allowed package with a ${what} fails`, 0, JSON.stringify([{ ...entry("Fx.Mit", "MIT"), ...fields }]), [], badIdentity],
+  [
+    `disallowed package with a ${what} fails`,
+    1,
+    JSON.stringify([{ ...entry("Fx.Gpl", "GPL-3.0", true), ...fields }]),
+    [exception({})],
+    badIdentity,
+  ],
+]);
+for (const [label, code, out, exceptions, want] of [
+  ["all allowed passes", 0, JSON.stringify([entry("Fx.Mit", "MIT"), entry("Fx.Apache", "Apache-2.0")]), [], null],
+  ["disallowed licence without an exception fails", 1, mixed, [], notCovered],
+  ["disallowed licence with a reasoned exception passes", 1, mixed, [exception({})], null],
+  ["exception with the exact reported version passes", 1, mixed, [exception({ version: "1.2.0" })], null],
+  ["exception for a patch-bumped version fails", 1, mixed, [exception({ version: "1.2.1" })], notCovered],
+  ["exception with an interval version fails", 1, mixed, [exception({ version: "[1.0.0,2.0.0)" })], notRange],
+  ["exception with a wildcard version fails", 1, mixed, [exception({ version: "1.0.*" })], notRange],
+  ["exception version differing only by whitespace passes", 1, mixed, [exception({ version: " 1.2.0 " })], null],
+  [
+    "exception version differing only by case fails",
+    1,
+    JSON.stringify([{ ...entry("Fx.Gpl", "GPL-3.0", true), PackageVersion: "1.2.0-beta" }]),
+    [exception({ version: "1.2.0-BETA" })],
+    'Fx.Gpl 1.2.0-beta: licence "GPL-3.0" is not allowed and no exception covers it',
+  ],
+  [
+    "exception that matches no package fails",
+    1,
+    mixed,
+    [exception({}), exception({ package: "Fx.Absent" })],
+    "Fx.Absent 1.2.0 GPL-3.0 matches no disallowed package",
+  ],
+  ["exception for another licence fails", 1, mixed, [exception({ license: "LGPL-3.0" })], notCovered],
+  ["exception with an empty reason fails", 1, mixed, [exception({ reason: " " })], '"reason" must be one non-blank line'],
+  ["exception without a reason fails", 1, mixed, [exception({ reason: undefined })], '"reason" must be one non-blank line'],
+  ["exception with an unknown field fails", 1, mixed, [exception({ note: "x" })], 'unknown field "note"'],
+  ["exception with an impossible date fails", 1, mixed, [exception({ addedOn: "2026-02-30" })], "real YYYY-MM-DD date"],
+  ["licence outside the allowlist without a tool error fails", 0, JSON.stringify([entry("Fx.Gpl", "GPL-3.0")]), [], notCovered],
+  ["package without a licence fails", 0, JSON.stringify([entry("Fx.None")]), [], 'licence null is not allowed'],
+  ["tool failure without a validation error fails", 2, JSON.stringify([entry("Fx.Mit", "MIT")]), [], "exited 2 without"],
+  ["tool that did not start fails", null, "spawn ENOENT", [], "nuget-license did not start"],
+  ["malformed JSON fails", 0, "{ not json", [], "report is not JSON"],
+  ["report that is not an array fails", 0, JSON.stringify({ packages: [] }), [], "not an array of packages"],
+  ["package without an id fails", 0, JSON.stringify([{ PackageVersion: "1.0.0" }]), [], badIdentity],
+  ...identityCases,
+]) {
+  const problems = licenceProblems(code, out, allowed, exceptions);
+  const ok = want === null ? problems.length === 0 : problems.some((p) => p.includes(want));
+  check(`nuget licence report: ${label}`, ok, problems.join("\n"));
+}
+const emptyAllow = licenceProblems(0, "[]", [], []);
+check("nuget licence report: empty allowlist fails", emptyAllow.some((p) => p.includes("non-empty array")), emptyAllow.join("\n"));
+
+// The restored tool package against its pinned digest, on a stand-in package folder.
+const toolPkgs = join(work, "tool-packages");
+mkdirSync(join(toolPkgs, "nuget-license", "9.9.9"), { recursive: true });
+const fakePkg = Buffer.from("stand-in package");
+writeFileSync(join(toolPkgs, "nuget-license", "9.9.9", "nuget-license.9.9.9.nupkg"), fakePkg);
+const fakePin = { version: "9.9.9", sha512: createHash("sha512").update(fakePkg).digest("hex") };
+const hashOk = toolPackageProblems(toolPkgs, fakePin);
+check("nuget-license package: matching digest passes", hashOk.length === 0, hashOk.join("\n"));
+const hashBad = toolPackageProblems(toolPkgs, { ...fakePin, sha512: "0".repeat(128) });
+check("nuget-license package: digest mismatch fails", hashBad.some((p) => p.includes("SHA-512 mismatch")), hashBad.join("\n"));
+const hashNone = toolPackageProblems(toolPkgs, { ...fakePin, version: "9.9.8" });
+check("nuget-license package: missing package fails", hashNone.some((p) => p.includes("not found")), hashNone.join("\n"));
+const licences = exec(node, [csharp, src, "--licences-only"], { cwd: src });
+check(
+  "nuget licences stage passes the repository",
+  licences.code === 0 && lines(licences.out).includes("PASS nuget licences"),
+  licences.out,
+);
+
 // A solution with a known-vulnerable package: restore succeeds and the stage itself fails it.
 const vuln = join(work, "vuln");
 mkdirSync(join(vuln, "Fx"), { recursive: true });
@@ -259,7 +358,7 @@ check(
     out.includes("FAIL .NET config"),
   none.out,
 );
-for (const name of [".NET build", ".NET tests", stage, "nuget vulnerabilities"]) {
+for (const name of [".NET build", ".NET tests", stage, "nuget vulnerabilities", "nuget licences"]) {
   const at = out.indexOf(`FAIL ${name}`);
   check(`no SDK: ${name} fails`, at > 0 && out[at - 1] === "  needs .NET config (see above)", none.out);
 }

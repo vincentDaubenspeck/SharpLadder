@@ -103,6 +103,11 @@ same record as a trailing `//` comment and has a later `restore`; each
 .NET build and tests, this suppression check (`C# suppression reasons`) and
 `nuget vulnerabilities`, which fails on any advisory of any severity
 for a direct or transitive package, and on a report it cannot read.
+`nuget licences` runs the pinned `nuget-license` tool (its package checked
+against the SHA-512 in `tools/tool-pins.json`) and fails any package whose
+licence is not in `tools/nuget-allowed-licenses.json`, build-only analyzers
+included, unless `tools/nuget-license-exceptions.json` records a reason for it;
+an exception that covers no failing package also fails.
 
 OpenSSF Scorecard runs weekly and on every push to `main`.
 
