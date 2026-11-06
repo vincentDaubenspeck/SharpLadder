@@ -1,20 +1,22 @@
 #!/bin/sh
 # Repository checks. Run before every commit; the pre-push hook and CI run it too.
-#   1. unfinished-text scan against tools/forbidden-phrases.txt
+# tools/check.ps1 does the same on Windows.
+#   1. Unfinished-text scan against tools/forbidden-phrases.txt
 #   2. UTF-8, LF line endings and final newline on tracked text files
 #   3. HEAD commit message against the commit-msg hook rule
-# tools/check.ps1 does the same on Windows.
 set -eu
+# Not every sh has pipefail; use it where available.
+# shellcheck disable=SC3040
 (set -o pipefail) 2>/dev/null && set -o pipefail
 
 root=$(git rev-parse --show-toplevel)
-cd "$root"
+cd "$root" || exit 1
 
 status=0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# stderr, so the message survives when stdout is redirected to a file.
+# die prints to stderr so the message survives when stdout is redirected.
 die() {
   echo "FAIL $1" >&2
   exit 1
@@ -29,25 +31,23 @@ grep_rc() {
 }
 
 phrase_file=tools/forbidden-phrases.txt
-[ -f "$phrase_file" ] && [ -r "$phrase_file" ] || die "$phrase_file is missing or unreadable"
+if [ ! -f "$phrase_file" ] || [ ! -r "$phrase_file" ]; then
+  die "$phrase_file is missing or unreadable"
+fi
 
 git -c core.quotepath=off ls-files > "$tmp/all"
 
-# 1. Phrase scan. Only these exact paths are exempt.
+# 1. Phrase scan
+# Only these exact paths are exempt.
 printf '%s\n' tools/check.sh tools/check.ps1 tools/forbidden-phrases.txt > "$tmp/exempt"
 grep_rc -v -x -F -f "$tmp/exempt" "$tmp/all" > "$tmp/scan" || :
 tr -d '\r' < "$phrase_file" | sed -e '/^#/d' -e '/^$/d' > "$tmp/phrases"
 [ -s "$tmp/phrases" ] || die "$phrase_file has no phrases"
-# Plain lines match anywhere ignoring case; ~ whole word ignoring case;
-# = whole word, case-sensitive.
-# Word boundaries are ASCII: start or end of line, or any character outside
-# A-Z, a-z, 0-9 and _. Each whole-word list becomes one extended regex,
-# (^|[^A-Za-z0-9_])(p1|p2)([^A-Za-z0-9_]|$), run under LC_ALL=C so the locale
-# cannot change it. tools/check.ps1 and tools/hooks/commit-msg use the same rule.
+# Pattern rule: see the header of tools/forbidden-phrases.txt. LC_ALL=C keeps the locale out of it.
 sed -e '/^[~=]/d' "$tmp/phrases" > "$tmp/p_any"
 word_regex() {
   sed -n -e "s/^$1//p" "$tmp/phrases" |
-    sed -e 's/\\/\\\\/g' -e 's/[.[$()|*+?{^]/\\&/g' > "$tmp/p_list"
+    sed -e 's/\\/\\\\/g' -e 's/[.[()|*+?{^$]/\\&/g' > "$tmp/p_list"
   alt=
   while IFS= read -r p; do
     alt=${alt:+$alt|}$p

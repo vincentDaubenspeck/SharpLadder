@@ -1,9 +1,11 @@
-# Repository text validation patterns.
+# Phrases that tools/check.sh, tools/check.ps1 and tools/hooks/commit-msg reject.
 # Lines starting with # are comments.
-# Plain lines match substrings, ignoring case.
-# ~ prefixes whole-word matches, ignoring case.
-# = prefixes case-sensitive whole-word matches.
-# Word boundaries are ASCII: any character outside A-Z, a-z, 0-9 and _ ends a word.
+# Plain lines match as substrings, ignoring case.
+# ~ prefixes a whole-word match, ignoring case.
+# = prefixes a whole-word match, case-sensitive.
+# Word boundaries are ASCII: start or end of line, or any character outside
+# A-Z, a-z, 0-9 and _, so a whole-word list p1, p2 is the extended regex
+# (^|[^A-Za-z0-9_])(p1|p2)([^A-Za-z0-9_]|$).
 ~TODO
 ~FIXME
 ~XXX

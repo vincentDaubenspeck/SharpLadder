@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Repository checks
         run: |
           command -v iconv
@@ -31,7 +31,7 @@ jobs:
       GITLEAKS_VERSION: 8.30.1
       GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Install Gitleaks (checksum verified)
@@ -46,3 +46,68 @@ jobs:
           echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
       - name: Gitleaks scan (full history)
         run: gitleaks detect --source . --log-opts=--all --redact --no-banner
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SHELLCHECK_VERSION: 0.11.0
+      SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install ShellCheck (checksum verified)
+        run: |
+          set -eu
+          base="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}"
+          file="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$file" "$base/$file"
+          echo "${SHELLCHECK_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/shellcheck-v${SHELLCHECK_VERSION}" >> "$GITHUB_PATH"
+      - name: ShellCheck the repository scripts
+        run: |
+          shellcheck --version
+          shellcheck tools/check.sh tools/hooks/* tools/tests/run.sh
+
+  psscriptanalyzer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PSSA_VERSION: 1.25.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install PSScriptAnalyzer (exact version)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION `
+            -Repository PSGallery -Scope CurrentUser -Force
+      - name: PSScriptAnalyzer the repository scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module -Name PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION
+          "PSScriptAnalyzer $((Get-Module -Name PSScriptAnalyzer).Version)"
+          $results = @(Invoke-ScriptAnalyzer -Path tools -Recurse)
+          $results | Format-Table -AutoSize | Out-String -Width 200
+          if ($results.Count -ne 0) { exit 1 }
+
+  tests-sh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      REQUIRE_PARITY: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Hook and check tests (sh, parity with pwsh)
+        run: sh tools/tests/run.sh
+
+  tests-ps:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      REQUIRE_PARITY: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Hook and check tests (Windows PowerShell, parity with sh)
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1

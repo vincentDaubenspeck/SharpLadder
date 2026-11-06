@@ -1,9 +1,10 @@
 #!/bin/sh
 # commit-msg hook: enforces the repository's commit message rule.
 # Usage: commit-msg <message-file>   (also called by tools/check.sh)
-#
 # Rule: one printable ASCII subject, 20 to 72 characters, without a final period.
 set -eu
+# Not every sh has pipefail; use it where available.
+# shellcheck disable=SC3040
 (set -o pipefail) 2>/dev/null && set -o pipefail
 LC_ALL=C
 export LC_ALL
@@ -28,8 +29,9 @@ fi
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || root=.
 phrases="$root/tools/forbidden-phrases.txt"
-[ -f "$phrases" ] && [ -r "$phrases" ] ||
+if [ ! -f "$phrases" ] || [ ! -r "$phrases" ]; then
   fail "tools/forbidden-phrases.txt is missing or unreadable"
+fi
 
 # Strip one carriage return at end of line only, then drop comment lines and
 # blank lines. A carriage return anywhere else stays and is rejected below.
@@ -66,15 +68,11 @@ esac
 
 tr -d '\r' < "$phrases" | sed -e '/^#/d' -e '/^$/d' > "$tmp/phrases"
 [ -s "$tmp/phrases" ] || fail "tools/forbidden-phrases.txt has no phrases"
-# Plain lines match anywhere ignoring case; ~ whole word ignoring case;
-# = whole word, case-sensitive.
-# Word boundaries are ASCII: start or end of line, or any character outside
-# A-Z, a-z, 0-9 and _ (LC_ALL=C is set above). Same rule as tools/check.sh
-# and tools/check.ps1: (^|[^A-Za-z0-9_])(p1|p2)([^A-Za-z0-9_]|$).
+# Pattern rule: see the header of tools/forbidden-phrases.txt. LC_ALL=C keeps the locale out of it.
 sed -e '/^[~=]/d' "$tmp/phrases" > "$tmp/p_any"
 word_regex() {
   sed -n -e "s/^$1//p" "$tmp/phrases" |
-    sed -e 's/\\/\\\\/g' -e 's/[.[$()|*+?{^]/\\&/g' > "$tmp/p_list"
+    sed -e 's/\\/\\\\/g' -e 's/[.[()|*+?{^$]/\\&/g' > "$tmp/p_list"
   alt=
   while IFS= read -r p; do
     alt=${alt:+$alt|}$p

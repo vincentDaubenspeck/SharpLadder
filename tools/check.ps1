@@ -1,5 +1,6 @@
-# Repository checks for Windows PowerShell; same behaviour as tools/check.sh.
-#   1. unfinished-text scan against tools/forbidden-phrases.txt
+# Repository checks for Windows PowerShell.
+# Same behaviour as tools/check.sh.
+#   1. Unfinished-text scan against tools/forbidden-phrases.txt
 #   2. UTF-8, LF line endings and final newline on tracked text files
 #   3. HEAD commit message against the commit-msg hook rule
 $ErrorActionPreference = 'Stop'
@@ -20,7 +21,7 @@ function Read-PhraseFile([string]$rel) {
     Where-Object { $_ -ne '' -and -not $_.StartsWith('#') })
 }
 
-function Read-Phrases {
+function Read-PhraseList {
   if (-not (Test-Path -LiteralPath (Join-Path $root 'tools/forbidden-phrases.txt') -PathType Leaf)) {
     Write-Output 'FAIL tools/forbidden-phrases.txt is missing or unreadable'; exit 1
   }
@@ -30,10 +31,7 @@ function Read-Phrases {
 }
 
 function Test-ContainsPhrase([string]$text, [string[]]$phrases) {
-  # Plain lines match anywhere ignoring case; ~ whole word ignoring case;
-  # = whole word, case-sensitive. Word boundaries are ASCII: start or end of
-  # line, or any character outside A-Z, a-z, 0-9 and _ (the same rule
-  # tools/check.sh and tools/hooks/commit-msg apply with grep -E under LC_ALL=C).
+  # Pattern rule: see the header of tools/forbidden-phrases.txt. ASCII boundaries, no locale.
   $rx = [Text.RegularExpressions.RegexOptions]
   foreach ($p in $phrases) {
     if ($p.StartsWith('~') -or $p.StartsWith('=')) {
@@ -64,7 +62,7 @@ function Test-CommitMessage([string]$message, [string[]]$phrases) {
   return $null
 }
 
-$phrases = Read-Phrases
+$phrases = Read-PhraseList
 $files = @(& git -c core.quotepath=off ls-files)
 
 # 1. Phrase scan
