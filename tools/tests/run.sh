@@ -5,11 +5,14 @@
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
 #   c. CRLF line endings and a missing final newline fail the encoding check
-#   d. tools/check.sh and tools/check.ps1 give the same result on each fixture
+#   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
+#   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
+#   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
 # Usage: sh tools/tests/run.sh
-# Part d needs PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts d to f need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
 
+started=$(date +%s)
 src=$(git rev-parse --show-toplevel)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -28,20 +31,48 @@ export GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 passed=0
 failed=0
 skipped=0
-pass() { echo "PASS $1"; passed=$((passed + 1)); }
-fail() { echo "FAIL $1"; failed=$((failed + 1)); }
+pass() {
+  echo "PASS $1"
+  passed=$((passed + 1))
+}
+fail() {
+  echo "FAIL $1"
+  failed=$((failed + 1))
+}
+no_ps() {
+  if [ "${REQUIRE_PARITY:-0}" = 1 ]; then
+    fail "$1 (no PowerShell)"
+  else
+    echo "SKIP $1 (no PowerShell)"
+    skipped=$((skipped + 1))
+  fi
+}
 
 ps=
 for c in pwsh powershell.exe; do
-  if command -v "$c" > /dev/null 2>&1; then ps=$c; break; fi
+  if command -v "$c" > /dev/null 2>&1; then
+    ps=$c
+    break
+  fi
 done
 
-# Fixture repository with the tracked checks and hooks.
+# PATH entries must be POSIX paths; Git for Windows reports C:/ paths.
+to_posix() {
+  if command -v cygpath > /dev/null 2>&1; then cygpath -u "$1"; else printf '%s\n' "$1"; fi
+}
+# The pinned tools from tools/install-tools.mjs, when installed, go first.
+for d in "$src/.tools/venv/bin" "$src/.tools/venv/Scripts" "$src/.tools/node/bin" \
+  "$src/.tools/node" "$src/.tools/bin"; do
+  if [ -d "$d" ]; then PATH=$(to_posix "$d"):$PATH; fi
+done
+export PATH
+node=$(command -v node || :)
+
 repo=$tmp/repo
-mkdir -p "$repo/tools/hooks"
+mkdir -p "$repo/tools/hooks" "$repo/tools/checks"
 cp "$src/.gitattributes" "$repo/"
-cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/forbidden-phrases.txt" \
-  "$repo/tools/"
+cp "$src/tools/checks/text.sh" "$src/tools/checks/text.ps1" "$repo/tools/checks/"
+cp "$src/tools/forbidden-phrases.txt" "$repo/tools/"
 cp "$src/tools/hooks/commit-msg" "$repo/tools/hooks/"
 chmod +x "$repo/tools/hooks/commit-msg"
 printf 'hello\n' > "$repo/notes.txt"
@@ -71,27 +102,22 @@ try_commit reject "body" 'Add a subject with a body below\n\nThe body line.\n'
 try_commit reject "trailer" 'Add a subject with a trailer below\n\nSigned-off-by: Test\n'
 try_commit reject "too short" 'Fix it\n'
 
-# run_checks <label> <expected exit code>: runs check.sh, then check.ps1 for parity.
+# run_checks <label> <expected exit code>: runs text.sh, then text.ps1 for parity.
 run_checks() {
   rc=0
-  sh tools/check.sh > "$tmp/out.sh" 2>&1 || rc=$?
-  if [ "$rc" -eq "$2" ]; then pass "check.sh $1 (exit $rc)"; else fail "check.sh $1 (exit $rc)"; fi
+  sh tools/checks/text.sh > "$tmp/out.sh" 2>&1 || rc=$?
+  if [ "$rc" -eq "$2" ]; then pass "text.sh $1 (exit $rc)"; else fail "text.sh $1 (exit $rc)"; fi
   if [ -z "$ps" ]; then
-    if [ "${REQUIRE_PARITY:-0}" = 1 ]; then
-      fail "parity $1 (no PowerShell)"
-    else
-      echo "SKIP parity $1 (no PowerShell)"
-      skipped=$((skipped + 1))
-    fi
+    no_ps "parity $1"
     return 0
   fi
   prc=0
-  "$ps" -NoProfile -ExecutionPolicy Bypass -File tools/check.ps1 > "$tmp/out.ps" 2>&1 || prc=$?
+  "$ps" -NoProfile -ExecutionPolicy Bypass -File tools/checks/text.ps1 > "$tmp/out.ps" 2>&1 || prc=$?
   tr -d '\r' < "$tmp/out.ps" > "$tmp/out.ps.lf"
   if [ "$prc" -eq "$rc" ] && cmp -s "$tmp/out.sh" "$tmp/out.ps.lf"; then
     pass "parity $1"
   else
-    fail "parity $1 (check.sh exit $rc, check.ps1 exit $prc)"
+    fail "parity $1 (text.sh exit $rc, text.ps1 exit $prc)"
     diff "$tmp/out.sh" "$tmp/out.ps.lf" || :
   fi
 }
@@ -102,9 +128,9 @@ printf 'one\r\ntwo\r\n' > crlf.txt
 git add crlf.txt 2> /dev/null
 run_checks "CRLF file" 1
 if grep -q '^  crlf.txt: CRLF line endings$' "$tmp/out.sh"; then
-  pass "check.sh names the CRLF file"
+  pass "text.sh names the CRLF file"
 else
-  fail "check.sh names the CRLF file"
+  fail "text.sh names the CRLF file"
 fi
 git rm -q --cached crlf.txt && rm crlf.txt
 
@@ -112,11 +138,121 @@ printf 'no final newline' > tail.txt
 git add tail.txt
 run_checks "missing final newline" 1
 if grep -q '^  tail.txt: no final newline$' "$tmp/out.sh"; then
-  pass "check.sh names the file without a final newline"
+  pass "text.sh names the file without a final newline"
 else
-  fail "check.sh names the file without a final newline"
+  fail "text.sh names the file without a final newline"
 fi
 git rm -q --cached tail.txt && rm tail.txt
 
-echo "$passed passed, $failed failed, $skipped skipped"
+# Shell and PowerShell report a named stage; ESLint reports by exit code.
+if [ -z "$node" ]; then
+  fail "suppression fixtures (no node)"
+else
+  "$node" "$src/tools/tests/fixtures.mjs" "$tmp/fx" > "$tmp/manifest"
+  tab=$(printf '\t')
+  while IFS="$tab" read -r lang want file label; do
+    got=fail
+    case "$lang" in
+      js)
+        if (cd "$tmp/fx/js" && "$node" "$src/web/lint-comments.js" "$file") > "$tmp/fx.out" 2>&1; then
+          got=pass
+        fi
+        ;;
+      sh)
+        (cd "$tmp/fx/sh" && "$node" "$src/tools/checks/shell.mjs" "$file") > "$tmp/fx.out" 2>&1 || :
+        if grep -q '^PASS shell suppression reasons$' "$tmp/fx.out"; then got=pass; fi
+        ;;
+      ps)
+        if [ -z "$ps" ]; then
+          no_ps "$lang $want: $label"
+          continue
+        fi
+        if (cd "$tmp/fx/ps" && "$ps" -NoProfile -ExecutionPolicy Bypass \
+          -File "$src/tools/checks/ps-suppressions.ps1" "$file") > "$tmp/fx.out" 2>&1; then
+          got=pass
+        fi
+        ;;
+    esac
+    if [ "$got" = "$want" ]; then
+      pass "$lang $want: $label"
+    else
+      fail "$lang $want: $label (got $got)"
+      cat "$tmp/fx.out"
+    fi
+  done < "$tmp/manifest"
+  if [ -z "$ps" ]; then
+    no_ps "ps: absolute paths"
+  else
+    for want in pass fail; do
+      if [ "$want" = pass ]; then f=good.ps1; else f=missing.ps1; fi
+      p=$tmp/fx/ps/$f
+      if command -v cygpath > /dev/null 2>&1; then p=$(cygpath -w "$p"); fi
+      got=fail
+      if "$ps" -NoProfile -ExecutionPolicy Bypass -File "$src/tools/checks/ps-suppressions.ps1" \
+        "$p" > "$tmp/fx.out" 2>&1; then got=pass; fi
+      if [ "$got" = "$want" ]; then
+        pass "ps $want: absolute path to $f"
+      else
+        fail "ps $want: absolute path to $f (got $got)"
+        cat "$tmp/fx.out"
+      fi
+    done
+  fi
+fi
+
+mkdir -p "$repo/web"
+cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$repo/tools/"
+cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
+  "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
+cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
+cp "$src/web/package.json" "$src/web/.nvmrc" "$repo/web/"
+# An unavailable PSScriptAnalyzer version stands in for a missing module.
+sed -e 's/"version": "1\.25\.0"/"version": "0.0.0"/' "$src/tools/tool-pins.json" > "$repo/tools/tool-pins.json"
+cp "$tmp/fx/sh/missing.sh" "$repo/bad.sh"
+cp "$tmp/fx/sh/missing.sh" "$repo/web/x.sh"
+git add -A
+git commit -q -m 'Add the propagation fixture files'
+
+mkdir "$tmp/empty"
+if [ -n "$node" ]; then
+  (PATH=$(to_posix "$tmp/empty") "$node" tools/checks/shell.mjs bad.sh) > "$tmp/out" 2>&1 || :
+  if grep -q '^  shfmt not found' "$tmp/out" && grep -q '^FAIL shell suppression reasons$' "$tmp/out"; then
+    pass "missing shfmt fails"
+  else
+    fail "missing shfmt fails"
+    cat "$tmp/out"
+  fi
+fi
+
+rc=0
+sh tools/check.sh > "$tmp/out" 2>&1 || rc=$?
+for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run npm ci in web/' \
+  '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
+  '  web/x.sh:2: shellcheck directive needs a reason comment on the line above'; do
+  if [ "$rc" -ne 0 ] && grep -qxF "$want" "$tmp/out"; then
+    pass "check.sh exit $rc with: $want"
+  else
+    fail "check.sh exit $rc with: $want"
+  fi
+done
+rc=0
+sh tools/hooks/pre-push > "$tmp/out" 2>&1 || rc=$?
+if [ "$rc" -ne 0 ] && grep -q '^pre-push: tools/check.sh failed; push blocked$' "$tmp/out"; then
+  pass "pre-push blocks on a failed check (exit $rc)"
+else
+  fail "pre-push blocks on a failed check (exit $rc)"
+fi
+if [ -z "$ps" ]; then
+  no_ps "check.ps1 propagates a failure"
+else
+  rc=0
+  "$ps" -NoProfile -ExecutionPolicy Bypass -File tools/check.ps1 > "$tmp/out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ] && tr -d '\r' < "$tmp/out" | grep -qxF 'FAIL shell suppression reasons'; then
+    pass "check.ps1 propagates a failure (exit $rc)"
+  else
+    fail "check.ps1 propagates a failure (exit $rc)"
+  fi
+fi
+
+echo "$passed passed, $failed failed, $skipped skipped in $(($(date +%s) - started))s"
 [ "$failed" -eq 0 ]

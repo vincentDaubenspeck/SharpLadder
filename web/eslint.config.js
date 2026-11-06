@@ -7,6 +7,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
 import { readFileSync } from "node:fs";
 import tseslint from "typescript-eslint";
+import { commentPolicy } from "./eslint.comments.config.js";
 
 // The repository phrase list is the one source of banned comment markers.
 const markers = readFileSync(
@@ -19,6 +20,13 @@ const markers = readFileSync(
 
 export default defineConfig([
   globalIgnores(["dist", "coverage"]),
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+      reportUnusedInlineConfigs: "error",
+    },
+  },
+  commentPolicy,
   {
     rules: {
       "no-warning-comments": [

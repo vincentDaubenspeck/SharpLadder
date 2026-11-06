@@ -19,14 +19,34 @@ After cloning, enable the repository's git hooks:
 git config core.hooksPath tools/hooks
 ```
 
-Run the repository checks with `sh tools/check.sh` (or
-`powershell -File tools/check.ps1` on Windows).
-
 ## Development
 
-The web app lives in `web/`. Use the Node version in `web/.nvmrc`, then run
-`npm ci` and `npm run dev` inside `web/`; `package.json` lists the lint, test,
-build and audit scripts that CI runs.
+The web app lives in `web/`; run `npm ci` and `npm run dev` there.
+
+The checks need these tools, at exactly these versions (pins and SHA-256
+digests in `tools/tool-pins.json`):
+
+- Node 26.13.0 (`web/.nvmrc`) with its bundled npm 11.20.0
+  (`packageManager` in `web/package.json`), then `npm ci` in `web/`
+- shfmt 3.14.1, editorconfig-checker 4.0.2 and ShellCheck 0.11.0
+- yamllint 1.38.0 (Python 3.10 or later; installed from
+  `tools/requirements-yamllint.txt` with hash checking)
+- PowerShell with PSScriptAnalyzer 1.25.0
+  (`Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`)
+
+`node tools/install-tools.mjs` downloads Node, shfmt, editorconfig-checker and
+ShellCheck into `.tools/`, verifies each against its pinned digest, and sets up
+yamllint in `.tools/venv`. yamllint (GPL-3.0-or-later) and its dependency
+pathspec (MPL-2.0) are development tools only; nothing from them ships.
+
+Run every check with one command:
+
+```sh
+sh tools/check.sh
+```
+
+(`powershell -File tools/check.ps1` on Windows runs the same checks.) A
+missing or wrong-version tool fails the check with install guidance.
 
 ## Licence
 

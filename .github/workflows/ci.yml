@@ -16,15 +16,37 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install pinned tools (checksum verified)
+        shell: bash
+        run: |
+          node tools/install-tools.mjs
+          node_dir="$GITHUB_WORKSPACE/.tools/node"
+          printf '%s\n' "$node_dir" "$node_dir/bin" >> "$GITHUB_PATH"
+      - name: Install web dependencies
+        shell: bash
+        working-directory: web
+        run: npm ci
+      - name: Install PSScriptAnalyzer (exact version)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pins = Get-Content -Raw -LiteralPath tools/tool-pins.json | ConvertFrom-Json
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion $pins.psscriptanalyzer.version `
+            -Repository PSGallery -Scope CurrentUser -Force
       - name: Repository checks
         run: |
           command -v iconv
           sh tools/check.sh
+      - name: Build and audit the web app
+        working-directory: web
+        run: |
+          npm run build
+          npm run audit
 
   secrets:
     runs-on: ubuntu-latest
@@ -50,76 +72,47 @@ jobs:
       - name: Gitleaks scan (full history)
         run: gitleaks detect --source . --log-opts=--all --redact --no-banner
 
-  shellcheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      SHELLCHECK_VERSION: 0.11.0
-      SHELLCHECK_SHA256: b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install ShellCheck (checksum verified)
-        run: |
-          set -eu
-          base="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}"
-          file="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.gz"
-          curl -fsSL -o "$RUNNER_TEMP/$file" "$base/$file"
-          echo "${SHELLCHECK_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/shellcheck-v${SHELLCHECK_VERSION}" >> "$GITHUB_PATH"
-      - name: ShellCheck the repository scripts
-        run: |
-          shellcheck --version
-          shellcheck tools/check.sh tools/hooks/* tools/tests/run.sh
-
-  psscriptanalyzer:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      PSSA_VERSION: 1.25.0
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install PSScriptAnalyzer (exact version)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Install-Module -Name PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION `
-            -Repository PSGallery -Scope CurrentUser -Force
-      - name: PSScriptAnalyzer the repository scripts
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Import-Module -Name PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION
-          "PSScriptAnalyzer $((Get-Module -Name PSScriptAnalyzer).Version)"
-          $results = @(Invoke-ScriptAnalyzer -Path tools -Recurse)
-          $results | Format-Table -AutoSize | Out-String -Width 200
-          if ($results.Count -ne 0) { exit 1 }
-
   tests-sh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install pinned tools (checksum verified)
+        shell: bash
+        run: |
+          node tools/install-tools.mjs
+          node_dir="$GITHUB_WORKSPACE/.tools/node"
+          printf '%s\n' "$node_dir" "$node_dir/bin" >> "$GITHUB_PATH"
+      - name: Install web dependencies
+        shell: bash
+        working-directory: web
+        run: npm ci
       - name: Hook and check tests (sh, parity with pwsh)
         run: sh tools/tests/run.sh
 
   tests-ps:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install pinned tools (checksum verified)
+        shell: bash
+        run: |
+          node tools/install-tools.mjs
+          node_dir="$GITHUB_WORKSPACE/.tools/node"
+          printf '%s\n' "$node_dir" "$node_dir/bin" >> "$GITHUB_PATH"
+      - name: Install web dependencies
+        shell: bash
+        working-directory: web
+        run: npm ci
       - name: Hook and check tests (Windows PowerShell, parity with sh)
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 
@@ -163,47 +156,3 @@ jobs:
         run: |
           zizmor --version
           zizmor --offline .github/workflows/
-
-  web:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      # Update both with web/.nvmrc; the install step fails on a mismatch.
-      NODE_HASH_VERSION: 26.13.0
-      NODE_SHA256: d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install Node (checksum verified)
-        # A pinned digest checked before extraction, which setup-node does not do.
-        run: |
-          set -eu
-          ver=$(cat .nvmrc)
-          [ "$ver" = "$NODE_HASH_VERSION" ]
-          file="node-v${ver}-linux-x64.tar.xz"
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$file" "https://nodejs.org/dist/v${ver}/$file"
-          echo "${NODE_SHA256}  $RUNNER_TEMP/$file" | sha256sum -c -
-          tar -xJf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/node-v${ver}-linux-x64/bin" >> "$GITHUB_PATH"
-      - name: Check Node and npm match the pins
-        run: |
-          set -eu
-          node_pin=$(cat .nvmrc)
-          npm_pin=$(node -p 'require("./package.json").packageManager.replace(/^npm@/, "")')
-          echo "node $(node --version) (pin v$node_pin), npm $(npm --version) (pin $npm_pin)"
-          [ "$(node --version)" = "v$node_pin" ]
-          [ "$(npm --version)" = "$npm_pin" ]
-      - run: npm ci
-      - run: npm run lint:lockfile
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: npm run lint:md
-      - run: npm run lint:spell
-      - run: npm run audit

@@ -44,3 +44,6 @@ desktop.ini
 
 # Logs
 *.log
+
+# Locally installed check tools
+.tools/

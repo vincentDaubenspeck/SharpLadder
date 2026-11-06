@@ -5,7 +5,7 @@
 set -eu
 # Not every sh has pipefail; use it where available.
 # shellcheck disable=SC3040
-(set -o pipefail) 2>/dev/null && set -o pipefail
+(set -o pipefail) 2> /dev/null && set -o pipefail
 LC_ALL=C
 export LC_ALL
 
@@ -27,7 +27,7 @@ if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
   fail "message file not found"
 fi
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || root=.
+root=$(git rev-parse --show-toplevel 2> /dev/null) || root=.
 phrases="$root/tools/forbidden-phrases.txt"
 if [ ! -f "$phrases" ] || [ ! -r "$phrases" ]; then
   fail "tools/forbidden-phrases.txt is missing or unreadable"

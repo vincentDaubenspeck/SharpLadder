@@ -1,0 +1,86 @@
+{
+  "node": {
+    "version": "26.13.0",
+    "assets": {
+      "linux-x64": {
+        "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-linux-x64.tar.xz",
+        "sha256": "d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997",
+        "dir": "node-v26.13.0-linux-x64"
+      },
+      "darwin-arm64": {
+        "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-darwin-arm64.tar.gz",
+        "sha256": "d38bd5e5a2ddce6bbb5ce45e46e208337da4d51fffe611e567fd32073d6439f6",
+        "dir": "node-v26.13.0-darwin-arm64"
+      },
+      "win32-x64": {
+        "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip",
+        "sha256": "dcc60d59a0746999f99064a01c020445d54d84228c691cdbf25b49ac3b59150a",
+        "dir": "node-v26.13.0-win-x64"
+      }
+    }
+  },
+  "shfmt": {
+    "version": "3.14.1",
+    "assets": {
+      "linux-x64": {
+        "url": "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_linux_amd64",
+        "sha256": "76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_darwin_arm64",
+        "sha256": "b7c872db63553ccffc7253aba3ed7d4885a27d83f1ba567b1138c6315a5847e5"
+      },
+      "win32-x64": {
+        "url": "https://github.com/mvdan/sh/releases/download/v3.14.1/shfmt_v3.14.1_windows_amd64.exe",
+        "sha256": "13629ce28442ca80b6b5a819f7574ab39e1c28c6e26734ca816c9714e04851df"
+      }
+    }
+  },
+  "shellcheck": {
+    "version": "0.11.0",
+    "assets": {
+      "linux-x64": {
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.gz",
+        "sha256": "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
+        "member": "shellcheck-v0.11.0/shellcheck"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.gz",
+        "sha256": "339b930feb1ea764467013cc1f72d09cd6b869ebf1013296ba9055ab2ffbd26f",
+        "member": "shellcheck-v0.11.0/shellcheck"
+      },
+      "win32-x64": {
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip",
+        "sha256": "8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e",
+        "member": "shellcheck.exe"
+      }
+    }
+  },
+  "ec": {
+    "version": "4.0.2",
+    "assets": {
+      "linux-x64": {
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-amd64.tar.gz",
+        "sha256": "44efaef3ed14c6ab52eb87481d78e5e5c204796dccf26e2f4598a61ba17f8003",
+        "member": "editorconfig-checker"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-darwin-all.tar.gz",
+        "sha256": "ff59f57717d95fc62b8e372c8051dbbb766f7d660942409a85d027b0feb2422c",
+        "member": "editorconfig-checker"
+      },
+      "win32-x64": {
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-windows-amd64.zip",
+        "sha256": "857f8f74dfc259d73dac93573e37cf3ce01150787d7b139bf839549cc6b5beb9",
+        "member": "editorconfig-checker.exe"
+      }
+    }
+  },
+  "yamllint": {
+    "version": "1.38.0",
+    "requirements": "tools/requirements-yamllint.txt"
+  },
+  "psscriptanalyzer": {
+    "version": "1.25.0"
+  }
+}
