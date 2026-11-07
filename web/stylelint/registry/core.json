@@ -1,0 +1,281 @@
+{
+  "colour": {
+    "names": [
+      "--bg",
+      "--surface",
+      "--surface-2",
+      "--line",
+      "--line-2",
+      "--text",
+      "--text-2",
+      "--muted",
+      "--accent",
+      "--accent-ink",
+      "--accent-soft",
+      "--accent-line",
+      "--warm",
+      "--warm-soft",
+      "--warm-ink",
+      "--second",
+      "--second-soft",
+      "--ok",
+      "--ok-soft",
+      "--warn",
+      "--warn-soft",
+      "--bad",
+      "--bad-soft",
+      "--header-bg",
+      "--shadow-press",
+      "--shadow-lift",
+      "--shadow-pop",
+      "--term-bg",
+      "--term-text",
+      "--sel",
+      "--sel-inactive",
+      "--find-other",
+      "--ed-bg",
+      "--ed-gutter",
+      "--ed-gutter-text",
+      "--ed-line",
+      "--ed-text",
+      "--ed-kw",
+      "--ed-type",
+      "--ed-str",
+      "--ed-cm",
+      "--ed-num",
+      "--ed-cur"
+    ],
+    "exact": {
+      "--ok": {
+        "light": "#1B6B3A",
+        "dark": "#86D9A6"
+      },
+      "--ok-soft": {
+        "light": "#DDF3E4",
+        "dark": "#1A3326"
+      },
+      "--term-bg": {
+        "light": "#F6F8FA",
+        "dark": "#131517"
+      },
+      "--term-text": {
+        "light": "#1F2328",
+        "dark": "#D3D8DE"
+      },
+      "--sel": {
+        "light": "#E1EAEB",
+        "dark": "#2A3337"
+      },
+      "--sel-inactive": {
+        "light": "#F0F4F5",
+        "dark": "#22282B"
+      },
+      "--find-other": {
+        "light": "#EAE6DE",
+        "dark": "#36342D"
+      },
+      "--ed-bg": {
+        "light": "#FFFFFF",
+        "dark": "#17191C"
+      },
+      "--ed-gutter": {
+        "light": "#F6F8FA",
+        "dark": "#17191C"
+      },
+      "--ed-gutter-text": {
+        "light": "#656D76",
+        "dark": "#7A8390"
+      },
+      "--ed-line": {
+        "light": "#E6E8EB",
+        "dark": "#272B30"
+      },
+      "--ed-text": {
+        "light": "#1F2328",
+        "dark": "#D3D8DE"
+      },
+      "--ed-kw": {
+        "light": "#95533F",
+        "dark": "#E2A98F"
+      },
+      "--ed-type": {
+        "light": "#485C69",
+        "dark": "#B9C5CD"
+      },
+      "--ed-str": {
+        "light": "#2F5B7A",
+        "dark": "#9FC3DF"
+      },
+      "--ed-cm": {
+        "light": "#5E6A75",
+        "dark": "#979FA8"
+      },
+      "--ed-num": {
+        "light": "#2B6391",
+        "dark": "#93B5D6"
+      },
+      "--ed-cur": {
+        "light": "#F6F8FA",
+        "dark": "#1F2328"
+      },
+      "--header-bg": {
+        "light": "rgb(243 245 248 / 88%)",
+        "dark": "rgb(19 21 23 / 88%)",
+        "translucent": true,
+        "headerOnly": true
+      },
+      "--shadow-press": {
+        "light": "rgb(0 0 0 / 18%)",
+        "dark": "rgb(0 0 0 / 18%)",
+        "translucent": true,
+        "boxShadowOnly": true
+      },
+      "--shadow-lift": {
+        "light": "rgb(16 24 40 / 8%)",
+        "dark": "rgb(16 24 40 / 8%)",
+        "translucent": true,
+        "boxShadowOnly": true
+      },
+      "--shadow-pop": {
+        "light": "rgb(16 24 40 / 12%)",
+        "dark": "rgb(16 24 40 / 12%)",
+        "translucent": true,
+        "boxShadowOnly": true
+      }
+    }
+  },
+  "namedTypePairs": [
+    {
+      "fontSize": {
+        "name": "--fs-wordmark",
+        "value": "1.1875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-wordmark",
+        "value": "1.55"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-hero",
+        "value": "clamp(2.25rem, 4vw, 3.25rem)"
+      },
+      "lineHeight": {
+        "name": "--lh-hero",
+        "value": "1.06"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-body",
+        "value": "1rem"
+      },
+      "lineHeight": {
+        "name": "--lh-body",
+        "value": "1.55"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-title",
+        "value": "2.375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-title",
+        "value": "1.12"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-title-narrow",
+        "value": "1.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-title-narrow",
+        "value": "1.12"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-prose",
+        "value": "1.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-prose",
+        "value": "1.7"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-prose-narrow",
+        "value": "1.0313rem"
+      },
+      "lineHeight": {
+        "name": "--lh-prose-narrow",
+        "value": "1.7"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-secno",
+        "value": "2.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-secno",
+        "value": "1"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-secno-narrow",
+        "value": "1.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-secno-narrow",
+        "value": "1"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-home-h1",
+        "value": "clamp(1.6rem, 2.4vw, 2.1rem)"
+      },
+      "lineHeight": {
+        "name": "--lh-home-h1",
+        "value": "1.06"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-subtitle",
+        "value": "1rem"
+      },
+      "lineHeight": {
+        "name": "--lh-subtitle",
+        "value": "1.5"
+      }
+    },
+    {
+      "fontSize": {
+        "name": "--fs-code",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-code",
+        "value": "1.6"
+      }
+    }
+  ],
+  "fontStacks": ["--font-ui", "--font-display", "--font-code"],
+  "layout": [
+    {
+      "name": "--prose",
+      "value": "68ch",
+      "properties": ["inline-size", "max-inline-size", "max-width", "width"]
+    },
+    {
+      "name": "--split",
+      "properties": ["grid-template-columns"]
+    }
+  ]
+}

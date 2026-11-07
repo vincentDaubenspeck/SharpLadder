@@ -1,0 +1,17 @@
+{
+  "spacing": [
+    { "name": "--space-a", "value": "0.5rem" },
+    { "name": "--space-b", "value": "0.875rem" },
+    { "name": "--space-neg-a", "value": "-0.5rem" }
+  ],
+  "typePairs": [
+    {
+      "fontSize": { "name": "--fs-fixture-a", "value": "0.8438rem" },
+      "lineHeight": { "name": "--lh-fixture-a", "value": "1.55" }
+    }
+  ],
+  "radius": [
+    { "name": "--radius-a", "value": "0.625rem" },
+    { "name": "--radius-pill", "value": "62.4375rem" }
+  ]
+}

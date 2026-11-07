@@ -8,6 +8,9 @@ import globals from "globals";
 import { readFileSync } from "node:fs";
 import tseslint from "typescript-eslint";
 import { commentPolicy } from "./eslint.comments.config.js";
+import appCapabilities from "./eslint-rules/app-capabilities.js";
+import cssModuleAccess from "./eslint-rules/css-module-access.js";
+import sourceExtension from "./eslint-rules/source-extension.js";
 
 // The repository phrase list is the one source of banned comment markers.
 const markers = readFileSync(
@@ -19,7 +22,7 @@ const markers = readFileSync(
   .map((line) => line.slice(1).trim());
 
 export default defineConfig([
-  globalIgnores(["dist", "coverage"]),
+  globalIgnores(["dist", "coverage", ".cache"]),
   {
     linterOptions: {
       reportUnusedDisableDirectives: "error",
@@ -34,6 +37,18 @@ export default defineConfig([
         { terms: markers, location: "anywhere" },
       ],
     },
+  },
+  {
+    plugins: {
+      sharpladder: {
+        rules: {
+          "app-capabilities": appCapabilities,
+          "css-module-access": cssModuleAccess,
+          "source-extension": sourceExtension,
+        },
+      },
+    },
+    rules: { "sharpladder/css-module-access": "error" },
   },
   {
     files: ["**/*.{ts,tsx}"],
@@ -54,9 +69,27 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.js"],
+    files: ["**/*.{js,mjs}"],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ["src/**"],
+    rules: {
+      "no-eval": "error",
+      "no-new-func": "error",
+      "sharpladder/app-capabilities": "error",
+    },
+  },
+  // Any other code extension in src would skip the type-aware lint, so it is
+  // parsed without type information only to be rejected.
+  {
+    files: ["src/**/*.{js,jsx,mjs,cjs,mts,cts}"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    rules: { "sharpladder/source-extension": "error" },
   },
   // Last, so formatting is Prettier's alone.
   prettier,

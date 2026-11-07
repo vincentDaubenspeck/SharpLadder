@@ -3,12 +3,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  anyFailed,
   exec,
   gitFiles,
   installHint,
   pins,
   report,
+  setExitCode,
   toolProblem,
   win,
 } from "./lib.mjs";
@@ -16,6 +16,7 @@ import { contentChecks } from "./content.mjs";
 import { csharpChecks } from "./csharp.mjs";
 import { dotnetChecks } from "./dotnet.mjs";
 import { shellChecks, trackedShellFiles } from "./shell.mjs";
+import { runWebStage, webStages } from "./web.mjs";
 
 const top = exec("git", ["rev-parse", "--show-toplevel"]);
 if (top.code !== 0) {
@@ -25,19 +26,6 @@ if (top.code !== 0) {
 const root = top.out.trim();
 const web = join(root, "web");
 
-const webStages = [
-  ["lockfile-lint", "lint:lockfile"],
-  ["licence allowlist", "license:check"],
-  ["dependency overrides", "overrides:check"],
-  ["ESLint", "lint"],
-  ["ESLint comment policy", "lint:comments"],
-  ["Prettier", "format:check"],
-  ["TypeScript", "typecheck"],
-  ["Vitest", "test"],
-  ["knip", "knip"],
-  ["markdownlint", "lint:md"],
-  ["cspell", "lint:spell"],
-];
 const nodeProblems = [];
 if (!existsSync(join(web, "package.json"))) {
   nodeProblems.push("web/package.json not found");
@@ -57,13 +45,12 @@ if (!existsSync(join(web, "package.json"))) {
   }
 }
 report("Node and npm", nodeProblems);
-for (const [name, script] of webStages) {
+for (const stage of webStages) {
   if (nodeProblems.length > 0) {
-    report(name, ["needs Node and npm (see above)"]);
+    report(stage[0], ["needs Node and npm (see above)"]);
     continue;
   }
-  const r = exec("npm", ["run", "--silent", script], { cwd: web });
-  report(name, r.code === 0 ? [] : [r.out]);
+  runWebStage(web, stage);
 }
 
 shellChecks(trackedShellFiles(root));
@@ -107,4 +94,4 @@ else {
 
 contentChecks(root, csharpChecks(root, dotnetChecks(root)));
 
-process.exitCode = anyFailed() ? 1 : 0;
+setExitCode();

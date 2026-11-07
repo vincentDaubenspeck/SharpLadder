@@ -227,8 +227,8 @@ try {
   New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web') | Out-Null
   Copy-FromSource @('tools/check.sh', 'tools/check.ps1', 'tools/checks/lib.mjs', 'tools/checks/run.mjs',
     'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/csharp.mjs', 'tools/checks/content.mjs',
-    'tools/checks/ps-suppressions.ps1', 'tools/checks/pssa.ps1', 'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc',
-    'web/.licensee.json', 'global.json', 'Directory.Build.props', 'Directory.Packages.props')
+    'tools/checks/web.mjs', 'tools/checks/ps-suppressions.ps1', 'tools/checks/pssa.ps1', 'tools/hooks/pre-push',
+    'web/package.json', 'web/.nvmrc', 'web/.licensee.json', 'global.json', 'Directory.Build.props', 'Directory.Packages.props')
   # An unavailable PSScriptAnalyzer version stands in for a missing module.
   $pins = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'tools/tool-pins.json'))
   Write-Text 'tools/tool-pins.json' ($pins -replace '"version": "1\.25\.0"', '"version": "0.0.0"')

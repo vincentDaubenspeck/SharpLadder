@@ -1,0 +1,4254 @@
+{
+  "source": {
+    "description": "theme mockup",
+    "sha256": "900cded236fabaf21380c05273f65b887d37373da2cdd7bddfde4bd4f4e0eb79"
+  },
+  "generator": "web/stylelint/extract/extract-mockup.mjs",
+  "pairs": [
+    {
+      "fontSize": {
+        "name": "--fs-body",
+        "value": "1rem",
+        "mockupSpelling": "1rem"
+      },
+      "lineHeight": {
+        "name": "--lh-body",
+        "value": "1.55"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": "body",
+          "line": 91,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["body"]
+        },
+        {
+          "selector": "body",
+          "line": 91,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "a.brand",
+            "aside.rail",
+            "details",
+            "div",
+            "div.actions",
+            "div.chapter",
+            "div.checks",
+            "div.feature-grid",
+            "div.hero",
+            "div.hints",
+            "div.ladder",
+            "div.panel",
+            "div.panel.work",
+            "div.panel.work.out-collapsed",
+            "div.practice",
+            "div.rails",
+            "div.resume.only-new",
+            "div.resume.only-returning",
+            "div.right",
+            "div.tablist",
+            "div.tabs",
+            "div.tile",
+            "div.wrap",
+            "div#outArea.out",
+            "div#split.splitter",
+            "header.top",
+            "li.rung",
+            "li.rung.done",
+            "li.rung.now",
+            "nav.nav",
+            "nav.topics",
+            "ol",
+            "ol.only-new",
+            "ol.only-returning",
+            "path",
+            "section.view.v-chapter",
+            "section.view.v-home",
+            "section.view.v-practice",
+            "span.ic",
+            "span.mark",
+            "span.title",
+            "summary",
+            "svg"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-6875-1",
+        "value": "0.6875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-6875-1",
+        "value": "1"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".cells li.lost .was",
+          "line": 352,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".cells li.lost .was",
+            "line": 352,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["walk-wrong-step-4"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.was"]
+        },
+        {
+          "selector": ".cells li.lost .was",
+          "line": 352,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".cells li.lost .was",
+            "line": 352,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["walk-wrong-step-4"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["s", "span.lw"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-6875-1-7",
+        "value": "0.6875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-6875-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".cells .ix",
+          "line": 345,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.ix"]
+        },
+        {
+          "selector": ".cells li.dst::after",
+          "line": 350,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["walk-safe-step-1", "walk-wrong-step-4"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["li.dst::after"],
+          "pseudoElement": "::after",
+          "effective": [
+            {
+              "fontSize": "11px",
+              "lineHeight": "18.7px"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-7188-1-3",
+        "value": "0.7188rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-7188-1-3",
+        "value": "1.3"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".rail li small",
+          "line": 220,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".rail li",
+            "line": 213,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["small"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-7188-1-55",
+        "value": "0.7188rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-7188-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": "kbd",
+          "line": 301,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["kbd"]
+        },
+        {
+          "selector": ".check .st",
+          "line": 310,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.st"]
+        },
+        {
+          "selector": ".cdetail .cl",
+          "line": 366,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.cl"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-75-1-3",
+        "value": "0.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-75-1-3",
+        "value": "1.3"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".stuck a small",
+          "line": 199,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".stuck a",
+            "line": 197,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["small"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-75-1-55",
+        "value": "0.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-75-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".resume .lbl",
+          "line": 152,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.lbl"]
+        },
+        {
+          "selector": ".card .lbl",
+          "line": 240,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".card",
+            "line": 237,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.lbl"]
+        },
+        {
+          "selector": ".ehint",
+          "line": 300,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.ehint"]
+        },
+        {
+          "selector": ".ehint",
+          "line": 300,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span"]
+        },
+        {
+          "selector": ".cdetail .cm",
+          "line": 370,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.cm"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-75-1-6",
+        "value": "0.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-75-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".diff",
+          "line": 276,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.diff"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-75-1-7",
+        "value": "0.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-75-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".drill-end .lbl",
+          "line": 202,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.lbl"]
+        },
+        {
+          "selector": ".next .lbl",
+          "line": 248,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.lbl"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-7813-1-55",
+        "value": "0.7813rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-7813-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".topics .lbl",
+          "line": 141,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.lbl"]
+        },
+        {
+          "selector": ".rung .st",
+          "line": 168,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.st"]
+        },
+        {
+          "selector": ".rail .crumb",
+          "line": 209,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.crumb"]
+        },
+        {
+          "selector": ".ph .tagc",
+          "line": 273,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.tagc"]
+        },
+        {
+          "selector": ".hints h4",
+          "line": 280,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h4"]
+        },
+        {
+          "selector": ".out .oh .tog",
+          "line": 288,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["button#outTog.tog"]
+        },
+        {
+          "selector": ".oh",
+          "line": 305,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.oh"]
+        },
+        {
+          "selector": ".check .why",
+          "line": 313,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.why"]
+        },
+        {
+          "selector": ".verdict",
+          "line": 314,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.verdict"]
+        },
+        {
+          "selector": ".cdetail code",
+          "line": 367,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["code"]
+        },
+        {
+          "selector": ".foot-site .ver",
+          "line": 377,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.ver"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-7813-1-6",
+        "value": "0.7813rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-7813-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".statement h4",
+          "line": 277,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h4"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-7813-1-7",
+        "value": "0.7813rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-7813-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".codehead",
+          "line": 243,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div#reach.codehead"]
+        },
+        {
+          "selector": ".codehead",
+          "line": 243,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span", "span.tag"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8125-1-5",
+        "value": "0.8125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8125-1-5",
+        "value": "1.5"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".def a",
+          "line": 326,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".def",
+            "line": 324,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["term-open"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8125-1-55",
+        "value": "0.8125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8125-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".rung-chip",
+          "line": 124,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "span.rung-chip.only-new",
+            "span.rung-chip.only-returning"
+          ]
+        },
+        {
+          "selector": ".rung-chip",
+          "line": 124,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["i", "i.now", "i.on", "span.mini"]
+        },
+        {
+          "selector": ".rung .title small",
+          "line": 167,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["small"]
+        },
+        {
+          "selector": ".rail .foot",
+          "line": 221,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.foot"]
+        },
+        {
+          "selector": ".rail .foot",
+          "line": 221,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a", "b"]
+        },
+        {
+          "selector": ".hint .act",
+          "line": 284,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["span.act"]
+        },
+        {
+          "selector": ".term2",
+          "line": 306,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.term2"]
+        },
+        {
+          "selector": ".cdetail",
+          "line": 364,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div#cd1.cdetail"]
+        },
+        {
+          "selector": ".cdetail",
+          "line": 364,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a", "div", "div.cact"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8125-1-7",
+        "value": "0.8125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8125-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".secno .c",
+          "line": 227,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.c"]
+        },
+        {
+          "selector": ".listen-ctl",
+          "line": 331,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.listen-ctl"]
+        },
+        {
+          "selector": ".listen-ctl",
+          "line": 331,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["label", "span.mono"]
+        },
+        {
+          "selector": ".walk-mode .wm",
+          "line": 341,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["button.wm"]
+        },
+        {
+          "selector": ".walk-step",
+          "line": 357,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span#wStep.walk-step.mono"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8438-1-3",
+        "value": "0.8438rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8438-1-3",
+        "value": "1.3"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".rail li.now ul a",
+          "line": 192,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".rail li",
+            "line": 213,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8438-1-55",
+        "value": "0.8438rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8438-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".tile .foot",
+          "line": 182,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.foot"]
+        },
+        {
+          "selector": ".tile .foot",
+          "line": 182,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["b", "span"]
+        },
+        {
+          "selector": ".ph",
+          "line": 271,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.ph"]
+        },
+        {
+          "selector": ".ph",
+          "line": 271,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.title"]
+        },
+        {
+          "selector": ".tab",
+          "line": 291,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["button.tab"]
+        },
+        {
+          "selector": ".tabs .btn",
+          "line": 295,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["button.btn", "button.btn.primary"]
+        },
+        {
+          "selector": ".tabs .btn",
+          "line": 295,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["path", "svg"]
+        },
+        {
+          "selector": ".check",
+          "line": 309,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.check.bad", "div.check.ok"]
+        },
+        {
+          "selector": ".check",
+          "line": 309,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["button.cbtn"]
+        },
+        {
+          "selector": ".foot-site",
+          "line": 374,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["footer.foot-site"]
+        },
+        {
+          "selector": ".foot-site",
+          "line": 374,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a", "div.wrap", "span"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8438-1-6",
+        "value": "0.8438rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8438-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".statement pre",
+          "line": 278,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["pre"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-8438-1-7",
+        "value": "0.8438rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-8438-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".drill-end .m",
+          "line": 204,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.m"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-875-1-3",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-875-1-3",
+        "value": "1.3"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".stuck a",
+          "line": 197,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".stuck a",
+            "line": 197,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["a"]
+        },
+        {
+          "selector": ".stuck a",
+          "line": 197,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".stuck a",
+            "line": 197,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["b"]
+        },
+        {
+          "selector": ".rail li",
+          "line": 213,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".rail li",
+            "line": 213,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["li", "li.done", "li.here", "li.now"]
+        },
+        {
+          "selector": ".rail li",
+          "line": 213,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".rail li",
+            "line": 213,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a", "span.sr", "ul"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-875-1-5",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-875-1-5",
+        "value": "1.5"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".def",
+          "line": 324,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".def",
+            "line": 324,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["term-open"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span#def-array.def"]
+        },
+        {
+          "selector": ".def",
+          "line": 324,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".def",
+            "line": 324,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": ["term-open"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["b"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-875-1-55",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-875-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".topics a",
+          "line": 142,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["a"]
+        },
+        {
+          "selector": ".resume .m",
+          "line": 155,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.m"]
+        },
+        {
+          "selector": ".resume .m",
+          "line": 155,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": ["new"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["em"]
+        },
+        {
+          "selector": ".hint",
+          "line": 281,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["button.hint", "div.hint.open"]
+        },
+        {
+          "selector": ".hint",
+          "line": 281,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["span"]
+        },
+        {
+          "selector": ".rail summary .cur",
+          "line": 392,
+          "atRules": ["@media (max-width:1040px)"],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.cur"]
+        },
+        {
+          "selector": "p.only-new",
+          "line": 510,
+          "atRules": [],
+          "origin": "inline",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": ["new"],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p.only-new"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-875-1-6",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-875-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": "p",
+          "line": 663,
+          "atRules": [],
+          "origin": "inline",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p"]
+        },
+        {
+          "selector": "p",
+          "line": 663,
+          "atRules": [],
+          "origin": "inline",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-875-1-7",
+        "value": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-875-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".tools",
+          "line": 230,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.tools"]
+        },
+        {
+          "selector": ".tools",
+          "line": 230,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span"]
+        },
+        {
+          "selector": ".walk-ctl .btn",
+          "line": 356,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": [
+            "button#wBack.btn",
+            "button#wNext.btn.primary",
+            "button#wReset.btn.ghost"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9063-1-55",
+        "value": "0.9063rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9063-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".btn",
+          "line": 128,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["button.btn", "button.btn.ghost", "button.btn.primary"]
+        },
+        {
+          "selector": ".btn",
+          "line": 128,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["circle", "path", "svg"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9063-1-7",
+        "value": "0.9063rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9063-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".btn",
+          "line": 128,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": [
+            "button.btn",
+            "button.btn.ghost",
+            "button.btn.primary",
+            "button#listenBtn.btn.listen"
+          ]
+        },
+        {
+          "selector": ".btn",
+          "line": 128,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["active", "focus-visible", "hover"],
+          "unforced": true,
+          "elements": ["i", "span.bars", "span.lt"]
+        },
+        {
+          "selector": ".walk-msg",
+          "line": 354,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p#walkMsg.walk-msg"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9375-1-55",
+        "value": "0.9375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9375-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".nav a",
+          "line": 121,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a"]
+        },
+        {
+          "selector": ".tile p",
+          "line": 181,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9375-1-6",
+        "value": "0.9375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9375-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".statement",
+          "line": 274,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.statement"]
+        },
+        {
+          "selector": ".statement",
+          "line": 274,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9375-1-7",
+        "value": "0.9375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9375-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".walk",
+          "line": 337,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div#walk.walk"]
+        },
+        {
+          "selector": ".walk",
+          "line": 337,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "div.walk-ctl",
+            "div.walk-top",
+            "li",
+            "li.dst",
+            "li.lost",
+            "li.spare",
+            "li.src",
+            "ol.cells",
+            "span.walk-mode",
+            "span#walk-h.walk-title"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-0-9688-1-55",
+        "value": "0.9688rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-0-9688-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".card",
+          "line": 237,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".card",
+            "line": 237,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.card.try", "div#trap.card.trap"]
+        },
+        {
+          "selector": ".card",
+          "line": 237,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".card",
+            "line": 237,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["a", "code", "div", "em", "path", "span.ic", "svg"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-0313-1-55",
+        "value": "1.0313rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-0313-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".resume .t",
+          "line": 154,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.t"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-125-1-5",
+        "value": "1.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-125-1-5",
+        "value": "1.5"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".prose .lede",
+          "line": 229,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose .lede",
+            "line": 229,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p.lede"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-125-1-7",
+        "value": "1.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-125-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".cells .val",
+          "line": 346,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.val"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-1875-1-55",
+        "value": "1.1875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-1875-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".tile h3",
+          "line": 180,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h3"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-1875-1-6",
+        "value": "1.1875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-1875-1-6",
+        "value": "1.6"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".statement h3",
+          "line": 275,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".statement",
+            "line": 274,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h3"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-3125-1-55",
+        "value": "1.3125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-3125-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".rung .n",
+          "line": 165,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.n"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-375-1-55",
+        "value": "1.375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-375-1-55",
+        "value": "1.55"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".resume .step",
+          "line": 151,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.step"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-375-1-7",
+        "value": "1.375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-375-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".next .step",
+          "line": 247,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.step"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-cat-1-5625-1-7",
+        "value": "1.5625rem"
+      },
+      "lineHeight": {
+        "name": "--lh-cat-1-5625-1-7",
+        "value": "1.7"
+      },
+      "named": false,
+      "provenance": [
+        {
+          "selector": ".prose h2",
+          "line": 234,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h2", "h2#smaller"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-code",
+        "value": "0.875rem",
+        "mockupSpelling": "0.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-code",
+        "value": "1.6"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": "pre.code",
+          "line": 245,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "pre.code",
+            "line": 245,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["pre.code"]
+        },
+        {
+          "selector": "pre.code",
+          "line": 245,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "pre.code",
+            "line": 245,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.c", "span.k", "span.n2"]
+        },
+        {
+          "selector": ".editor",
+          "line": 296,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".editor",
+            "line": 296,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["div.editor"]
+        },
+        {
+          "selector": ".editor",
+          "line": 296,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".editor",
+            "line": 296,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "div.b",
+            "div.g",
+            "span.cur",
+            "span.k",
+            "span.n2",
+            "span.t"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-hero",
+        "value": "clamp(2.25rem, 4vw, 3.25rem)",
+        "mockupSpelling": "clamp(2.25rem,4vw,3.25rem)"
+      },
+      "lineHeight": {
+        "name": "--lh-hero",
+        "value": "1.06"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": "h1.display",
+          "line": 147,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "h1.display",
+            "line": 147,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "evidence": "authored source",
+          "note": "not observed as the winning DOM pair"
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-home-h1",
+        "value": "clamp(1.6rem, 2.4vw, 2.1rem)",
+        "mockupSpelling": "clamp(1.6rem,2.4vw,2.1rem)"
+      },
+      "lineHeight": {
+        "name": "--lh-home-h1",
+        "value": "1.06"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": "h1.display",
+          "line": 487,
+          "atRules": [],
+          "origin": "inline",
+          "lineHeightFrom": {
+            "selector": "h1.display",
+            "line": 147,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h1.display"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-prose",
+        "value": "1.125rem",
+        "mockupSpelling": "1.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-prose",
+        "value": "1.7"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".prose",
+          "line": 224,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["article.prose"]
+        },
+        {
+          "selector": ".prose",
+          "line": 224,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "a.term",
+            "button.term",
+            "code",
+            "div",
+            "div.drill-end",
+            "div.next",
+            "div.secno",
+            "div.t",
+            "em",
+            "nav.stuck",
+            "p",
+            "span.seg.now",
+            "span.termwrap"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-prose-narrow",
+        "value": "1.0313rem",
+        "mockupSpelling": "1.0313rem"
+      },
+      "lineHeight": {
+        "name": "--lh-prose-narrow",
+        "value": "1.7"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".prose",
+          "line": 407,
+          "atRules": ["@media (max-width:760px)"],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["article.prose"]
+        },
+        {
+          "selector": ".prose",
+          "line": 407,
+          "atRules": ["@media (max-width:760px)"],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose",
+            "line": 224,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": [
+            "a.term",
+            "button.term",
+            "code",
+            "div",
+            "div.drill-end",
+            "div.next",
+            "div.secno",
+            "div.t",
+            "em",
+            "nav.stuck",
+            "p",
+            "span.seg.now",
+            "span.termwrap"
+          ]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-secno",
+        "value": "2.125rem",
+        "mockupSpelling": "2.125rem"
+      },
+      "lineHeight": {
+        "name": "--lh-secno",
+        "value": "1"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".secno .n",
+          "line": 226,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".secno .n",
+            "line": 226,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.n"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-secno-narrow",
+        "value": "1.75rem",
+        "mockupSpelling": "1.75rem"
+      },
+      "lineHeight": {
+        "name": "--lh-secno-narrow",
+        "value": "1"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".secno .n",
+          "line": 409,
+          "atRules": ["@media (max-width:760px)"],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".secno .n",
+            "line": 226,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.n"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-subtitle",
+        "value": "1rem",
+        "mockupSpelling": "1rem"
+      },
+      "lineHeight": {
+        "name": "--lh-subtitle",
+        "value": "1.5"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": "p.sub",
+          "line": 488,
+          "atRules": [],
+          "origin": "inline",
+          "lineHeightFrom": {
+            "selector": ".hero p.sub",
+            "line": 148,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["home"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["p.sub"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-title",
+        "value": "2.375rem",
+        "mockupSpelling": "2.375rem"
+      },
+      "lineHeight": {
+        "name": "--lh-title",
+        "value": "1.12"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".prose h1",
+          "line": 228,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose h1",
+            "line": 228,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h1"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-title-narrow",
+        "value": "1.875rem",
+        "mockupSpelling": "1.875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-title-narrow",
+        "value": "1.12"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".prose h1",
+          "line": 408,
+          "atRules": ["@media (max-width:760px)"],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": ".prose h1",
+            "line": 228,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": false
+          },
+          "fontSizeInherited": false,
+          "viewports": [760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["h1"]
+        }
+      ]
+    },
+    {
+      "fontSize": {
+        "name": "--fs-wordmark",
+        "value": "1.1875rem",
+        "mockupSpelling": "1.1875rem"
+      },
+      "lineHeight": {
+        "name": "--lh-wordmark",
+        "value": "1.55"
+      },
+      "named": true,
+      "provenance": [
+        {
+          "selector": ".word",
+          "line": 118,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": false,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["span.word"]
+        },
+        {
+          "selector": ".word",
+          "line": 118,
+          "atRules": [],
+          "origin": "stylesheet",
+          "lineHeightFrom": {
+            "selector": "body",
+            "line": 91,
+            "atRules": [],
+            "origin": "stylesheet",
+            "inherited": true
+          },
+          "fontSizeInherited": true,
+          "viewports": [1920, 1041, 1040, 761, 760, 390],
+          "themes": ["dark", "light"],
+          "views": ["chapter", "home", "practice"],
+          "states": [
+            "checks-open",
+            "listening",
+            "new",
+            "output-collapsed",
+            "returning",
+            "term-open",
+            "walk-safe-step-1",
+            "walk-wrong-step-4"
+          ],
+          "pseudo": ["focus-visible"],
+          "unforced": true,
+          "elements": ["b"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2283 @@
+{
+  "source": {
+    "description": "theme mockup",
+    "sha256": "900cded236fabaf21380c05273f65b887d37373da2cdd7bddfde4bd4f4e0eb79"
+  },
+  "generator": "web/stylelint/extract/extract-mockup.mjs",
+  "tokens": [
+    {
+      "name": "--space-neg-0-125",
+      "value": "-0.125rem",
+      "occurrences": [
+        {
+          "line": 173,
+          "selector": ".rung.now::before",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "-2px"
+        },
+        {
+          "line": 174,
+          "selector": ".rung.now::after",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "-2px"
+        },
+        {
+          "line": 255,
+          "selector": ".aside li",
+          "atRules": [],
+          "property": "margin-left",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "-2px"
+        }
+      ]
+    },
+    {
+      "name": "--space-neg-0-0625",
+      "value": "-0.0625rem",
+      "occurrences": [
+        {
+          "line": 291,
+          "selector": ".tab",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "-1px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-0625",
+      "value": "0.0625rem",
+      "occurrences": [
+        {
+          "line": 310,
+          "selector": ".check .st",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "1px 7px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-125",
+      "value": "0.125rem",
+      "occurrences": [
+        {
+          "line": 120,
+          "selector": ".nav",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px"
+        },
+        {
+          "line": 141,
+          "selector": ".topics .lbl",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px"
+        },
+        {
+          "line": 189,
+          "selector": ".rail li.now ul",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 0 4px"
+        },
+        {
+          "line": 232,
+          "selector": ".listen .bars",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px"
+        },
+        {
+          "line": 244,
+          "selector": ".codehead .tag",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 261,
+          "selector": ".drill .t",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 2px"
+        },
+        {
+          "line": 273,
+          "selector": ".ph .tagc",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 276,
+          "selector": ".diff",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 314,
+          "selector": ".verdict",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 9px"
+        },
+        {
+          "line": 332,
+          "selector": ".listen-ctl .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 345,
+          "selector": ".cells .ix",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px"
+        },
+        {
+          "line": 352,
+          "selector": ".cells li.lost .was",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px"
+        },
+        {
+          "line": 364,
+          "selector": ".cdetail",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 0 2px 0"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-1875",
+      "value": "0.1875rem",
+      "occurrences": [
+        {
+          "line": 125,
+          "selector": ".rung-chip .mini",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "3px"
+        },
+        {
+          "line": 168,
+          "selector": ".rung .st",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "3px 9px"
+        },
+        {
+          "line": 197,
+          "selector": ".stuck a",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "3px"
+        },
+        {
+          "line": 240,
+          "selector": ".card .lbl",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "3px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-25",
+      "value": "0.25rem",
+      "occurrences": [
+        {
+          "line": 106,
+          "selector": ".mock .seg button",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": true,
+          "sourceValue": "4px 10px"
+        },
+        {
+          "line": 189,
+          "selector": ".rail li.now ul",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 0 4px"
+        },
+        {
+          "line": 192,
+          "selector": ".rail li.now ul a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 10px"
+        },
+        {
+          "line": 192,
+          "selector": ".rail li.now ul a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 10px"
+        },
+        {
+          "line": 209,
+          "selector": ".rail .crumb",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 12px 4px"
+        },
+        {
+          "line": 221,
+          "selector": ".rail .foot",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 0 4px"
+        },
+        {
+          "line": 256,
+          "selector": ".aside li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 12px"
+        },
+        {
+          "line": 256,
+          "selector": ".aside li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 12px"
+        },
+        {
+          "line": 261,
+          "selector": ".drill .t",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 2px"
+        },
+        {
+          "line": 300,
+          "selector": ".ehint",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 14px"
+        },
+        {
+          "line": 364,
+          "selector": ".cdetail",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px"
+        },
+        {
+          "line": 368,
+          "selector": ".cdetail .cact",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-3125",
+      "value": "0.3125rem",
+      "occurrences": [
+        {
+          "line": 124,
+          "selector": ".rung-chip",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px 5px 8px"
+        },
+        {
+          "line": 124,
+          "selector": ".rung-chip",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px 5px 8px"
+        },
+        {
+          "line": 142,
+          "selector": ".topics a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 11px"
+        },
+        {
+          "line": 295,
+          "selector": ".tabs .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 11px"
+        },
+        {
+          "line": 301,
+          "selector": "kbd",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 5px"
+        },
+        {
+          "line": 341,
+          "selector": ".walk-mode .wm",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-375",
+      "value": "0.375rem",
+      "occurrences": [
+        {
+          "line": 180,
+          "selector": ".tile h3",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 0 0"
+        },
+        {
+          "line": 244,
+          "selector": ".codehead .tag",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px"
+        },
+        {
+          "line": 277,
+          "selector": ".statement h4",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "18px 0 6px"
+        },
+        {
+          "line": 281,
+          "selector": ".hint",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px"
+        },
+        {
+          "line": 294,
+          "selector": ".tabs .actions",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 0"
+        },
+        {
+          "line": 309,
+          "selector": ".check",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 8px"
+        },
+        {
+          "line": 326,
+          "selector": ".def a",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px"
+        },
+        {
+          "line": 331,
+          "selector": ".listen-ctl",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px"
+        },
+        {
+          "line": 333,
+          "selector": ".listen-ctl label",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px"
+        },
+        {
+          "line": 344,
+          "selector": ".cells li",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 6px"
+        },
+        {
+          "line": 356,
+          "selector": ".walk-ctl .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 12px"
+        },
+        {
+          "line": 364,
+          "selector": ".cdetail",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 0 2px 0"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-4375",
+      "value": "0.4375rem",
+      "occurrences": [
+        {
+          "line": 103,
+          "selector": ".mock",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": true,
+          "sourceValue": "7px 16px"
+        },
+        {
+          "line": 121,
+          "selector": ".nav a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "7px 12px"
+        },
+        {
+          "line": 310,
+          "selector": ".check .st",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "1px 7px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-5",
+      "value": "0.5rem",
+      "occurrences": [
+        {
+          "line": 124,
+          "selector": ".rung-chip",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 124,
+          "selector": ".rung-chip",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px 5px 8px"
+        },
+        {
+          "line": 128,
+          "selector": ".btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 14px"
+        },
+        {
+          "line": 128,
+          "selector": ".btn",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 140,
+          "selector": ".topics",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 145,
+          "selector": ".eyebrow",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 176,
+          "selector": ".feature-grid",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 56px"
+        },
+        {
+          "line": 177,
+          "selector": ".tile",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 228,
+          "selector": ".prose h1",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 10px"
+        },
+        {
+          "line": 244,
+          "selector": ".codehead .tag",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 245,
+          "selector": "pre.code",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 22px"
+        },
+        {
+          "line": 253,
+          "selector": ".aside h4",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 8px"
+        },
+        {
+          "line": 266,
+          "selector": ".practice .wrap",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 273,
+          "selector": ".ph .tagc",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 275,
+          "selector": ".statement h3",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 8px"
+        },
+        {
+          "line": 276,
+          "selector": ".diff",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 276,
+          "selector": ".diff",
+          "atRules": [],
+          "property": "margin-left",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 280,
+          "selector": ".hints h4",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 8px"
+        },
+        {
+          "line": 281,
+          "selector": ".hint",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 290,
+          "selector": ".tabs",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 8px"
+        },
+        {
+          "line": 294,
+          "selector": ".tabs .actions",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 305,
+          "selector": ".oh",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 14px"
+        },
+        {
+          "line": 307,
+          "selector": ".checks",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 309,
+          "selector": ".check",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 8px"
+        },
+        {
+          "line": 332,
+          "selector": ".listen-ctl .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 8px"
+        },
+        {
+          "line": 333,
+          "selector": ".listen-ctl label",
+          "atRules": [],
+          "property": "margin-left",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 343,
+          "selector": ".cells",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 344,
+          "selector": ".cells li",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 6px"
+        },
+        {
+          "line": 355,
+          "selector": ".walk-ctl",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 364,
+          "selector": ".cdetail",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 365,
+          "selector": ".cdetail > div",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 474,
+          "selector": "div",
+          "atRules": [],
+          "property": "gap",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 482,
+          "selector": "div",
+          "atRules": [],
+          "property": "gap",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "8px"
+        },
+        {
+          "line": 712,
+          "selector": "span.verdict",
+          "atRules": [],
+          "property": "margin-left",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "8px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-5625",
+      "value": "0.5625rem",
+      "occurrences": [
+        {
+          "line": 168,
+          "selector": ".rung .st",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "3px 9px"
+        },
+        {
+          "line": 214,
+          "selector": ".rail li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "9px 0 9px 36px"
+        },
+        {
+          "line": 214,
+          "selector": ".rail li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "9px 0 9px 36px"
+        },
+        {
+          "line": 314,
+          "selector": ".verdict",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "2px 9px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-625",
+      "value": "0.625rem",
+      "occurrences": [
+        {
+          "line": 106,
+          "selector": ".mock .seg button",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": true,
+          "sourceValue": "4px 10px"
+        },
+        {
+          "line": 114,
+          "selector": ".brand",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 123,
+          "selector": ".top .right",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 124,
+          "selector": ".rung-chip",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px 5px 8px"
+        },
+        {
+          "line": 164,
+          "selector": ".rung",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 10px"
+        },
+        {
+          "line": 182,
+          "selector": ".tile .foot",
+          "atRules": [],
+          "property": "padding-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 192,
+          "selector": ".rail li.now ul a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 10px"
+        },
+        {
+          "line": 196,
+          "selector": ".stuck",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 197,
+          "selector": ".stuck a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 228,
+          "selector": ".prose h1",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 10px"
+        },
+        {
+          "line": 262,
+          "selector": ".drill .m",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 271,
+          "selector": ".ph",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 271,
+          "selector": ".ph",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 278,
+          "selector": ".statement pre",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 278,
+          "selector": ".statement pre",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 10px"
+        },
+        {
+          "line": 281,
+          "selector": ".hint",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 281,
+          "selector": ".hint",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 291,
+          "selector": ".tab",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 305,
+          "selector": ".oh",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 306,
+          "selector": ".term2",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 307,
+          "selector": ".checks",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 309,
+          "selector": ".check",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 324,
+          "selector": ".def",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 341,
+          "selector": ".walk-mode .wm",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 10px"
+        },
+        {
+          "line": 354,
+          "selector": ".walk-msg",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "26px 0 10px"
+        },
+        {
+          "line": 362,
+          "selector": ".cbtn",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 364,
+          "selector": ".cdetail",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 10px"
+        },
+        {
+          "line": 390,
+          "selector": ".rail summary",
+          "atRules": ["@media (max-width:1040px)"],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 393,
+          "selector": ".rail ol",
+          "atRules": ["@media (max-width:1040px)"],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px"
+        },
+        {
+          "line": 510,
+          "selector": "p.only-new",
+          "atRules": [],
+          "property": "margin",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "14px 10px 0"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-6875",
+      "value": "0.6875rem",
+      "occurrences": [
+        {
+          "line": 142,
+          "selector": ".topics a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 11px"
+        },
+        {
+          "line": 295,
+          "selector": ".tabs .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "5px 11px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-75",
+      "value": "0.75rem",
+      "occurrences": [
+        {
+          "line": 121,
+          "selector": ".nav a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "7px 12px"
+        },
+        {
+          "line": 147,
+          "selector": "h1.display",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 0 16px"
+        },
+        {
+          "line": 157,
+          "selector": ".cta",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 197,
+          "selector": ".stuck a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 209,
+          "selector": ".rail .crumb",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 12px 4px"
+        },
+        {
+          "line": 225,
+          "selector": ".secno",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 230,
+          "selector": ".tools",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 230,
+          "selector": ".tools",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 0"
+        },
+        {
+          "line": 234,
+          "selector": ".prose h2",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "44px 0 12px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 256,
+          "selector": ".aside li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 0 4px 12px"
+        },
+        {
+          "line": 278,
+          "selector": ".statement pre",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 279,
+          "selector": ".hints",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 18px 16px"
+        },
+        {
+          "line": 297,
+          "selector": ".editor .g",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 12px 12px 0"
+        },
+        {
+          "line": 297,
+          "selector": ".editor .g",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 12px 12px 0"
+        },
+        {
+          "line": 297,
+          "selector": ".editor .g",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 12px 12px 0"
+        },
+        {
+          "line": 298,
+          "selector": ".editor .b",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 16px"
+        },
+        {
+          "line": 324,
+          "selector": ".def",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 12px"
+        },
+        {
+          "line": 337,
+          "selector": ".walk",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 16px 12px"
+        },
+        {
+          "line": 338,
+          "selector": ".walk-top",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 338,
+          "selector": ".walk-top",
+          "atRules": [],
+          "property": "margin-bottom",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 356,
+          "selector": ".walk-ctl .btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "6px 12px"
+        },
+        {
+          "line": 403,
+          "selector": ".top .wrap",
+          "atRules": ["@media (max-width:760px)"],
+          "property": "padding-block",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        },
+        {
+          "line": 403,
+          "selector": ".top .wrap",
+          "atRules": ["@media (max-width:760px)"],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-8125",
+      "value": "0.8125rem",
+      "occurrences": [
+        {
+          "line": 164,
+          "selector": ".rung",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "13px 18px"
+        }
+      ]
+    },
+    {
+      "name": "--space-0-875",
+      "value": "0.875rem",
+      "occurrences": [
+        {
+          "line": 128,
+          "selector": ".btn",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 14px"
+        },
+        {
+          "line": 157,
+          "selector": ".cta",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px"
+        },
+        {
+          "line": 161,
+          "selector": ".ladder",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 0"
+        },
+        {
+          "line": 164,
+          "selector": ".rung",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 18px 14px 16px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 18px 14px 16px"
+        },
+        {
+          "line": 245,
+          "selector": "pre.code",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 16px"
+        },
+        {
+          "line": 259,
+          "selector": ".drill",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px"
+        },
+        {
+          "line": 271,
+          "selector": ".ph",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 291,
+          "selector": ".tab",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 300,
+          "selector": ".ehint",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "4px 14px"
+        },
+        {
+          "line": 305,
+          "selector": ".oh",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 14px"
+        },
+        {
+          "line": 306,
+          "selector": ".term2",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 337,
+          "selector": ".walk",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 16px 12px"
+        },
+        {
+          "line": 390,
+          "selector": ".rail summary",
+          "atRules": ["@media (max-width:1040px)"],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "10px 14px"
+        },
+        {
+          "line": 510,
+          "selector": "p.only-new",
+          "atRules": [],
+          "property": "margin",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "14px 10px 0"
+        }
+      ]
+    },
+    {
+      "name": "--space-1",
+      "value": "1rem",
+      "occurrences": [
+        {
+          "line": 103,
+          "selector": ".mock",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": true,
+          "sourceValue": "7px 16px"
+        },
+        {
+          "line": 147,
+          "selector": "h1.display",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 0 16px"
+        },
+        {
+          "line": 150,
+          "selector": ".resume",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 20px"
+        },
+        {
+          "line": 163,
+          "selector": ".ladder ol",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px"
+        },
+        {
+          "line": 201,
+          "selector": ".drill-end",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 201,
+          "selector": ".drill-end",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px"
+        },
+        {
+          "line": 221,
+          "selector": ".rail .foot",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 0 4px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 18px 14px 16px"
+        },
+        {
+          "line": 245,
+          "selector": "pre.code",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 16px"
+        },
+        {
+          "line": 246,
+          "selector": ".next",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 246,
+          "selector": ".next",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px"
+        },
+        {
+          "line": 265,
+          "selector": ".practice",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 32px"
+        },
+        {
+          "line": 274,
+          "selector": ".statement",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 279,
+          "selector": ".hints",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 18px 16px"
+        },
+        {
+          "line": 298,
+          "selector": ".editor .b",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 16px"
+        },
+        {
+          "line": 300,
+          "selector": ".ehint",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px"
+        },
+        {
+          "line": 337,
+          "selector": ".walk",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 16px 12px"
+        },
+        {
+          "line": 337,
+          "selector": ".walk",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 26px"
+        },
+        {
+          "line": 400,
+          "selector": ".wrap",
+          "atRules": ["@media (max-width:760px)"],
+          "property": "padding-inline",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-125",
+      "value": "1.125rem",
+      "occurrences": [
+        {
+          "line": 103,
+          "selector": ".mock",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": true,
+          "sourceValue": "18px"
+        },
+        {
+          "line": 150,
+          "selector": ".resume",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "18px"
+        },
+        {
+          "line": 164,
+          "selector": ".rung",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "13px 18px"
+        },
+        {
+          "line": 176,
+          "selector": ".feature-grid",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "18px"
+        },
+        {
+          "line": 201,
+          "selector": ".drill-end",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 229,
+          "selector": ".prose .lede",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 18px"
+        },
+        {
+          "line": 235,
+          "selector": ".prose p",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 18px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "14px 18px 14px 16px"
+        },
+        {
+          "line": 243,
+          "selector": ".codehead",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "18px"
+        },
+        {
+          "line": 246,
+          "selector": ".next",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 274,
+          "selector": ".statement",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 18px"
+        },
+        {
+          "line": 277,
+          "selector": ".statement h4",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "18px 0 6px"
+        },
+        {
+          "line": 279,
+          "selector": ".hints",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "12px 18px 16px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-25",
+      "value": "1.25rem",
+      "occurrences": [
+        {
+          "line": 150,
+          "selector": ".resume",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 20px"
+        },
+        {
+          "line": 177,
+          "selector": ".tile",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "20px 22px"
+        },
+        {
+          "line": 386,
+          "selector": ".chapter .wrap",
+          "atRules": ["@media (max-width:1040px)"],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "20px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-375",
+      "value": "1.375rem",
+      "occurrences": [
+        {
+          "line": 140,
+          "selector": ".topics",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "22px 0 0"
+        },
+        {
+          "line": 177,
+          "selector": ".tile",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "20px 22px"
+        },
+        {
+          "line": 237,
+          "selector": ".card",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "22px 0"
+        },
+        {
+          "line": 245,
+          "selector": "pre.code",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 22px"
+        },
+        {
+          "line": 374,
+          "selector": ".foot-site",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "22px 0 40px"
+        },
+        {
+          "line": 375,
+          "selector": ".foot-site .wrap",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "22px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-5",
+      "value": "1.5rem",
+      "occurrences": [
+        {
+          "line": 201,
+          "selector": ".drill-end",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "24px"
+        },
+        {
+          "line": 254,
+          "selector": ".aside ul",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 24px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-625",
+      "value": "1.625rem",
+      "occurrences": [
+        {
+          "line": 148,
+          "selector": ".hero p.sub",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 26px"
+        },
+        {
+          "line": 337,
+          "selector": ".walk",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 26px"
+        },
+        {
+          "line": 354,
+          "selector": ".walk-msg",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "26px 0 10px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-75",
+      "value": "1.75rem",
+      "occurrences": [
+        {
+          "line": 98,
+          "selector": ".wrap",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 28px"
+        },
+        {
+          "line": 139,
+          "selector": ".hero",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "40px 0 28px"
+        },
+        {
+          "line": 385,
+          "selector": ".hero .wrap",
+          "atRules": ["@media (max-width:1040px)"],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "28px"
+        }
+      ]
+    },
+    {
+      "name": "--space-1-875",
+      "value": "1.875rem",
+      "occurrences": [
+        {
+          "line": 113,
+          "selector": ".top .wrap",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "30px"
+        },
+        {
+          "line": 196,
+          "selector": ".stuck",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 30px"
+        },
+        {
+          "line": 230,
+          "selector": ".tools",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 30px"
+        },
+        {
+          "line": 487,
+          "selector": "h1.display",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "inline",
+          "toolbar": false,
+          "sourceValue": "30px"
+        }
+      ]
+    },
+    {
+      "name": "--space-2",
+      "value": "2rem",
+      "occurrences": [
+        {
+          "line": 265,
+          "selector": ".practice",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "16px 0 32px"
+        }
+      ]
+    },
+    {
+      "name": "--space-2-25",
+      "value": "2.25rem",
+      "occurrences": [
+        {
+          "line": 186,
+          "selector": ".chapter",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "36px 0 96px"
+        },
+        {
+          "line": 189,
+          "selector": ".rail li.now ul",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 0 0 36px"
+        },
+        {
+          "line": 214,
+          "selector": ".rail li a",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "9px 0 9px 36px"
+        },
+        {
+          "line": 381,
+          "selector": ".chapter .wrap",
+          "atRules": ["@media (min-width:1041px) and (max-width:1199px)"],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 36px"
+        }
+      ]
+    },
+    {
+      "name": "--space-2-5",
+      "value": "2.5rem",
+      "occurrences": [
+        {
+          "line": 139,
+          "selector": ".hero",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "40px 0 28px"
+        },
+        {
+          "line": 374,
+          "selector": ".foot-site",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "22px 0 40px"
+        }
+      ]
+    },
+    {
+      "name": "--space-2-75",
+      "value": "2.75rem",
+      "occurrences": [
+        {
+          "line": 234,
+          "selector": ".prose h2",
+          "atRules": [],
+          "property": "margin",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "44px 0 12px"
+        }
+      ]
+    },
+    {
+      "name": "--space-3",
+      "value": "3rem",
+      "occurrences": [
+        {
+          "line": 246,
+          "selector": ".next",
+          "atRules": [],
+          "property": "margin-top",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "48px"
+        }
+      ]
+    },
+    {
+      "name": "--space-3-5",
+      "value": "3.5rem",
+      "occurrences": [
+        {
+          "line": 144,
+          "selector": ".hero .wrap",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "56px"
+        },
+        {
+          "line": 176,
+          "selector": ".feature-grid",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "8px 0 56px"
+        },
+        {
+          "line": 187,
+          "selector": ".chapter .wrap",
+          "atRules": [],
+          "property": "gap",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "0 56px"
+        }
+      ]
+    },
+    {
+      "name": "--space-6",
+      "value": "6rem",
+      "occurrences": [
+        {
+          "line": 186,
+          "selector": ".chapter",
+          "atRules": [],
+          "property": "padding",
+          "origin": "stylesheet",
+          "toolbar": false,
+          "sourceValue": "36px 0 96px"
+        }
+      ]
+    }
+  ]
+}

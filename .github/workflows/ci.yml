@@ -129,6 +129,14 @@ jobs:
         shell: bash
         working-directory: web
         run: npm ci
+      - name: Real-tree install-health acceptance (Windows)
+        shell: bash
+        working-directory: web
+        run: node source-check/install-acceptance.js
+      - name: Stylesheet and source-check tests (Windows paths)
+        shell: bash
+        working-directory: web
+        run: npx vitest run stylelint source-check
       - name: Hook and check tests (Windows PowerShell, parity with sh)
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 

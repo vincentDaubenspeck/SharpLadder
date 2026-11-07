@@ -86,6 +86,13 @@ export function report(name, problems) {
   }
 }
 export const anyFailed = () => failed;
+// The run's exit status, which check.sh and check.ps1 read.
+export function setExitCode() {
+  process.exitCode = failed ? 1 : 0;
+}
+export function notApplicable(name, reason) {
+  console.log(`NOT APPLICABLE ${name} (${reason})`);
+}
 
 export function gitFiles(root, patterns) {
   const r = exec("git", ["-c", "core.quotepath=off", "ls-files", "-z", "--", ...patterns], {

@@ -249,6 +249,7 @@ mkdir -p "$repo/web"
 cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$repo/tools/"
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
   "$src/tools/checks/dotnet.mjs" "$src/tools/checks/csharp.mjs" "$src/tools/checks/content.mjs" \
+  "$src/tools/checks/web.mjs" \
   "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
 cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"

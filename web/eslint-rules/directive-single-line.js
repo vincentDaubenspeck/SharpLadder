@@ -1,4 +1,4 @@
-// Keeps each directive and its reason on one physical line, so the reason sits beside it.
+// A reason on a later line is easily separated from its directive.
 const directives = new Set([
   "eslint",
   "eslint-disable",
