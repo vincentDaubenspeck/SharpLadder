@@ -65,8 +65,10 @@ The .NET build settings live in `Directory.Build.props`, analyzer versions in
 build a throwaway probe project against them.
 
 The solution is `SharpLadder.sln`: the API in `api/SharpLadder.Api` and its
-xUnit v3 tests in `api/SharpLadder.Api.Tests`, and the policy tool in
-`tools/SharpLadder.Policy` with its tests in `tools/SharpLadder.Policy.Tests`.
+xUnit v3 tests in `api/SharpLadder.Api.Tests`, the policy tool in
+`tools/SharpLadder.Policy` with its tests in `tools/SharpLadder.Policy.Tests`,
+and the content compiler in `tools/SharpLadder.Content` with its tests in
+`tools/SharpLadder.Content.Tests`.
 `dotnet test` runs in
 Microsoft.Testing.Platform mode (the `test` entry in `global.json`):
 
@@ -108,6 +110,21 @@ against the SHA-512 in `tools/tool-pins.json`) and fails any package whose
 licence is not in `tools/nuget-allowed-licenses.json`, build-only analyzers
 included, unless `tools/nuget-license-exceptions.json` records a reason for it;
 an exception that covers no failing package also fails.
+
+The content compiler turns each Markdown file in `chapters/<chapter>/` under a
+content root into one JSON file at the same relative path (Markdig, with YAML
+front matter read by YamlDotNet), and validates every file against the draft-07
+JSON Schema in `content/schema/`, from an offline registry, before anything is
+written. Its three folder arguments must be full paths; the kernel resolves each
+one, links and mount points are accepted only above those folders, every entry
+of both input trees is checked before anything is compiled, and the output
+folder must be empty or absent and lie outside both inputs. On Linux it needs
+kernel 5.8 or later (`openat2` and the `statx` mount-root flag). The `content`
+stage compiles the fixture chapter in
+`tools/SharpLadder.Content.Tests/fixtures/content` and compares the SHA-256 of
+its output set with `tools/SharpLadder.Content.Tests/fixtures/content.sha256`;
+the `content` CI job runs it on Linux and Windows. A reviewed change to the
+output updates that file with the digest `node tools/checks/content.mjs` prints.
 
 OpenSSF Scorecard runs weekly and on every push to `main`.
 

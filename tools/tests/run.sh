@@ -12,8 +12,10 @@
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities and licences, no SDK
 #   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
+#   k. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
+#      full-path arguments, output containment, no partial output, schema setup errors, no SDK
 # Usage: sh tools/tests/run.sh
-# Parts h and i need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
 
 started=$(date +%s)
@@ -246,8 +248,8 @@ fi
 mkdir -p "$repo/web"
 cp "$src/tools/check.sh" "$src/tools/check.ps1" "$src/tools/tool-pins.json" "$repo/tools/"
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
-  "$src/tools/checks/dotnet.mjs" "$src/tools/checks/csharp.mjs" "$src/tools/checks/ps-suppressions.ps1" \
-  "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
+  "$src/tools/checks/dotnet.mjs" "$src/tools/checks/csharp.mjs" "$src/tools/checks/content.mjs" \
+  "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/tools/hooks/pre-push" "$repo/tools/hooks/"
 cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"
 cp "$src/global.json" "$src/Directory.Build.props" "$src/Directory.Packages.props" "$repo/"
@@ -391,6 +393,10 @@ else
   rc=0
   "$node" "$src/tools/tests/csharp-cases.mjs" "$tmp/csharp" > "$tmp/out" 2>&1 || rc=$?
   count_lines "C# cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/content-cases.mjs" "$tmp/content" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "content cases" "$rc" "$tmp/out"
 fi
 
 if [ -z "$node" ]; then

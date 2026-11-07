@@ -65,6 +65,15 @@ export function toolProblem(cmd, args, pattern, want) {
   return null;
 }
 
+// The tool prints its own problem lines and a final PASS or FAIL line.
+export function toolProblems(r, name) {
+  const lines = r.out.split(/\r?\n/).filter((l) => l.trim() !== "");
+  const last = lines.pop() ?? "";
+  if (r.code === 0 && last === `PASS ${name}`) return [];
+  const problems = lines.map((l) => l.replace(/^ {2}/, ""));
+  return problems.length > 0 ? problems : [last || `exit ${String(r.code)}`];
+}
+
 let failed = false;
 export function report(name, problems) {
   for (const p of problems) {

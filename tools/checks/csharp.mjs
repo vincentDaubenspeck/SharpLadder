@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { dotnetChecks } from "./dotnet.mjs";
-import { anyFailed, ciEnv, dotnet, exec, pins, report } from "./lib.mjs";
+import { anyFailed, ciEnv, dotnet, exec, pins, report, toolProblems } from "./lib.mjs";
 
 const solution = "SharpLadder.sln";
 const allowedFile = "tools/nuget-allowed-licenses.json";
@@ -15,15 +15,6 @@ const exceptionsFile = "tools/nuget-license-exceptions.json";
 const policyDll = "tools/SharpLadder.Policy/bin/Debug/net10.0/SharpLadder.Policy.dll";
 // The documented severities; any other value fails rather than being read as harmless.
 const severities = new Set(["Low", "Moderate", "High", "Critical"]);
-
-// The tool prints its own problem lines and a final PASS or FAIL line.
-function toolProblems(r, name) {
-  const lines = r.out.split(/\r?\n/).filter((l) => l.trim() !== "");
-  const last = lines.pop() ?? "";
-  if (r.code === 0 && last === `PASS ${name}`) return [];
-  const problems = lines.map((l) => l.replace(/^ {2}/, ""));
-  return problems.length > 0 ? problems : [last || `exit ${String(r.code)}`];
-}
 
 const samePath = (a, b) =>
   process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
@@ -256,6 +247,7 @@ export function nugetLicences(root) {
   return licenceProblems(scan.code, scan.out, allowed.value, exceptions.value);
 }
 
+// Returns the build state the content stage needs: empty when the build passed.
 export function csharpChecks(root, configOk) {
   const config = configOk ? [] : ["needs .NET config (see above)"];
   const build = config.length > 0 ? config : runProblems(exec(dotnet, ["build", solution, "-nologo"], { cwd: root }));
@@ -268,6 +260,7 @@ export function csharpChecks(root, configOk) {
   report(name, built.length > 0 ? built : toolProblems(exec(dotnet, [policyDll], { cwd: root }), name));
   report("nuget vulnerabilities", config.length > 0 ? config : nugetVulnerabilities(root));
   report("nuget licences", config.length > 0 ? config : nugetLicences(root));
+  return built;
 }
 
 const runProblems = (r) => (r.code === 0 ? [] : [r.out]);

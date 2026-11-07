@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sharpladder.com/schema/content.schema.json",
+  "title": "Compiled content file",
+  "oneOf": [
+    { "$ref": "#/definitions/chapterFile" },
+    { "$ref": "#/definitions/partFile" }
+  ],
+  "definitions": {
+    "chapterId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^ch-" }
+      ]
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "chapterFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "slug", "title", "order", "targets", "intro", "sections"],
+      "properties": {
+        "type": { "const": "chapter" },
+        "id": { "$ref": "#/definitions/chapterId" },
+        "slug": {
+          "type": "string",
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(?![\\s\\S])"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "order": { "$ref": "#/definitions/order" },
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["csharp", "dotnet"],
+          "properties": {
+            "csharp": { "const": 12 },
+            "dotnet": { "const": 8 }
+          }
+        },
+        "intro": { "$ref": "body.schema.json#/definitions/body" },
+        "sections": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/chapterSection" }
+        }
+      }
+    },
+    "partFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "enum": ["syntax", "build", "idioms", "gotchas", "library"] },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/partSection" }
+        }
+      }
+    },
+    "chapterSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "body"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/sectionId" },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "body": { "$ref": "body.schema.json#/definitions/body" }
+      }
+    },
+    "partSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "number", "title", "body"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/sectionId" },
+        "number": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*(?![\\s\\S])"
+        },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "body": { "$ref": "body.schema.json#/definitions/body" }
+      }
+    }
+  }
+}

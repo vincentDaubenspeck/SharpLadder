@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sharpladder.com/schema/body.schema.json",
+  "title": "Body blocks and inline spans",
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,47}(?![\\s\\S])"
+    },
+    "sectionId": {
+      "allOf": [
+        { "$ref": "#/definitions/id" },
+        { "not": { "const": "intro" } }
+      ]
+    },
+    "blockId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,47}/b[1-9][0-9]*(?![\\s\\S])"
+    },
+    "itemId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,47}/b[1-9][0-9]*\\.i[1-9][0-9]*(?![\\s\\S])"
+    },
+    "spoken": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "body": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/block" }
+    },
+    "block": {
+      "oneOf": [
+        { "$ref": "#/definitions/paragraphBlock" },
+        { "$ref": "#/definitions/listBlock" },
+        { "$ref": "#/definitions/codeBlock" },
+        { "$ref": "#/definitions/textBlock" }
+      ]
+    },
+    "paragraphBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "blockId", "content"],
+      "properties": {
+        "type": { "const": "paragraph" },
+        "blockId": { "$ref": "#/definitions/blockId" },
+        "content": { "$ref": "#/definitions/spans" }
+      }
+    },
+    "listBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "blockId", "ordered", "items"],
+      "properties": {
+        "type": { "const": "list" },
+        "blockId": { "$ref": "#/definitions/blockId" },
+        "ordered": { "type": "boolean" },
+        "start": { "type": "integer", "minimum": 0 },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/listItem" }
+        }
+      }
+    },
+    "listItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockId", "content"],
+      "properties": {
+        "blockId": { "$ref": "#/definitions/itemId" },
+        "content": { "$ref": "#/definitions/spans" }
+      }
+    },
+    "codeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "blockId", "id", "group", "spoken", "source"],
+      "properties": {
+        "type": { "const": "code" },
+        "blockId": { "$ref": "#/definitions/blockId" },
+        "id": { "$ref": "#/definitions/id" },
+        "group": { "$ref": "#/definitions/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "spoken": { "$ref": "#/definitions/spoken" },
+        "check": { "type": "string", "minLength": 1 },
+        "throws": { "type": "string", "minLength": 1 },
+        "fail": { "type": "string", "pattern": "^CS[0-9]+(?![\\s\\S])" },
+        "source": { "type": "string" }
+      },
+      "not": {
+        "anyOf": [
+          { "required": ["check", "throws"] },
+          { "required": ["check", "fail"] },
+          { "required": ["throws", "fail"] }
+        ]
+      }
+    },
+    "textBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "blockId", "spoken", "source"],
+      "properties": {
+        "type": { "const": "text" },
+        "blockId": { "$ref": "#/definitions/blockId" },
+        "id": { "$ref": "#/definitions/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "spoken": { "$ref": "#/definitions/spoken" },
+        "source": { "type": "string" }
+      }
+    },
+    "spans": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/span" }
+    },
+    "span": {
+      "oneOf": [
+        { "$ref": "#/definitions/textSpan" },
+        { "$ref": "#/definitions/codeSpan" },
+        { "$ref": "#/definitions/emSpan" },
+        { "$ref": "#/definitions/strongSpan" }
+      ]
+    },
+    "textSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "codeSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "code" },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "emSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "const": "em" },
+        "content": { "$ref": "#/definitions/spans" }
+      }
+    },
+    "strongSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "const": "strong" },
+        "content": { "$ref": "#/definitions/spans" }
+      }
+    }
+  }
+}

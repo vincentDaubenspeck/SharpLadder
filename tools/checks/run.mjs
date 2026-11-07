@@ -12,6 +12,7 @@ import {
   toolProblem,
   win,
 } from "./lib.mjs";
+import { contentChecks } from "./content.mjs";
 import { csharpChecks } from "./csharp.mjs";
 import { dotnetChecks } from "./dotnet.mjs";
 import { shellChecks, trackedShellFiles } from "./shell.mjs";
@@ -104,6 +105,6 @@ else {
   report("YAML (yamllint)", r.code === 0 ? [] : [r.out]);
 }
 
-csharpChecks(root, dotnetChecks(root));
+contentChecks(root, csharpChecks(root, dotnetChecks(root)));
 
 process.exitCode = anyFailed() ? 1 : 0;

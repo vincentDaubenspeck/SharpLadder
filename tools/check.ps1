@@ -2,7 +2,7 @@
 # Runs the same components as tools/check.sh:
 #   1. Text rules (tools/checks/text.ps1): phrases, encoding, HEAD commit message
 #   2. Tool checks (tools/checks/run.mjs): web, shell, PowerShell, EditorConfig, YAML, .NET config,
-#      .NET build and tests, C# suppression reasons, nuget vulnerabilities, nuget licences
+#      .NET build and tests, C# suppression reasons, nuget vulnerabilities, nuget licences, content
 $ErrorActionPreference = 'Stop'
 
 $root = (& git rev-parse --show-toplevel)

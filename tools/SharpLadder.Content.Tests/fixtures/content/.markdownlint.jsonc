@@ -1,0 +1,6 @@
+// Content files start with front matter and ## sections, and fence attributes run long.
+{
+  "default": true,
+  "MD013": { "code_blocks": false },
+  "MD041": false
+}

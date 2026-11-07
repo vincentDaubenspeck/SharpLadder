@@ -29,6 +29,8 @@ const analyzers = {
 };
 // Central package management also lists every global reference as a package version.
 const packageVersions = {
+  "LateApexEarlySpeed.Json.Schema": "4.2.3",
+  Markdig: "1.6.0",
   "Microsoft.AspNetCore.Mvc.Testing": "10.0.14",
   "Microsoft.Build.Locator": "1.11.2",
   "Microsoft.CodeAnalysis.CSharp": "5.6.0",
@@ -36,6 +38,7 @@ const packageVersions = {
   "Microsoft.CodeAnalysis.Workspaces.MSBuild": "5.6.0",
   "xunit.analyzers": "2.2.0",
   "xunit.v3": "4.0.2",
+  YamlDotNet: "18.1.0",
   ...analyzers,
 };
 const properties = {

@@ -11,8 +11,10 @@
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities and licences, no SDK
 #   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
+#   k. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
+#      full-path arguments, output containment, no partial output, schema setup errors, no SDK
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
-# Parts h and i need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
+# Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
 
 $started = Get-Date
@@ -224,8 +226,8 @@ try {
 
   New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web') | Out-Null
   Copy-FromSource @('tools/check.sh', 'tools/check.ps1', 'tools/checks/lib.mjs', 'tools/checks/run.mjs',
-    'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/csharp.mjs', 'tools/checks/ps-suppressions.ps1',
-    'tools/checks/pssa.ps1', 'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc',
+    'tools/checks/shell.mjs', 'tools/checks/dotnet.mjs', 'tools/checks/csharp.mjs', 'tools/checks/content.mjs',
+    'tools/checks/ps-suppressions.ps1', 'tools/checks/pssa.ps1', 'tools/hooks/pre-push', 'web/package.json', 'web/.nvmrc',
     'web/.licensee.json', 'global.json', 'Directory.Build.props', 'Directory.Packages.props')
   # An unavailable PSScriptAnalyzer version stands in for a missing module.
   $pins = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'tools/tool-pins.json'))
@@ -337,6 +339,9 @@ try {
 
     Add-CaseLine 'C# cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/csharp-cases.mjs'),
         (Join-Path -Path $tmp -ChildPath 'csharp')) -dir $src)
+
+    Add-CaseLine 'content cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/content-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'content')) -dir $src)
   }
 
   if (-not $node) { Write-Fail 'npm audit cases (no node)' }
