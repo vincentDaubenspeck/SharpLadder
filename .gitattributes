@@ -7,3 +7,6 @@
 *.ico binary
 
 web/package-lock.json linguist-generated=true
+
+# Upstream licence texts are kept byte for byte, line endings included; their hashes are recorded.
+web/assets/licences/*/OFL.txt -text

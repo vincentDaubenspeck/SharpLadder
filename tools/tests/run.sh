@@ -4,7 +4,8 @@
 # Builds a throwaway git repository, installs the tracked hooks there and checks:
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
-#   c. CRLF line endings and a missing final newline fail the encoding check; lock files are exempt
+#   c. CRLF line endings and a missing final newline fail the encoding check; lock files and
+#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt
 #   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
@@ -14,6 +15,7 @@
 #   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
 #   k. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
+#   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 # Usage: sh tools/tests/run.sh
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
@@ -164,6 +166,33 @@ else
   fail "text.sh exempts only packages.lock.json"
 fi
 git rm -q -r --cached lock && rm -r lock
+
+# Only an OFL.txt in an asset licence folder may keep upstream CRLF bytes.
+mkdir -p web/assets/licences/sample
+printf 'one\r\ntwo\r\n' > web/assets/licences/sample/OFL.txt
+git add web/assets/licences/sample/OFL.txt 2> /dev/null
+run_checks "verbatim licence text with CRLF" 0
+printf 'one\r\ntwo\r\n' > web/assets/licences/sample/NOTES.txt
+git add web/assets/licences/sample/NOTES.txt 2> /dev/null
+run_checks "other name in the licence folder with CRLF" 1
+if grep -q '^  web/assets/licences/sample/NOTES.txt: CRLF line endings$' "$tmp/out.sh"; then
+  pass "text.sh exempts only licence-folder OFL.txt"
+else
+  fail "text.sh exempts only licence-folder OFL.txt"
+fi
+git rm -q --cached web/assets/licences/sample/NOTES.txt && rm web/assets/licences/sample/NOTES.txt
+mkdir -p web/assets/licences/sample/extra
+printf 'one\r\ntwo\r\n' > web/assets/licences/sample/extra/OFL.txt
+git add web/assets/licences/sample/extra/OFL.txt 2> /dev/null
+run_checks "nested licence text with CRLF" 1
+if grep -q '^  web/assets/licences/sample/extra/OFL.txt: CRLF line endings$' "$tmp/out.sh" &&
+  [ "$(git check-attr text -- web/assets/licences/sample/extra/OFL.txt)" = \
+    'web/assets/licences/sample/extra/OFL.txt: text: auto' ]; then
+  pass "the licence text exemption covers one folder level only"
+else
+  fail "the licence text exemption covers one folder level only"
+fi
+git rm -q -r --cached web && rm -r web
 
 # Shell and PowerShell report a named stage; ESLint reports by exit code.
 if [ -z "$node" ]; then
@@ -406,6 +435,10 @@ else
   rc=0
   "$node" "$src/tools/tests/npm-audit-cases.mjs" "$tmp/audit" > "$tmp/out" 2>&1 || rc=$?
   count_lines "npm audit cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/asset-licence-cases.mjs" "$tmp/assets" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "asset licence cases" "$rc" "$tmp/out"
 fi
 
 echo "$passed passed, $failed failed, $skipped skipped in $(($(date +%s) - started))s"

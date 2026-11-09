@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "allowedLicences": ["OFL-1.1"],
+  "noticesContract": {
+    "assetsAreNoticesSource": true,
+    "servedWithEachShippedAsset": ["copyright", "licenceText"],
+    "siteLicenceGrantsExcludeAssets": true,
+    "consumer": "notices-page-generator",
+    "consumerReads": "web/assets/licences/asset-inventory.json"
+  },
+  "assets": [
+    {
+      "schemaVersion": 1,
+      "id": "noto-sans",
+      "family": "Noto Sans",
+      "upstreamSource": "https://github.com/notofonts/latin-greek-cyrillic/releases/download/NotoSans-v2.015/NotoSans-v2.015.zip",
+      "upstreamRevision": "c4a321e123e4d4ff315f57f4e0adf294fe3a95be",
+      "upstreamTag": "NotoSans-v2.015",
+      "originalFiles": [
+        {
+          "id": "variable",
+          "acquisitionPath": "NotoSans/unhinted/variable-ttf/NotoSans[wdth,wght].ttf",
+          "sha256": "511cc04b442ffcc3b24d65c2cc780bdffaf482b20ba0aebdc8f27b37017ff0f5"
+        }
+      ],
+      "copyright": "Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)",
+      "licence": "OFL-1.1",
+      "licenceText": {
+        "sourcePath": "web/assets/licences/noto-sans/OFL.txt",
+        "sha256": "cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a",
+        "distributionPath": null
+      },
+      "reservedFontNames": [],
+      "declarationHash": "5ac9f3ae86a7933e0b51f407817cf7a266d2bd383fd90a78538ef67d32c17b3f",
+      "renamedIdentity": false,
+      "distributedFamilyName": null,
+      "transformation": { "kind": "none" },
+      "distributedFiles": [],
+      "shipped": false
+    },
+    {
+      "schemaVersion": 1,
+      "id": "noto-sans-display",
+      "family": "Noto Sans Display",
+      "upstreamSource": "https://github.com/google/fonts",
+      "upstreamRevision": "5bb28733cec313b63fbd415b574b5ae35c8aa8b8",
+      "upstreamTag": null,
+      "originalFiles": [
+        {
+          "id": "variable",
+          "acquisitionPath": "ofl/notosansdisplay/NotoSansDisplay[wdth,wght].ttf",
+          "sha256": "deaa68141fa5ad21bd17d7c11fa79183ceda19b32e40ff5c33874d42f3636dde"
+        }
+      ],
+      "copyright": "Copyright 2012 Google Inc. All Rights Reserved.",
+      "licence": "OFL-1.1",
+      "licenceText": {
+        "sourcePath": "web/assets/licences/noto-sans-display/OFL.txt",
+        "sha256": "5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6",
+        "distributionPath": null
+      },
+      "reservedFontNames": [],
+      "declarationHash": "9d01241d6ad241e6e01a52f384f14bac4c494fdc142d9d36eae6c80bdd9409ad",
+      "renamedIdentity": false,
+      "distributedFamilyName": null,
+      "transformation": { "kind": "none" },
+      "distributedFiles": [],
+      "shipped": false
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cascadia-code",
+      "family": "Cascadia Code",
+      "upstreamSource": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "upstreamRevision": "56bcca3f2c1e4cb19458954f0e2bb4635960df91",
+      "upstreamTag": "v2407.24",
+      "originalFiles": [
+        {
+          "id": "regular",
+          "acquisitionPath": "woff2/static/CascadiaCode-Regular.woff2",
+          "sha256": "55e460d6c9345a4769ed28fc9f01ecc2160a10e95080523f3d340a0d208288c8"
+        }
+      ],
+      "copyright": "Copyright (c) 2019 - Present, Microsoft Corporation, with Reserved Font Name Cascadia Code.",
+      "licence": "OFL-1.1",
+      "licenceText": {
+        "sourcePath": "web/assets/licences/cascadia-code/OFL.txt",
+        "sha256": "51882cd3cdba4e16f220f44ddb08a635c38c44ea6e0975db2574f4be6f958238",
+        "distributionPath": null
+      },
+      "reservedFontNames": ["Cascadia Code"],
+      "declarationHash": "993d0487409ac2dc6312d9047e16e15be05fd515e68c1f48d891f6989c427888",
+      "renamedIdentity": false,
+      "distributedFamilyName": null,
+      "transformation": { "kind": "none" },
+      "distributedFiles": [],
+      "shipped": false
+    }
+  ]
+}

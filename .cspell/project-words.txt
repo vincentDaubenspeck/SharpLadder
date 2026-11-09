@@ -3,6 +3,7 @@ analyzerpolicy
 atrule
 cacache
 cact
+cascadia
 cbtn
 ccent
 cdetail
@@ -57,6 +58,8 @@ NONBLOCK
 NOPASSWD
 norc
 NOSYSTEM
+noto
+notosansdisplay
 ntdll
 ntwo
 nvmrc
@@ -104,6 +107,7 @@ tagc
 termwrap
 toplevel
 UAPI
+unhinted
 unlayered
 unlinkat
 userconfig
@@ -112,8 +116,11 @@ Vite
 vitest
 vmax
 vmin
+wdth
 webref
+wght
 wordmark
 XDEV
 xunit
 zizmor
+Ünïcode

@@ -63,6 +63,18 @@ exception without a reason or a reason without an exception. CI also produces a
 CycloneDX SBOM of the full npm inventory, validates it with the CycloneDX CLI
 and keeps it as a build artifact for 14 days.
 
+Files that are not packages, such as fonts, are governed by the asset licence
+check (`npm run asset-licence:check` in `web/`, also part of the full check).
+It validates `web/assets/licences/asset-inventory.json` against
+`web/asset-licence.schema.json` (OFL-1.1 only) and the verbatim upstream
+licence texts beside it, which are stored byte for byte and exempt from the
+text rules. Each record's reserved font names are a reviewed declaration bound to
+its licence hash by `declarationHash`: SHA-256 over the UTF-8 bytes of the
+lowercase hex `licenceText.sha256` string concatenated with
+`JSON.stringify(reservedFontNames)` in declared order. It is an
+edit-consistency tripwire, not proof of review. No asset ships yet; output
+mode (`--output` with `--owned`) checks a build output against the inventory.
+
 The .NET build settings live in `Directory.Build.props`, analyzer versions in
 `Directory.Packages.props` (central package management), rule severities in
 `.globalconfig` and banned APIs in `BannedSymbols.txt`. The test suites also

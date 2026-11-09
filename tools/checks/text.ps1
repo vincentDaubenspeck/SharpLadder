@@ -91,6 +91,8 @@ foreach ($entry in @(& git -c core.quotepath=off ls-files --eol)) {
   $cols = $parts[0] -split '\s+'
   $indexEol = $cols[0]; $workEol = $cols[1]; $f = $parts[1]
   if ($indexEol -eq 'i/-text') { continue }
+  # Upstream licence texts are kept byte for byte; the asset licence check pins their hashes.
+  if ($f -cmatch '^web/assets/licences/[^/]+/OFL\.txt$') { continue }
   if ($indexEol -eq 'i/crlf' -or $indexEol -eq 'i/mixed') {
     Write-Output "  ${f}: CRLF line endings in index"; $bad++; continue
   }

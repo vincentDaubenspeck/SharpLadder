@@ -11,6 +11,7 @@ export const webStages = [
   // Serial, where no Vite load or other install writer is active, unlike a vitest worker.
   ["Install health (real tree acceptance)", ["source-check/install-acceptance.js"]],
   ["licence allowlist", "license:check"],
+  ["asset licence inventory", "asset-licence:check"],
   ["dependency overrides", "overrides:check"],
   ["ESLint", "lint"],
   ["Stylelint (source stylesheets)", "lint:css"],

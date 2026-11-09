@@ -22,6 +22,7 @@
     "lint:spell": "cd .. && git ls-files | cspell --no-progress --no-must-find-files --file-list stdin",
     "lint:comments": "cd .. && node web/lint-comments.js web tools",
     "license:check": "node license-check.js",
+    "asset-licence:check": "node asset-licence-check.js",
     "overrides:check": "node dependency-overrides-check.js",
     "knip": "node knip/run.js",
     "check": "npm run lint:lockfile && npm run license:check && npm run overrides:check && npm run lint && npm run lint:css && npm run lint:comments && npm run format:check && npm run typecheck && npm test && npm run knip && npm run lint:md && npm run lint:spell"
@@ -42,6 +43,7 @@
     "@typescript-eslint/parser": "8.72.1",
     "@vitejs/plugin-react": "6.2.1",
     "@webref/css": "8.7.8",
+    "ajv": "6.15.0",
     "bin-links": "6.0.3",
     "cspell": "10.4.0",
     "css-tree": "3.2.1",

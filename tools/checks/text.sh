@@ -121,6 +121,12 @@ while IFS= read -r line; do
   index_eol=$(printf '%s' "$line" | awk '{print $1}')
   work_eol=$(printf '%s' "$line" | awk '{print $2}')
   f=$(printf '%s' "$line" | cut -f 2-)
+  # Upstream licence texts are kept byte for byte; the asset licence check pins their hashes.
+  # A case pattern star also matches a slash, so a deeper path is ruled out first.
+  case "$f" in
+    web/assets/licences/*/*/OFL.txt) ;;
+    web/assets/licences/*/OFL.txt) continue ;;
+  esac
   case "$index_eol" in
     i/-text) continue ;;
     i/crlf | i/mixed)

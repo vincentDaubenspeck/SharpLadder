@@ -3,7 +3,8 @@
 # Builds a throwaway git repository, installs the tracked hooks there and checks:
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
-#   c. CRLF line endings and a missing final newline fail the encoding check; lock files are exempt
+#   c. CRLF line endings and a missing final newline fail the encoding check; lock files and
+#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt
 #   d. tools/checks/text.ps1 and text.sh give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
@@ -13,6 +14,7 @@
 #   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
 #   k. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
+#   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
@@ -170,6 +172,31 @@ try {
   } else { Write-Fail 'text.ps1 exempts only packages.lock.json' }
   [void](Invoke-Program 'git' @('rm', '-q', '-r', '--cached', 'lock'))
   Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'lock') -Recurse
+
+  # Only an OFL.txt in an asset licence folder may keep upstream CRLF bytes.
+  New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web/assets/licences/sample') -Force | Out-Null
+  Write-Text 'web/assets/licences/sample/OFL.txt' "one`r`ntwo`r`n"
+  [void](Invoke-Program 'git' @('add', 'web/assets/licences/sample/OFL.txt'))
+  Test-Check 'verbatim licence text with CRLF' 0
+  Write-Text 'web/assets/licences/sample/NOTES.txt' "one`r`ntwo`r`n"
+  [void](Invoke-Program 'git' @('add', 'web/assets/licences/sample/NOTES.txt'))
+  Test-Check 'other name in the licence folder with CRLF' 1
+  if ($script:out -cmatch '(?m)^  web/assets/licences/sample/NOTES\.txt: CRLF line endings$') {
+    Write-Pass 'text.ps1 exempts only licence-folder OFL.txt'
+  } else { Write-Fail 'text.ps1 exempts only licence-folder OFL.txt' }
+  [void](Invoke-Program 'git' @('rm', '-q', '--cached', 'web/assets/licences/sample/NOTES.txt'))
+  Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'web/assets/licences/sample/NOTES.txt')
+  New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'web/assets/licences/sample/extra') -Force | Out-Null
+  Write-Text 'web/assets/licences/sample/extra/OFL.txt' "one`r`ntwo`r`n"
+  [void](Invoke-Program 'git' @('add', 'web/assets/licences/sample/extra/OFL.txt'))
+  Test-Check 'nested licence text with CRLF' 1
+  $attr = Invoke-Program 'git' @('check-attr', 'text', '--', 'web/assets/licences/sample/extra/OFL.txt')
+  if ($script:out -cmatch '(?m)^  web/assets/licences/sample/extra/OFL\.txt: CRLF line endings$' -and
+    $attr.All.Trim() -ceq 'web/assets/licences/sample/extra/OFL.txt: text: auto') {
+    Write-Pass 'the licence text exemption covers one folder level only'
+  } else { Write-Fail 'the licence text exemption covers one folder level only' }
+  [void](Invoke-Program 'git' @('rm', '-q', '-r', '--cached', 'web'))
+  Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'web') -Recurse
 
   # Shell and PowerShell report a named stage; ESLint reports by exit code.
   $fx = Join-Path -Path $tmp -ChildPath 'fx'
@@ -348,6 +375,8 @@ try {
   else {
     Add-CaseLine 'npm audit cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/npm-audit-cases.mjs'),
         (Join-Path -Path $tmp -ChildPath 'audit')) -dir $src)
+    Add-CaseLine 'asset licence cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/asset-licence-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'assets')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

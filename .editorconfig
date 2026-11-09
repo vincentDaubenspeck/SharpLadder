@@ -29,3 +29,12 @@ space_redirects = true
 # NuGet writes lock files without a final newline; they are committed exactly as written.
 [packages.lock.json]
 insert_final_newline = false
+
+# Upstream licence texts are kept byte for byte, so no text rule may rewrite them.
+[web/assets/licences/*/OFL.txt]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
