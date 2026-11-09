@@ -61,12 +61,19 @@ function extra(dir) {
   writeJson(join(dir, "package.json"), { name: "extra", version: "1.0.0" });
 }
 
-function deny(path) {
+// The test timer cannot interrupt spawnSync, so a hung icacls or chmod dies here.
+function permissions(windows, posix) {
   const r = win
-    ? spawnSync(icacls, [path, "/deny", "*S-1-1-0:(RD)"], {
-        encoding: "utf8",
-      })
-    : spawnSync("chmod", ["000", path], { encoding: "utf8" });
+    ? spawnSync(icacls, windows, { encoding: "utf8", timeout: 30_000 })
+    : spawnSync("chmod", posix, { encoding: "utf8", timeout: 30_000 });
+  if (r.error) throw r.error;
+  if (r.signal)
+    throw new Error(`${win ? "icacls" : "chmod"} was killed by ${r.signal}.`);
+  return r;
+}
+
+function deny(path) {
+  const r = permissions([path, "/deny", "*S-1-1-0:(RD)"], ["000", path]);
   if (r.status !== 0)
     throw new Error(`cannot deny ${path}: ${r.stdout}${r.stderr}`);
   locked.push(path);
@@ -87,8 +94,7 @@ function deny(path) {
 }
 
 function allow(path) {
-  if (win) spawnSync(icacls, [path, "/remove:d", "*S-1-1-0"]);
-  else spawnSync("chmod", ["755", path]);
+  permissions([path, "/remove:d", "*S-1-1-0"], ["755", path]);
 }
 
 beforeAll(() => {
@@ -98,12 +104,33 @@ beforeAll(() => {
   buildFixture(clean);
 }, 180_000);
 
+// Every step is attempted, so one failure never leaves the rest locked or behind.
 afterAll(() => {
-  for (const path of locked) allow(path);
+  const errors = [];
+  const attempt = (step) => {
+    try {
+      step();
+      return true;
+    } catch (e) {
+      errors.push(e);
+      return false;
+    }
+  };
+  for (const path of locked) attempt(() => allow(path));
   // Links go before the recursive delete, so it never walks through one.
-  for (const path of links) rmSync(path, { force: true });
-  if (base) rmSync(base, { recursive: true, force: true });
+  const unlinked = links
+    .map((path) => attempt(() => rmSync(path, { force: true })))
+    .every(Boolean);
+  if (base && unlinked)
+    attempt(() => rmSync(base, { recursive: true, force: true }));
+  if (errors.length > 0)
+    throw new AggregateError(
+      errors,
+      `cleanup failed: ${errors.map((e) => e.message).join("; ")}`,
+    );
 });
+
+// Suites timed at 30_000 load the fixture with npm Arborist, which is cold the first time.
 
 describe("census of the clean fixture", () => {
   it("finds every package arborist loads and every .bin", async () => {
@@ -124,7 +151,7 @@ describe("census of the clean fixture", () => {
     expect(bins).toHaveLength(2);
     expect(await check(clean)).toEqual([]);
   });
-});
+}, 30_000);
 
 describe("census fails what arborist drops silently", () => {
   it("fails a file named @broken in a nested node_modules", async () => {
@@ -185,7 +212,7 @@ describe("census fails what arborist drops silently", () => {
       `census: cannot read node_modules/abbrev: ${denied}`,
     );
   });
-});
+}, 30_000);
 
 describe("census fails dot entries", () => {
   it.each([
@@ -242,7 +269,7 @@ describe("census fails dot entries", () => {
       problems.some((p) => p.startsWith("census:") && p.includes(name)),
     ).toBe(true);
   });
-});
+}, 30_000);
 
 describe(".vite-temp", () => {
   it("passes an empty top-level folder", async () => {
@@ -278,7 +305,7 @@ describe(".vite-temp", () => {
       "census: node_modules/@npmcli/promise-spawn/node_modules/.vite-temp is only allowed at the top level",
     );
   });
-});
+}, 30_000);
 
 describe("census fails scope faults", () => {
   it.each([
@@ -299,7 +326,7 @@ describe("census fails scope faults", () => {
       "census: node_modules/@npmcli/.bin is a dot entry inside a scope",
     );
   });
-});
+}, 30_000);
 
 describe("census fails links and package faults", () => {
   it("fails a linked top-level node_modules", async () => {
@@ -349,7 +376,7 @@ describe("census fails links and package faults", () => {
       "census: node_modules/abbrev/package.json is a link, not a regular file",
     );
   });
-});
+}, 30_000);
 
 describe("census equality", () => {
   it("reports both differences when the counts are equal", () => {
@@ -423,7 +450,7 @@ describe("Windows spelling", () => {
       "bin: node_modules/.bin/node-which is a link, not a regular file",
     );
   });
-});
+}, 30_000);
 
 describe(".bin contents", () => {
   it("fails a missing entry and a missing .bin", async () => {
@@ -482,7 +509,7 @@ describe(".bin contents", () => {
       "bin: node_modules/.bin/node-which is declared by node_modules/abbrev and node_modules/which; collision not modelled",
     );
   });
-});
+}, 30_000);
 
 describe("declared bin forms", () => {
   const root = join(tmpdir(), "declared-bins");
@@ -687,4 +714,4 @@ describe("Linux .bin links", () => {
       "bin: node_modules/.bin/example points at its declared target through a link",
     ]);
   });
-});
+}, 30_000);

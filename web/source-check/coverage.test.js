@@ -8,6 +8,7 @@ afterAll(cleanUp);
 
 const web = join(import.meta.dirname, "..");
 
+// Loads the real eslint config with typescript-eslint; the first load is cold.
 describe("ESLint coverage with the real config", () => {
   it("covers src scripts with the type-aware configuration", async () => {
     const files = ["src/App.tsx", "src/test-setup.ts", "src/deep/new.ts"].map(
@@ -28,7 +29,7 @@ describe("ESLint coverage with the real config", () => {
       "src/a.js: not under the type-aware ESLint configuration",
     ]);
   });
-});
+}, 30_000);
 
 describe("Stylelint coverage", () => {
   it("matches the Stylelint stage's own file set", () => {

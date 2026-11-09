@@ -6,7 +6,8 @@ import rule, { reservedNames } from "./css-module-access.js";
 import { production } from "./production-eslint.js";
 
 RuleTester.afterAll = afterAll;
-RuleTester.describe = describe;
+// Rule cases run real ESLint with typescript-eslint; the first case loads them cold.
+RuleTester.describe = (name, fn) => describe(name, fn, 30_000);
 RuleTester.it = it;
 RuleTester.itOnly = it.only;
 
@@ -340,6 +341,7 @@ describe("css-module-access reserved names", () => {
   });
 });
 
+// Lints with the real eslint config and typescript-eslint; the first load is cold.
 describe("css-module-access in the production configuration", () => {
   it("fails a computed read of a CSS module class", async () => {
     const [result] = await production.lintText(
@@ -365,4 +367,4 @@ console.log(alias[key]);
       [["sharpladder/css-module-access", "reserved", 2]],
     );
   });
-});
+}, 30_000);

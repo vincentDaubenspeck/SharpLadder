@@ -25,6 +25,8 @@ const fixture = (files, at = "") =>
     },
   ).problems;
 
+// Suites timed at 30_000 call the real TypeScript compiler, which is cold the first time.
+
 describe("TypeScript program inputs", () => {
   it("passes the real program, React and DOM types included", () => {
     const { problems, inputs } = programInputs(web);
@@ -149,7 +151,7 @@ describe("TypeScript program inputs", () => {
       }),
     ).toEqual([]);
   });
-});
+}, 30_000);
 
 describe("tsconfig shape", () => {
   it("accepts the real tsconfig", () => {
@@ -176,4 +178,4 @@ describe("tsconfig shape", () => {
       "tsconfig.json must not set baseUrl",
     ]);
   });
-});
+}, 30_000);

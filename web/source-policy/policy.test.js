@@ -268,41 +268,47 @@ const disabled =
   "// eslint-disable-next-line sharpladder/app-capabilities, no-eval -- probe\n" +
   'globalThis.eval("1");\n';
 
-describe.each(Object.entries(parsers))("the engine on %s trees", (_, parse) => {
-  it.each(refused)("refuses %s", (_name, code, global) => {
-    expect(scan(parse, code)).toContain(`reference to ${global}`);
-  });
+// Suites timed at 30_000 run typescript-eslint, ESLint or Vite, each cold the first time.
 
-  it.each(emptyAttributes)("refuses %s", (_name, code) => {
-    expect(scan(parse, code)).toEqual(["import attributes"]);
-  });
+describe.each(Object.entries(parsers))(
+  "the engine on %s trees",
+  (_, parse) => {
+    it.each(refused)("refuses %s", (_name, code, global) => {
+      expect(scan(parse, code)).toContain(`reference to ${global}`);
+    });
 
-  it("refuses dynamic import options", () => {
-    expect(scan(parse, 'void import("./a.ts", {});')).toContain("import()");
-  });
+    it.each(emptyAttributes)("refuses %s", (_name, code) => {
+      expect(scan(parse, code)).toEqual(["import attributes"]);
+    });
 
-  it.each(allowed)("allows %s", (_name, code) => {
-    expect(scan(parse, code)).toEqual([]);
-  });
+    it("refuses dynamic import options", () => {
+      expect(scan(parse, 'void import("./a.ts", {});')).toContain("import()");
+    });
 
-  it.each(["App.tsx", "App.test.tsx", "main.tsx", "test-setup.ts"])(
-    "allows src/%s",
-    (file) => {
-      const code = readFileSync(join(import.meta.dirname, "..", "src", file));
-      expect(scan(parse, String(code))).toEqual([]);
-    },
-  );
+    it.each(allowed)("allows %s", (_name, code) => {
+      expect(scan(parse, code)).toEqual([]);
+    });
 
-  it("refuses the global behind a disable comment", () => {
-    expect(scan(parse, disabled)).toContain("reference to globalThis");
-  });
+    it.each(["App.tsx", "App.test.tsx", "main.tsx", "test-setup.ts"])(
+      "allows src/%s",
+      (file) => {
+        const code = readFileSync(join(import.meta.dirname, "..", "src", file));
+        expect(scan(parse, String(code))).toEqual([]);
+      },
+    );
 
-  it("fails closed on syntax it does not know", () => {
-    const parsed = parse("console.log(1);");
-    parsed.ast.body.push({ type: "FutureStatement" });
-    expect(judge(parsed)).toContain("unsupported syntax FutureStatement");
-  });
-});
+    it("refuses the global behind a disable comment", () => {
+      expect(scan(parse, disabled)).toContain("reference to globalThis");
+    });
+
+    it("fails closed on syntax it does not know", () => {
+      const parsed = parse("console.log(1);");
+      parsed.ast.body.push({ type: "FutureStatement" });
+      expect(judge(parsed)).toContain("unsupported syntax FutureStatement");
+    });
+  },
+  30_000,
+);
 
 // Every banned value name the real scope manager leaves unresolved outside a type query must
 // be a finding too.
@@ -343,7 +349,7 @@ describe("agreement with the typescript-eslint scope manager", () => {
       expect(named).toContain(name);
     }
   });
-});
+}, 30_000);
 
 describe("the ESLint adapter in the production configuration", () => {
   const lint = async (code) => {
@@ -386,7 +392,7 @@ describe("the ESLint adapter in the production configuration", () => {
       expected.map((e) => e.split(" ").at(-1)),
     );
   });
-});
+}, 30_000);
 
 // The build adapter and the ESLint adapter must reach the same complete verdict on every case.
 describe("parity between the build and ESLint adapters", () => {
@@ -435,7 +441,7 @@ describe("parity between the build and ESLint adapters", () => {
     const eslint = result.messages.filter((m) => m.ruleId === app);
     expect(eslint.map(fromEslint).sort()).toEqual(build.sort());
   });
-});
+}, 30_000);
 
 describe("the build guard in a real build", () => {
   const build = (code) => buildFixture({ "src/main.tsx": `${code}\n` });
@@ -475,4 +481,4 @@ describe("the build guard in a real build", () => {
       ),
     ).resolves.toBeDefined();
   });
-});
+}, 30_000);

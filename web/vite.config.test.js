@@ -15,6 +15,7 @@ const buildWith = (moduleCss) =>
     { modules: false },
   );
 
+// Each case runs a real Vite build; the first build loads Vite cold.
 describe("Vite CSS module build", () => {
   it("fails on a bare element selector in pure mode", async () => {
     await expect(buildWith("a { color: red }")).rejects.toThrow(
@@ -28,4 +29,4 @@ describe("Vite CSS module build", () => {
     const css = files.find(({ fileName }) => fileName.endsWith(".css"));
     expect(css.source).toMatch(/_card a\s*\{\s*color:\s*red/u);
   });
-});
+}, 30_000);

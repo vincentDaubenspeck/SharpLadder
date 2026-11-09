@@ -58,6 +58,8 @@ async function passes(c) {
 
 const pair = "font-size: var(--fs-body); line-height: var(--lh-body);";
 
+// Suites timed at 30_000 run the real Stylelint, which loads cold the first time.
+
 describe("colour literals", () => {
   it.each([
     ["A1", "color: #fff"],
@@ -142,7 +144,7 @@ describe("colour literals", () => {
 
   it("A17 fails on an unclosed string", () =>
     fails(inComponent('content: "x;')));
-});
+}, 30_000);
 
 describe("spacing, type and px", () => {
   it.each([
@@ -282,7 +284,7 @@ describe("spacing, type and px", () => {
         "@layer components {\n  :root {\n    --space-a: 2rem;\n  }\n}\n",
       ),
     ));
-});
+}, 30_000);
 
 describe("at-rules and media", () => {
   const sheet = (body) => at(componentAt, `@layer components {\n${body}\n}\n`);
@@ -306,7 +308,7 @@ describe("at-rules and media", () => {
     "%s passes: %s",
     (_id, body) => passes(sheet(body)),
   );
-});
+}, 30_000);
 
 describe("@import ban", () => {
   // A leading escape leaves PostCSS without an at-rule name, so it is a syntax error.
@@ -336,7 +338,7 @@ describe("@import ban", () => {
     expect(r.invalid).toEqual([]);
     expect(r.contract.some((w) => reason.test(w.text))).toBe(true);
   });
-});
+}, 30_000);
 
 describe("tokens.css", () => {
   const replaced = (name, value) =>
@@ -441,7 +443,7 @@ describe("tokens.css", () => {
     ));
   it("A54 passes the source spelling", () =>
     passes(replaced("--fs-fixture-a", "0.8438rem")));
-});
+}, 30_000);
 
 describe("inline disable comments", () => {
   const wrap = (body, head = "") =>
@@ -471,7 +473,7 @@ describe("inline disable comments", () => {
     expect(texts).toContain("Disallowed !important");
     expect(texts).toContain("padding takes registry tokens only");
   });
-});
+}, 30_000);
 
 describe("tokens.css context (G3)", () => {
   const block = (css) => asTokens(fixtureTokens({ extra: css }));
@@ -541,7 +543,7 @@ describe("tokens.css context (G3)", () => {
       ),
     );
   });
-});
+}, 30_000);
 
 describe("layers and structure", () => {
   it.each([
@@ -571,7 +573,7 @@ describe("layers and structure", () => {
         "@layer base {\n  button {\n    font: inherit;\n    color: currentColor;\n  }\n}\n",
       ),
     ));
-});
+}, 30_000);
 
 describe("adversarial cases through the production lint", () => {
   async function rejected(c, ...messages) {
@@ -724,7 +726,7 @@ describe("adversarial cases through the production lint", () => {
     inComponent("outline-offset: 0;"),
     accent("rgb(0 0 0 / 100%)"),
   ])("literal %# passes with no warning from any rule", (c) => passes(c));
-});
+}, 30_000);
 
 describe("composed configuration and webref data", () => {
   // The token rule accepts these; only the inherited spelling rule rejects them.
@@ -862,7 +864,7 @@ describe("composed configuration and webref data", () => {
       );
     },
   );
-});
+}, 30_000);
 
 describe("header module identity", () => {
   it("A62 passes in the configured header module", () =>
@@ -880,4 +882,4 @@ describe("header module identity", () => {
     write(other, inModule("background: var(--header-bg);"));
     return fails(at(() => other, inModule("background: var(--header-bg);")));
   });
-});
+}, 30_000);

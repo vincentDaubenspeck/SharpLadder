@@ -89,7 +89,10 @@ export function buildFixture(clean) {
       "--no-audit",
       "--no-fund",
     ],
-    { cwd: clean, env: quietEnv(), encoding: "utf8" },
+    { cwd: clean, env: quietEnv(), encoding: "utf8", timeout: 150_000 },
   );
+  // No timer can interrupt spawnSync; the kill stays inside the 180 s hook budget.
+  if (r.error) throw r.error;
+  if (r.signal) throw new Error(`fixture npm ci was killed by ${r.signal}.`);
   if (r.status !== 0) throw new Error(`fixture npm ci failed: ${r.stderr}`);
 }

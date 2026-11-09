@@ -6,7 +6,8 @@ import rule from "./app-capabilities.js";
 import { production, web } from "./production-eslint.js";
 
 RuleTester.afterAll = afterAll;
-RuleTester.describe = describe;
+// Rule cases run real ESLint with typescript-eslint; the first case loads them cold.
+RuleTester.describe = (name, fn) => describe(name, fn, 30_000);
 RuleTester.it = it;
 RuleTester.itOnly = it.only;
 
@@ -283,6 +284,8 @@ const composed = [
   ]),
 ];
 
+// Suites timed at 30_000 lint with the real eslint config, which loads cold the first time.
+
 describe("application capabilities in the production configuration", () => {
   it.each(composed)("fails %s", async (_, code, ruleId, messageId) => {
     const messages = await lint(code);
@@ -324,7 +327,7 @@ export const fn = function F() {
     );
     expect(messages).toEqual([]);
   });
-});
+}, 30_000);
 
 describe("source extension coverage", () => {
   const extensions = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts"];
@@ -367,4 +370,4 @@ describe("source extension coverage", () => {
     expect(config.rules[app]).toBeUndefined();
     expect(config.rules[extension]).toBeUndefined();
   });
-});
+}, 30_000);

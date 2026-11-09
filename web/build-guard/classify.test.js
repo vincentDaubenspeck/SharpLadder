@@ -123,6 +123,7 @@ describe("classifyId", () => {
   });
 });
 
+// Timed at 30_000: it parses with typescript-eslint, which is cold the first time.
 describe("scriptViolations", () => {
   const scan = (code) => scriptViolations(code, "src/Probe.tsx");
 
@@ -149,7 +150,7 @@ describe("scriptViolations", () => {
   ])("refuses %s", (code, pattern) => {
     expect(scan(code).join(" ")).toMatch(pattern);
   });
-});
+}, 30_000);
 
 describe("cssViolations", () => {
   it.each([

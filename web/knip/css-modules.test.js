@@ -35,8 +35,15 @@ const knip = (files) => {
   const result = spawnSync(
     process.execPath,
     [knipBin, "--directory", root, "--no-progress", "--reporter", "json"],
-    { encoding: "utf8", env: { ...process.env, JITI_FS_CACHE: "false" } },
+    {
+      encoding: "utf8",
+      env: { ...process.env, JITI_FS_CACHE: "false" },
+      timeout: 30_000,
+    },
   );
+  // The test timer cannot interrupt spawnSync, so a hung knip is killed here.
+  if (result.error) throw result.error;
+  if (result.signal) throw new Error(`knip was killed by ${result.signal}.`);
   expect(result.stderr).toBe("");
   const { issues } = JSON.parse(result.stdout);
   const unused = {};
@@ -51,6 +58,7 @@ const knip = (files) => {
   return { status: result.status, unused };
 };
 
+// Each case spawns the real knip CLI; the first spawn loads it cold.
 describe("knip CSS module compiler", () => {
   it("exports every local name from the Lightning CSS map", () => {
     const out = compileCssModule(
@@ -156,4 +164,4 @@ describe("knip CSS module compiler", () => {
     expect(unused).toEqual({});
     expect(status).toBe(0);
   });
-});
+}, 30_000);

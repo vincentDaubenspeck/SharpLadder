@@ -16,6 +16,8 @@ import { guard } from "./index.js";
 
 afterAll(cleanUp);
 
+// Only suites that run a real Vite build are timed at 30_000; Vite loads cold at first.
+
 describe("build guard: configuration", () => {
   it("guards every worker bundle and copies no public folder", () => {
     expect(config.publicDir).toBe(false);
@@ -124,7 +126,7 @@ describe("build guard: module ids", () => {
   ])("fails on an authored import of %s", async (specifier, pattern) => {
     await rejects(main(`import "${specifier}";`), pattern);
   });
-});
+}, 30_000);
 
 describe("build guard: source constructs", () => {
   const css = {
@@ -187,7 +189,7 @@ describe("build guard: source constructs", () => {
       pattern,
     );
   });
-});
+}, 30_000);
 
 describe("build guard: index.html", () => {
   it.each([
@@ -265,7 +267,7 @@ describe("build guard: index.html", () => {
       buildRoot(fixture(main("export {};")).root, { publicDir: "public" }),
     ).rejects.toThrow(/build guard: publicDir is not false/u);
   });
-});
+}, 30_000);
 
 describe("build guard: clean builds", () => {
   it("builds the real app", async () => {
@@ -303,4 +305,4 @@ describe("build guard: clean builds", () => {
     const files = outputFiles(await buildRoot(root));
     expect(files.some((f) => f.endsWith(".css"))).toBe(true);
   });
-});
+}, 30_000);

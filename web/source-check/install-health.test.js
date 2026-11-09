@@ -60,6 +60,8 @@ afterAll(() => {
   if (base) rmSync(base, { recursive: true, force: true });
 });
 
+// Suites timed at 30_000 load the fixture with npm Arborist, which is cold the first time.
+
 describe("install health on the clean fixture", () => {
   it("passes the clean fixture and excuses only its platform skip", async () => {
     const { problems, excused } = await installHealth(clean);
@@ -69,7 +71,7 @@ describe("install health on the clean fixture", () => {
       process.platform === "darwin" ? [] : ["node_modules/fsevents"],
     );
   });
-});
+}, 30_000);
 
 describe("npm configuration cannot change the result", () => {
   const settings = [
@@ -120,7 +122,7 @@ describe("npm configuration cannot change the result", () => {
       expect(await under(setting, dir)).toEqual(expected);
     },
   );
-});
+}, 30_000);
 
 describe("install health fails on a changed install", () => {
   const nm = (dir, ...parts) => join(dir, "node_modules", ...parts);
@@ -340,7 +342,7 @@ describe("install health fails on a changed install", () => {
     ]);
     expect(process.listenerCount("log")).toBe(listeners);
   });
-});
+}, 30_000);
 
 describe("root specifier drift", () => {
   const pkg = { name: "w", version: "1.0.0", dependencies: { a: "1.0.0" } };

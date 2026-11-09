@@ -19,6 +19,8 @@ const fixture = (options) =>
 const run = (paths, registry = fixtureRegistry) =>
   lintProduction(paths, registry, fixture);
 
+// Suites timed at 30_000 run the real Stylelint, in-process or by spawn; it loads cold.
+
 describe("stylesheet discovery", () => {
   it("A68 zero stylesheets is not applicable and exits zero, never PASS", async () => {
     const src = mkdtempSync(join(tmpdir(), "sl-empty-"));
@@ -29,10 +31,11 @@ describe("stylesheet discovery", () => {
     const cli = spawnSync(
       process.execPath,
       [fileURLToPath(new URL("lint-production.js", import.meta.url))],
-      {
-        encoding: "utf8",
-      },
+      { encoding: "utf8", timeout: 30_000 },
     );
+    // The test timer cannot interrupt spawnSync, so a hung lint is killed here.
+    if (cli.error) throw cli.error;
+    if (cli.signal) throw new Error(`the lint was killed by ${cli.signal}.`);
     expect(cli.status).toBe(0);
     expect(cli.stdout.trim()).toBe(notApplicable);
     expect(cli.stdout).not.toContain("PASS");
@@ -58,7 +61,7 @@ describe("stylesheet discovery", () => {
       join(src, "a", "b", "Panel.module.CSS"),
     ]);
   });
-});
+}, 30_000);
 
 describe("production lint with stylesheets", () => {
   it("fails when the registry is incomplete", async () => {
@@ -127,7 +130,7 @@ describe("production lint with stylesheets", () => {
     );
     expect(pkg.scripts.build.startsWith("npm run lint:css && ")).toBe(true);
   });
-});
+}, 30_000);
 
 describe("production registry", () => {
   it("loads the extracted inventory and catalogue and lacks only radius", () => {

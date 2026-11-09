@@ -67,6 +67,8 @@ const cssFixture = main(
 const kinds = (record) =>
   [...record.files].map(([name, { type }]) => `${type}:${name}`).sort();
 
+// Suites timed at 30_000 run a real Vite build, which loads Vite cold the first time.
+
 describe("output admission: clean builds", () => {
   it("builds the real app to exactly the page and one chunk", async () => {
     const outDir = mkdtempSync(join(tmpdir(), "sl-out-"));
@@ -129,8 +131,11 @@ describe("output admission: clean builds", () => {
     const r = spawnSync(
       process.execPath,
       ["--input-type=module", "--eval", script],
-      { cwd: web, env, encoding: "utf8" },
+      { cwd: web, env, encoding: "utf8", timeout: 30_000 },
     );
+    // The test timer cannot interrupt spawnSync, so a hung Vite is killed here.
+    if (r.error) throw r.error;
+    if (r.signal) throw new Error(`Vite was killed by ${r.signal}.`);
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
     return JSON.parse(r.stdout);
@@ -155,7 +160,7 @@ describe("output admission: clean builds", () => {
     expect([...record.files.keys()]).toContain("index.html");
     expect([...record.files.keys()].some((f) => f.endsWith(".css"))).toBe(true);
   });
-});
+}, 30_000);
 
 describe("output admission: layer order", () => {
   const names = ["tokens", "base", "Card.module", "overrides"];
@@ -250,7 +255,7 @@ describe("output admission: layer order", () => {
     );
     expect(error?.message).toMatch(/a\.module\.css:3:0/u);
   });
-});
+}, 30_000);
 
 describe("output admission: configuration", () => {
   const plain = main("export {};");
@@ -332,7 +337,7 @@ describe("output admission: configuration", () => {
       /wrote no admitted output/u,
     );
   });
-});
+}, 30_000);
 
 describe("output admission: inventory", () => {
   const chunk = { type: "chunk", fileName: "assets/i.js", code: "1" };
@@ -460,4 +465,4 @@ describe("output admission: disk walk", () => {
       /cannot list/u,
     );
   });
-});
+}, 30_000);

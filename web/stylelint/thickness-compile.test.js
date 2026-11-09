@@ -28,6 +28,7 @@ function acceptedSpellings() {
 // Compiler output is compared as a string, so a rounded or exponent form cannot slip past.
 const compiled = /^(?:0|(?:[0-3](?:\.[0-9]*)?|\.[0-9]+|4(?:\.0*)?)(?:px)?)$/;
 
+// Compiles with the real Lightning CSS; the first transform loads it cold.
 describe("compiled thickness stays within 0 to 4px", () => {
   it("every accepted source spelling is accepted by the lint", () => {
     const spellings = acceptedSpellings();
@@ -64,4 +65,4 @@ describe("compiled thickness stays within 0 to 4px", () => {
     },
     60_000,
   );
-});
+}, 30_000);

@@ -115,6 +115,8 @@ const thicknessCases = (values) =>
   reg(values.flatMap((v) => widthProps.map((p) => p(v))));
 const thicknessMessage = /thickness takes|use px/;
 
+// Suites timed at 30_000 run the real Stylelint, which loads cold the first time.
+
 describe("thickness is a literal from 0 to 4px", () => {
   it.each(
     thicknessCases([
@@ -207,7 +209,7 @@ describe("thickness is a literal from 0 to 4px", () => {
   )("multi-value list %s", (d, pattern) =>
     pattern === null ? accepts(inModule(d)) : rejects(inModule(d), pattern),
   );
-});
+}, 30_000);
 
 describe("every visible style states its width", () => {
   it.each(
@@ -275,7 +277,7 @@ describe("every visible style states its width", () => {
   );
   it("fails when the width is only in another rule", () =>
     rejects(split, /needs border-width/));
-});
+}, 30_000);
 
 describe("outline-offset is a literal from -4px to 4px", () => {
   it.each(
@@ -305,7 +307,7 @@ describe("outline-offset is a literal from -4px to 4px", () => {
       inModule(`outline-offset: ${v};`),
     ),
   )("passes: %s", (v) => accepts(inModule(`outline-offset: ${v};`)));
-});
+}, 30_000);
 
 describe("opaque alpha is spelled 100%", () => {
   const tokens = (value) =>
@@ -330,7 +332,7 @@ describe("opaque alpha is spelled 100%", () => {
   it.each(["100%"])("passes: %s", (value) =>
     accepts(tokens(value), alpha.tokensFile, alpha),
   );
-});
+}, 30_000);
 
 describe("media queries are an exact allowlist", () => {
   const sheet = (query) =>
@@ -383,7 +385,7 @@ describe("media queries are an exact allowlist", () => {
       sheet,
     ),
   )("fails: %s", (query) => rejects(sheet(query), /is not an allowed query/));
-});
+}, 30_000);
 
 describe("banned properties", () => {
   const columnRule = webref.properties
@@ -415,7 +417,7 @@ describe("banned properties", () => {
     "fails: %s",
     (d) => rejects(inModule(d), /stroke-width is not allowed/),
   );
-});
+}, 30_000);
 
 describe("composes is banned", () => {
   const layer = (body) => `@layer components {\n${body}\n}\n`;
@@ -444,4 +446,4 @@ describe("composes is banned", () => {
       (row) => row[1],
     ),
   )("%s fails", (_form, code) => rejects(code, /composes is not allowed/));
-});
+}, 30_000);
