@@ -34,7 +34,9 @@ jzczhz
 katex
 LASTEXITCODE
 lede
+libatomic
 libc
+libicu
 lightningcss
 lvmax
 lvmin
@@ -52,6 +54,7 @@ msvc
 Newtonsoft
 nologo
 NONBLOCK
+NOPASSWD
 norc
 NOSYSTEM
 ntdll
@@ -63,6 +66,7 @@ olor
 openat
 OPTOUT
 ossf
+PATHCONV
 PATHEXT
 pathspec
 pcss

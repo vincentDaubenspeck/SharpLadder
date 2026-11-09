@@ -49,6 +49,10 @@ sh tools/check.sh
 
 (`powershell -File tools/check.ps1` on Windows runs the same checks.) A
 missing or wrong-version tool fails the check with install guidance.
+`sh tools/check-linux.sh [<commit>]` runs the same checks for a commit in a
+digest-pinned Ubuntu container through Docker, with logs in a per-run folder
+under `.tools/check-linux/` (kept when a step fails); `--self-test` proves a
+wrong download checksum is rejected before anything is extracted.
 
 The licence allowlist check (`npm run license:check` in `web/`, also part of
 the full check) runs licensee over every installed package, development
