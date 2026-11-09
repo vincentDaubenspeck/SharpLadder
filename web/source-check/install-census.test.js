@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -69,6 +70,20 @@ function deny(path) {
   if (r.status !== 0)
     throw new Error(`cannot deny ${path}: ${r.stdout}${r.stderr}`);
   locked.push(path);
+  // Root, or a token with the backup privilege enabled (Git Bash enables it
+  // on an elevated token), lists through any deny; the census assertion would
+  // then prove nothing, so the precondition fails loudly instead.
+  let code;
+  try {
+    readdirSync(path);
+  } catch (e) {
+    code = e.code;
+  }
+  if (code !== denied)
+    throw new Error(
+      `precondition did not hold: listing ${path} gave ${code ?? "no error"}, not ${denied}; ` +
+        "run as a non-root user without an enabled backup privilege",
+    );
 }
 
 function allow(path) {

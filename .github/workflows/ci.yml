@@ -134,7 +134,9 @@ jobs:
         working-directory: web
         run: node source-check/install-acceptance.js
       - name: Stylesheet and source-check tests (Windows paths)
-        shell: bash
+        # Git Bash enables the backup privilege, which lets a directory listing
+        # read through the deny ACLs the census tests rely on.
+        shell: pwsh
         working-directory: web
         run: npx vitest run stylelint source-check
       - name: Hook and check tests (Windows PowerShell, parity with sh)
