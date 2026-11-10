@@ -78,7 +78,12 @@ export function buildFixture(clean) {
     requires: true,
     packages,
   });
-  cpSync(join(web, ".npmrc"), join(clean, ".npmrc"));
+  writeJson(join(clean, "bin-collisions.json"), []);
+  install(clean, quietEnv());
+}
+
+function install(dir, env) {
+  cpSync(join(web, ".npmrc"), join(dir, ".npmrc"));
   const r = spawnSync(
     process.execPath,
     [
@@ -89,10 +94,40 @@ export function buildFixture(clean) {
       "--no-audit",
       "--no-fund",
     ],
-    { cwd: clean, env: quietEnv(), encoding: "utf8", timeout: 150_000 },
+    { cwd: dir, env, encoding: "utf8", timeout: 150_000 },
   );
   // No timer can interrupt spawnSync; the kill stays inside the 180 s hook budget.
   if (r.error) throw r.error;
   if (r.signal) throw new Error(`fixture npm ci was killed by ${r.signal}.`);
   if (r.status !== 0) throw new Error(`fixture npm ci failed: ${r.stderr}`);
+}
+
+// The real colliding pair at the locked versions, with the real record beside the lock.
+const PLAYWRIGHT = [
+  "node_modules/@playwright/test",
+  "node_modules/playwright",
+  "node_modules/playwright-core",
+];
+
+/** A clean install of the real playwright packages from cached tarballs, with no browser download. */
+export function buildPlaywrightFixture(dir) {
+  const version = realLock.packages[PLAYWRIGHT[0]].version;
+  const pkg = {
+    name: "fixture",
+    version: "1.0.0",
+    devDependencies: { "@playwright/test": version },
+  };
+  const packages = { "": { ...pkg } };
+  for (const location of PLAYWRIGHT)
+    packages[location] = { ...realLock.packages[location], dev: true };
+  writeJson(join(dir, "package.json"), pkg);
+  writeJson(join(dir, "package-lock.json"), {
+    name: pkg.name,
+    version: pkg.version,
+    lockfileVersion: 3,
+    requires: true,
+    packages,
+  });
+  cpSync(join(web, "bin-collisions.json"), join(dir, "bin-collisions.json"));
+  install(dir, { ...quietEnv(), PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1" });
 }

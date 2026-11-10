@@ -203,3 +203,167 @@ jobs:
         run: |
           zizmor --version
           zizmor --offline .github/workflows/
+
+  browser-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    container:
+      # The linux/amd64 child of v1.65.0-noble as pinned in tools/tool-pins.json;
+      # a test keeps the two equal.
+      image: >-
+        mcr.microsoft.com/playwright@sha256:bc4fbb329a25287ed23e9216c97063646abdd1bf2da669a9895fa3e2078b2302
+      options: --ipc=host
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Node (checksum verified)
+        shell: bash
+        run: |
+          set -eu
+          read -r url sha dir version < <(node -e '
+            const p = require("./tools/tool-pins.json");
+            const a = p.node.assets["linux-x64"];
+            console.log(a.url, a.sha256, a.dir, "v" + p.node.version);
+          ')
+          curl -fsSL -o "$RUNNER_TEMP/node.tar.xz" "$url"
+          echo "$sha  $RUNNER_TEMP/node.tar.xz" | sha256sum -c -
+          mkdir -p .tools
+          python3 -I -c 'import sys, tarfile
+          tarfile.open(sys.argv[1], "r:xz").extractall(sys.argv[2], filter="data")
+          ' "$RUNNER_TEMP/node.tar.xz" .tools
+          mv ".tools/$dir" .tools/node
+          [ "$(.tools/node/bin/node -v)" = "$version" ]
+          echo "$GITHUB_WORKSPACE/.tools/node/bin" >> "$GITHUB_PATH"
+      - name: Install web dependencies (no install scripts)
+        shell: bash
+        working-directory: web
+        run: npm ci --ignore-scripts
+      - name: Record the image, Node and font inventory
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p browser-evidence
+          { uname -a; cat /etc/os-release; node -v; npm -v; } > browser-evidence/host.txt
+          fc-list | sort > browser-evidence/fc-list.txt
+      - name: Guarded production build
+        shell: bash
+        working-directory: web
+        run: |
+          npm run build
+          cp -r .cache/build-evidence ../browser-evidence/build-evidence
+      - name: Browser suite (three desktop engines, two phone projects)
+        shell: bash
+        working-directory: web
+        env:
+          # Firefox refuses to start as root when HOME belongs to another user.
+          HOME: /root
+        run: node browser/run.mjs --output=../browser-evidence/suite
+      - name: Collect unreviewed font identities in the baseline shape
+        if: ${{ !cancelled() }}
+        shell: bash
+        working-directory: web
+        run: |
+          node browser/observed.mjs ../browser-evidence/suite \
+            ../browser-evidence/font-observed.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: browser-linux-evidence
+          path: browser-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+  browser-windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned tools (checksum verified)
+        shell: bash
+        run: |
+          node tools/install-tools.mjs
+          node_dir="$GITHUB_WORKSPACE/.tools/node"
+          printf '%s\n' "$node_dir" "$node_dir/bin" >> "$GITHUB_PATH"
+      - name: Install web dependencies (no install scripts)
+        shell: bash
+        working-directory: web
+        run: npm ci --ignore-scripts
+      - name: Record the image version, OS build and installed fonts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path browser-evidence | Out-Null
+          $os = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+          $key = Get-Item -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts'
+          $registered = foreach ($name in ($key.GetValueNames() | Sort-Object)) {
+            [ordered]@{ name = $name; file = [string]$key.GetValue($name) }
+          }
+          $fonts = Get-ChildItem -LiteralPath "$env:SystemRoot\Fonts" -File | Sort-Object Name
+          $files = foreach ($font in $fonts) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $font.FullName).Hash
+            [ordered]@{ name = $font.Name; bytes = $font.Length; sha256 = $hash.ToLowerInvariant() }
+          }
+          [ordered]@{
+            imageOS = $env:ImageOS
+            imageVersion = $env:ImageVersion
+            osBuild = "$($os.CurrentBuildNumber).$($os.UBR)"
+            displayVersion = $os.DisplayVersion
+            registeredFonts = @($registered)
+            fontFiles = @($files)
+          } | ConvertTo-Json -Depth 4 |
+            Set-Content -Encoding utf8 -LiteralPath browser-evidence/runner.json
+          "image $env:ImageOS $env:ImageVersion, OS build $($os.CurrentBuildNumber).$($os.UBR)"
+          "$(@($files).Count) font files"
+      - name: Provision the pinned browsers (verified archives, launch check)
+        shell: bash
+        run: node tools/install-browsers.mjs
+      - name: Guarded production build
+        shell: bash
+        working-directory: web
+        run: |
+          npm run build
+          cp -r .cache/build-evidence ../browser-evidence/build-evidence
+      - name: Browser suite (both font environments, three desktop engines, two phone projects)
+        shell: bash
+        working-directory: web
+        run: node browser/run.mjs --output=../browser-evidence/suite
+      - name: Collect unreviewed font identities in the baseline shape
+        if: ${{ !cancelled() }}
+        shell: bash
+        working-directory: web
+        run: |
+          node browser/observed.mjs ../browser-evidence/suite \
+            ../browser-evidence/font-observed.json
+      - name: Real high contrast through SPI (hosted runner only, restored in a finally)
+        id: high-contrast
+        if: ${{ !cancelled() }}
+        shell: bash
+        working-directory: web
+        env:
+          SHARPLADDER_REAL_HIGH_CONTRAST: "1"
+        run: node browser/run.mjs --output=../browser-evidence/high-contrast
+      - name: Post-restore summary (fails when the high-contrast step did)
+        if: ${{ !cancelled() }}
+        shell: bash
+        working-directory: web
+        env:
+          HIGH_CONTRAST_OUTCOME: ${{ steps.high-contrast.outcome }}
+        run: node browser/high-contrast-summary.ts ../browser-evidence/high-contrast
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: browser-windows-evidence
+          path: browser-evidence
+          if-no-files-found: error
+          retention-days: 14

@@ -29,6 +29,27 @@ describe("ESLint coverage with the real config", () => {
       "src/a.js: not under the type-aware ESLint configuration",
     ]);
   });
+
+  it("lints each program's files through that program's config only", async () => {
+    const browser = {
+      projectService: false,
+      project: "./tsconfig.browser.json",
+    };
+    const tests = [
+      "playwright.config.ts",
+      "vite.config.ts",
+      "browser/new.pw.ts",
+    ].map((f) => join(web, f));
+    expect(await eslintCoverage(web, tests, browser)).toEqual([]);
+    expect(await eslintCoverage(web, tests)).toEqual([
+      "playwright.config.ts: not under the type-aware ESLint configuration",
+      "vite.config.ts: not under the type-aware ESLint configuration",
+      "browser/new.pw.ts: not under the type-aware ESLint configuration",
+    ]);
+    expect(
+      await eslintCoverage(web, [join(web, "src", "App.tsx")], browser),
+    ).toEqual(["src/App.tsx: not under the type-aware ESLint configuration"]);
+  });
 }, 30_000);
 
 describe("Stylelint coverage", () => {

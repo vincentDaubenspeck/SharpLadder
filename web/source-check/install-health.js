@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -661,6 +662,21 @@ function declaredTarget(pkgPath, declared) {
   let dir = pkgPath;
   const parts = inside.split(sep);
   for (const [i, part] of parts.entries()) {
+    // A case-folding filesystem opens a variant spelling, so the listing must hold this one.
+    let names;
+    try {
+      names = readdirSync(dir);
+    } catch (e) {
+      return {
+        problem: `has a declared target that cannot be read: ${errorCode(e)}`,
+      };
+    }
+    const misspelled = {
+      problem: `has a declared target not spelled ${parts.slice(0, i + 1).join("/")} on disk`,
+    };
+    const listed = names.includes(part);
+    if (!listed && names.some((n) => n.toUpperCase() === part.toUpperCase()))
+      return misspelled;
     dir = join(dir, part);
     let stat;
     try {
@@ -670,6 +686,7 @@ function declaredTarget(pkgPath, declared) {
         problem: `has a declared target that cannot be read: ${errorCode(e)}`,
       };
     }
+    if (!listed) return misspelled;
     if (stat.isSymbolicLink())
       return { problem: "has a declared target path through a link" };
     if (i === parts.length - 1 && !stat.isFile())
@@ -678,21 +695,222 @@ function declaredTarget(pkgPath, declared) {
   return { target };
 }
 
+const BIN_COLLISIONS = "bin-collisions.json";
+const RECORD_KEYS = ["bin", "declarers", "reason", "winner"];
+const DECLARER_KEYS = [
+  "integrity",
+  "name",
+  "path",
+  "target",
+  "targetSha256",
+  "version",
+];
+const EXACT_VERSION =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const SRI = /^sha512-[A-Za-z0-9+/]+={0,2}$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+const LAST_SEGMENT = new RegExp(`${SEGMENT}$`);
+
+/** The .bin directory that a package at this location links into. */
+const binDirOf = (location) => location.replace(LAST_SEGMENT, ".bin");
+
+const canonicalParts = (path) =>
+  path
+    .split("/")
+    .every((p) => p !== "" && p !== "." && p !== ".." && !/[\\:]/.test(p));
+
+const canonicalLocation = (path) => LOCATION.test(path) && canonicalParts(path);
+
+/** A recorded target must be exactly what npm's normaliser keeps for that bin. */
+function canonicalTarget(bin, target) {
+  if (!nonEmpty(target) || !canonicalParts(target)) return false;
+  try {
+    const out = normalizeBin({ name: "record", bin: { [bin]: target } }).bin;
+    return (
+      isObject(out) && Object.keys(out).length === 1 && out[bin] === target
+    );
+  } catch {
+    return false;
+  }
+}
+
+function keysFault(value, keys) {
+  if (!isObject(value)) return "must be an object";
+  const unknown = Object.keys(value).find((key) => !keys.includes(key));
+  if (unknown !== undefined)
+    return `has unknown key ${JSON.stringify(unknown)}`;
+  const missing = keys.find((key) => !Object.hasOwn(value, key));
+  if (missing !== undefined) return `is missing ${JSON.stringify(missing)}`;
+  return undefined;
+}
+
+function declarerFault(bin, declarer) {
+  const keys = keysFault(declarer, DECLARER_KEYS);
+  if (keys) return keys;
+  const wrong = DECLARER_KEYS.find((key) => typeof declarer[key] !== "string");
+  if (wrong !== undefined) return `"${wrong}" must be a string`;
+  const { path, name, version, integrity, target, targetSha256 } = declarer;
+  if (!canonicalLocation(path))
+    return '"path" must be a canonical package location';
+  if (name === "") return '"name" must not be empty';
+  if (!EXACT_VERSION.test(version)) return '"version" must be an exact version';
+  if (!SRI.test(integrity)) return '"integrity" must be one sha512 integrity';
+  if (!canonicalTarget(bin, target))
+    return '"target" must be a canonical package-relative target';
+  if (!SHA256.test(targetSha256))
+    return '"targetSha256" must be 64 lowercase hex characters';
+  return undefined;
+}
+
+function recordFault(record) {
+  const keys = keysFault(record, RECORD_KEYS);
+  if (keys) return keys;
+  const { bin, declarers, winner, reason } = record;
+  if (typeof bin !== "string" || !allowedBinName(bin))
+    return `"bin" must be an allowed bin name: ${ALLOWED}`;
+  if (!Array.isArray(declarers) || declarers.length < 2)
+    return '"declarers" must list two or more packages';
+  for (const [i, declarer] of declarers.entries()) {
+    const fault = declarerFault(bin, declarer);
+    if (fault) return `declarers[${String(i)}] ${fault}`;
+  }
+  const paths = declarers.map((d) => d.path);
+  // Ordinal order, so the record reads the same under every locale.
+  if (!paths.every((p, i) => i === 0 || paths[i - 1] < p))
+    return '"declarers" must be unique and sorted by path';
+  if (!paths.every((p) => binDirOf(p) === binDirOf(paths[0])))
+    return '"declarers" must share one .bin directory';
+  if (typeof winner !== "string" || !paths.includes(winner))
+    return '"winner" must be the path of one declarer';
+  if (
+    typeof reason !== "string" ||
+    reason.trim() === "" ||
+    /[\r\n\p{Zl}\p{Zp}]/u.test(reason)
+  )
+    return '"reason" must be one non-blank line';
+  return undefined;
+}
+
+/** Recorded bin collisions keyed by .bin entry; any fault is a problem and admits nothing. */
+export function binCollisions(records) {
+  const problems = [];
+  const collisions = new Map();
+  if (!Array.isArray(records))
+    return { problems: [`${BIN_COLLISIONS}: must be an array`], collisions };
+  let previous;
+  for (const [i, record] of records.entries()) {
+    const at = `${BIN_COLLISIONS}[${String(i)}]`;
+    const fault = recordFault(record);
+    if (fault) {
+      problems.push(`${at}: ${fault}`);
+      continue;
+    }
+    const key = `${binDirOf(record.declarers[0].path)}/${record.bin}`;
+    if (key === previous) problems.push(`${at}: duplicate record for ${key}`);
+    else if (previous !== undefined && key < previous)
+      problems.push(`${at}: ${key} is not sorted after ${previous}`);
+    else collisions.set(key, record);
+    previous = key;
+  }
+  return { problems, collisions };
+}
+
+/** Every binding of one recorded declarer to the installed package, its lock entry and its target bytes. */
+function bindingFaults(owner, declarer, bin, lock, normalize) {
+  const faults = [];
+  const differs = (what, actual, want) => {
+    if (actual !== want)
+      faults.push(
+        `has ${what} ${JSON.stringify(actual)}, not the recorded ${JSON.stringify(want)}`,
+      );
+  };
+  differs("installed name", owner.pkg.name, declarer.name);
+  differs("installed version", owner.pkg.version, declarer.version);
+  const entry =
+    isObject(lock) && Object.hasOwn(lock, declarer.path)
+      ? lock[declarer.path]
+      : undefined;
+  if (!isObject(entry)) faults.push("has no lock entry");
+  else {
+    // npm writes a lock name only when it differs from the folder name.
+    const folder = declarer.path.slice(
+      declarer.path.lastIndexOf("node_modules/") + "node_modules/".length,
+    );
+    differs(
+      "lock name",
+      Object.hasOwn(entry, "name") ? entry.name : folder,
+      declarer.name,
+    );
+    differs("lock version", entry.version, declarer.version);
+    if (typeof entry.integrity !== "string")
+      faults.push("has no lock integrity");
+    else differs("lock integrity", entry.integrity, declarer.integrity);
+    let locked;
+    try {
+      const bins = normalize({
+        name: declarer.name,
+        bin: isObject(entry.bin) ? { ...entry.bin } : entry.bin,
+      }).bin;
+      locked =
+        isObject(bins) && Object.hasOwn(bins, bin) ? bins[bin] : undefined;
+    } catch {
+      locked = undefined;
+    }
+    differs("lock bin target", locked, declarer.target);
+  }
+  differs("declared target", owner.declared, declarer.target);
+  const { target, problem } = declaredTarget(owner.path, owner.declared);
+  if (problem) return [...faults, problem];
+  try {
+    const inside = relative(
+      realpathSync.native(owner.path),
+      realpathSync.native(target),
+    );
+    if (outside(inside)) return [...faults, "is declared outside its package"];
+    const sha = createHash("sha256").update(readFileSync(target)).digest("hex");
+    differs("target SHA-256", sha, declarer.targetSha256);
+  } catch (e) {
+    faults.push(`has a declared target that cannot be read: ${errorCode(e)}`);
+  }
+  return faults;
+}
+
+/** The single owner of a name claimed by several packages, admitted only through an exact record. */
+function collisionOwner(entry, owners, record, bin, lock, normalize, problems) {
+  const live = owners.map((o) => o.location).sort();
+  const claim = `bin: ${entry} is declared by ${live.join(" and ")}`;
+  if (!record) {
+    problems.push(`${claim}; collision not modelled`);
+    return undefined;
+  }
+  const recorded = record.declarers.map((d) => d.path);
+  if (!isDeepStrictEqual(live, recorded)) {
+    problems.push(`${claim}; the record names ${recorded.join(" and ")}`);
+    return undefined;
+  }
+  let bound = true;
+  for (const declarer of record.declarers) {
+    const owner = owners.find((o) => o.location === declarer.path);
+    for (const fault of bindingFaults(owner, declarer, bin, lock, normalize)) {
+      problems.push(
+        `bin: ${entry} recorded declarer ${declarer.path} ${fault}`,
+      );
+      bound = false;
+    }
+  }
+  return bound ? owners.find((o) => o.location === record.winner) : undefined;
+}
+
 /** The .bin entries bin-links would write for each package, keyed by .bin directory. */
 export function expectedBins(
   root,
   packages,
   problems,
   platform = process.platform,
-  { normalize = normalizeBin } = {},
+  { normalize = normalizeBin, collisions = new Map(), lock } = {},
 ) {
-  const expected = new Map();
-  // Windows resolves names regardless of case, so two spellings are one file there.
-  const same =
-    platform === "win32"
-      ? (want, file) =>
-          [...want.keys()].find((n) => n.toUpperCase() === file.toUpperCase())
-      : (want, file) => (want.has(file) ? file : undefined);
+  // Logical claims come first, per original bin name, before any shim suffix is added.
+  const claims = new Map();
   for (const [location, { path, pkg }] of packages) {
     for (const [bin, { target }] of packageBins(
       location,
@@ -709,26 +927,90 @@ export function expectedBins(
       });
       const dir = resolve(dirname(to));
       const name = basename(to);
-      const want = expected.get(dir) ?? new Map();
-      expected.set(dir, want);
-      const names =
+      const names = claims.get(dir) ?? new Map();
+      claims.set(dir, names);
+      const owners = names.get(name) ?? [];
+      names.set(name, owners);
+      owners.push({
+        location,
+        path,
+        pkg,
+        declared: target,
+        to: join(dir, name),
+      });
+    }
+  }
+  const expected = new Map();
+  const uses = new Map();
+  // Windows resolves names regardless of case, so two spellings are one file there.
+  const same =
+    platform === "win32"
+      ? (want, file) =>
+          [...want.keys()].find((n) => n.toUpperCase() === file.toUpperCase())
+      : (want, file) => (want.has(file) ? file : undefined);
+  for (const [dir, names] of claims) {
+    const want = new Map();
+    expected.set(dir, want);
+    const folded = new Map();
+    for (const name of names.keys()) {
+      const group = folded.get(name.toUpperCase()) ?? [];
+      folded.set(name.toUpperCase(), group);
+      group.push(name);
+    }
+    // One .bin must work on every host, so names equal but for case fail before any record is read.
+    const caseOnly = new Set();
+    for (const group of folded.values()) {
+      if (group.length < 2) continue;
+      group.sort((a, b) => (a < b ? -1 : 1));
+      const by = [
+        ...new Set(group.flatMap((n) => names.get(n).map((o) => o.location))),
+      ].sort((a, b) => (a < b ? -1 : 1));
+      problems.push(
+        `bin: ${slash(root, dir)} has ${group.join(" and ")}, which differ only by case, declared by ${by.join(" and ")}`,
+      );
+      for (const name of group) caseOnly.add(name);
+    }
+    for (const [name, owners] of names) {
+      if (caseOnly.has(name)) continue;
+      let owner = owners[0];
+      if (owners.length > 1) {
+        const entry = `${slash(root, dir)}/${name}`;
+        const record = collisions.get(entry);
+        if (record) uses.set(entry, (uses.get(entry) ?? 0) + 1);
+        owner = collisionOwner(
+          entry,
+          owners,
+          record,
+          name,
+          lock,
+          normalize,
+          problems,
+        );
+        if (!owner) continue;
+      }
+      const files =
         platform === "win32" ? [name, `${name}.cmd`, `${name}.ps1`] : [name];
-      for (const file of names) {
+      // Physical names are judged after ownership, so no record admits a case or suffix overlap.
+      for (const file of files) {
         const prior = want.get(same(want, file));
         if (prior) {
           problems.push(
-            `bin: ${slash(root, join(dir, file))} is declared by ${prior.location} and ${location}; collision not modelled`,
+            `bin: ${slash(root, join(dir, file))} is declared by ${prior.location} and ${owner.location}; collision not modelled`,
           );
           continue;
         }
-        want.set(file, {
-          location,
-          path,
-          declared: target,
-          to: join(dir, name),
-        });
+        const { location, path, declared, to } = owner;
+        want.set(file, { location, path, declared, to });
       }
     }
+  }
+  // A record not consumed by exactly one live collision would admit the next one unreviewed.
+  for (const entry of collisions.keys()) {
+    const count = uses.get(entry) ?? 0;
+    if (count !== 1)
+      problems.push(
+        `bin: the record for ${entry} matches ${String(count)} collisions, not one`,
+      );
   }
   return expected;
 }
@@ -897,10 +1179,13 @@ export async function binProblems(
   packages,
   bins,
   platform = process.platform,
-  { loadShim = npmCmdShim, temp = tmpdir() } = {},
+  { loadShim = npmCmdShim, temp = tmpdir(), collisions, lock } = {},
 ) {
   const problems = [];
-  const expected = expectedBins(root, packages, problems, platform);
+  const expected = expectedBins(root, packages, problems, platform, {
+    collisions,
+    lock,
+  });
   let cmdShim;
   const generated = new Map();
   const shims = (to, target) => {
@@ -951,17 +1236,25 @@ export async function binProblems(
   return problems;
 }
 
-function readJson(path, name, problems) {
+function readJson(path, name, problems, { canonical = false } = {}) {
   if (!existsSync(path)) {
     problems.push(`${name} is missing`);
     return undefined;
   }
+  let text, value;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    text = readFileSync(path, "utf8");
+    value = JSON.parse(text);
   } catch (e) {
     problems.push(`${name} is not valid JSON: ${e.message}`);
     return undefined;
   }
+  // Canonical form is JSON.stringify with two-space indent and a final newline; a duplicate key cannot survive it.
+  if (canonical && text !== `${JSON.stringify(value, null, 2)}\n`) {
+    problems.push(`${name} is not in canonical form`);
+    return undefined;
+  }
+  return value;
 }
 
 /** Arborist is driven in-process with only a path, so no npm configuration reaches it. */
@@ -1027,9 +1320,33 @@ export async function installHealth(
   try {
     // Arborist drops dot entries and unreadable folders, so the census vouches for completeness.
     const counted = census(root);
+    // Read beside the lock; a missing or malformed record admits nothing.
+    const records = readJson(
+      join(root, BIN_COLLISIONS),
+      BIN_COLLISIONS,
+      problems,
+      { canonical: true },
+    );
+    const recorded =
+      records === undefined
+        ? { problems: [], collisions: new Map() }
+        : binCollisions(records);
     problems.push(
       ...counted.problems,
-      ...(await binProblems(root, counted.packages, counted.bins)),
+      ...recorded.problems,
+      ...(await binProblems(
+        root,
+        counted.packages,
+        counted.bins,
+        process.platform,
+        {
+          collisions: recorded.collisions,
+          lock:
+            isObject(lock) && isObject(lock.packages)
+              ? lock.packages
+              : undefined,
+        },
+      )),
     );
     const tally = { census: counted.packages.size, bins: counted.bins.length };
     if (!actual || !virtual) return { problems, excused: new Map(), tally };

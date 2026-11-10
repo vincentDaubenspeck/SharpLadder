@@ -16,6 +16,7 @@
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
 #   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   m. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
+#   n. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
@@ -394,6 +395,8 @@ try {
         (Join-Path -Path $tmp -ChildPath 'assets')) -dir $src)
     Add-CaseLine 'PSScriptAnalyzer installer cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/pssa-cases.mjs'),
         (Join-Path -Path $tmp -ChildPath 'pssa')) -dir $src)
+    Add-CaseLine 'browser provisioning cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/browser-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'browsers')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

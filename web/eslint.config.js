@@ -68,6 +68,24 @@ export default defineConfig([
       },
     },
   },
+  // The project service finds only tsconfig.json, so the browser tooling and the Vite config,
+  // which need Node types, name their own program.
+  {
+    files: [
+      "playwright.config.ts",
+      "vite.config.ts",
+      "build-guard/index.d.ts",
+      "browser/**/*.ts",
+      "stylelint/registry.d.ts",
+    ],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: "./tsconfig.browser.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
   {
     files: ["**/*.{js,mjs}"],
     extends: [js.configs.recommended],

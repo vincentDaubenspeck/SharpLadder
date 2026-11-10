@@ -41,6 +41,11 @@ for (const [name, tool] of Object.entries(pins)) {
     if (!ok) bad.push(`${name} ${platform}`);
   }
 }
+// Browser archives are pinned by build rather than by platform, with a byte length beside the SHA-256.
+for (const [build, b] of Object.entries(pins.playwright?.windows?.builds ?? {})) {
+  const ok = /^[0-9a-f]{64}$/.test(b.sha256 ?? "") && Number.isSafeInteger(b.bytes) && b.bytes > 0;
+  if (!ok) bad.push(`playwright ${build}`);
+}
 console.log(`${bad.length === 0 ? "PASS" : "FAIL"} digest: every pinned asset has a well-formed digest`);
 for (const b of bad) console.log(`  ${b}`);
 if (bad.length > 0) failed++;

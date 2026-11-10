@@ -10,8 +10,16 @@ afterAll(cleanUp);
 const web = join(import.meta.dirname, "..");
 const tsconfig = JSON.stringify({
   compilerOptions: { types: ["vite/client"] },
-  include: ["src", "vite.config.ts"],
+  include: ["src"],
 });
+const browserFiles = {
+  "tsconfig.browser.json": JSON.stringify({
+    compilerOptions: { types: ["node"] },
+    include: ["playwright.config.ts", "vite.config.ts", "browser"],
+  }),
+  "playwright.config.ts": "export {};\n",
+  "browser/a.ts": "export {};\n",
+};
 
 describe("source tree stage", () => {
   it("passes the real tree", async () => {
@@ -21,6 +29,7 @@ describe("source tree stage", () => {
   it("fails a fixture tree on every bad entry, nested and linked", async () => {
     const base = tree({
       "tsconfig.json": tsconfig,
+      ...browserFiles,
       "vite.config.ts": "export {};\n",
       "src/App.tsx": "export {};\n",
       "src/Untested.JS": "",
@@ -32,11 +41,24 @@ describe("source tree stage", () => {
     expect(problems).toContain("src/Untested.JS: extension is not admitted");
     expect(problems).toContain("src/nested/x.vue: extension is not admitted");
     expect(problems).toContain("src/linked: symlink or junction");
+    expect(problems).not.toContain("tsconfig.browser.json: missing");
+  }, 60_000);
+
+  it("fails a fixture tree without the browser program", async () => {
+    const base = tree({
+      "tsconfig.json": tsconfig,
+      "vite.config.ts": "export {};\n",
+      "src/App.tsx": "export {};\n",
+    });
+    expect(await sourceTreeProblems(base)).toContain(
+      "tsconfig.browser.json: missing",
+    );
   }, 60_000);
 
   it("fails when a directory cannot be read", async () => {
     const base = tree({
       "tsconfig.json": tsconfig,
+      ...browserFiles,
       "src/locked/a.ts": "export {};\n",
     });
     const readdir = (dir, options) => {

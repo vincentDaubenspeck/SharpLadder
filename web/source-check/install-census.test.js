@@ -1,12 +1,15 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
+  appendFileSync,
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -14,10 +17,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildFixture, writeJson } from "./install-fixture.js";
 import {
+  buildFixture,
+  buildPlaywrightFixture,
+  writeJson,
+} from "./install-fixture.js";
+import {
+  binCollisions,
   binProblems,
   census,
   censusEquality,
@@ -1139,18 +1147,42 @@ describe("Windows .bin shims", () => {
         },
       ]),
     );
-    const problems = [];
-    expectedBins(root, packages, problems, "win32");
-    expect(problems).toEqual(
-      suffixes.map(
-        (suffix) =>
-          `bin: node_modules/.bin/foo${suffix} is declared by node_modules/Foo-tool and node_modules/foo-tool; collision not modelled`,
-      ),
-    );
-    const sensitive = [];
-    expectedBins(root, packages, sensitive, "linux");
-    expect(sensitive).toEqual([]);
+    for (const platform of ["win32", "linux"]) {
+      const problems = [];
+      expectedBins(root, packages, problems, platform);
+      expect(problems).toEqual([
+        "bin: node_modules/.bin has Foo and foo, which differ only by case, declared by node_modules/Foo-tool and node_modules/foo-tool",
+      ]);
+    }
   });
+
+  it.each(["win32", "linux"])(
+    "fails one package declaring names that differ only by case, judged as %s",
+    (platform) => {
+      const root = join(base, "fold one");
+      const problems = [];
+      const expected = expectedBins(
+        root,
+        new Map([
+          [
+            "node_modules/tool",
+            {
+              path: join(root, "node_modules", "tool"),
+              pkg: { bin: { TOOL: "cli.js", tool: "cli.js" } },
+            },
+          ],
+        ]),
+        problems,
+        platform,
+      );
+      expect(problems).toEqual([
+        "bin: node_modules/.bin has TOOL and tool, which differ only by case, declared by node_modules/tool",
+      ]);
+      expect([...expected.values()].every((want) => want.size === 0)).toBe(
+        true,
+      );
+    },
+  );
 
   describe.each(["win32", "linux"])("bin names judged as %s", (platform) => {
     const judged = (bin, name = "tool") => {
@@ -1616,4 +1648,786 @@ describe("Windows .bin shims written by npm", () => {
       );
     },
   );
+}, 30_000);
+
+const ALPHA = "node_modules/alpha";
+const BETA = "node_modules/beta";
+const GAMMA = "node_modules/gamma";
+const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+const script = (who) => `#!/usr/bin/env node\nconsole.log("${who}");\n`;
+const sri = (name) => `sha512-${name.slice(0, 1).toUpperCase().repeat(86)}==`;
+const spec = (location, bin = { tool: "cli.js" }) => {
+  const name = location.split("/").pop();
+  return { location, name, bin, files: { "cli.js": script(name) } };
+};
+const declarer = (location) => {
+  const name = location.split("/").pop();
+  return {
+    path: location,
+    name,
+    version: "1.0.0",
+    integrity: sri(name),
+    target: "cli.js",
+    targetSha256: sha256(script(name)),
+  };
+};
+const record = (bin = "tool", paths = [ALPHA, BETA]) => ({
+  bin,
+  declarers: paths.map(declarer),
+  winner: paths[0],
+  reason: "Both packages are needed and this winner is reviewed.",
+});
+
+describe("bin collision record", () => {
+  const faulty = (edit) => {
+    const records = [record()];
+    return binCollisions(edit(records) ?? records).problems;
+  };
+  const at = (message) => [`bin-collisions.json[0]: ${message}`];
+  const lineSeparator = String.fromCodePoint(0x2028);
+  const path = '"path" must be a canonical package location';
+  const target = '"target" must be a canonical package-relative target';
+
+  it("accepts a valid record and an empty file", () => {
+    expect(binCollisions([record()]).problems).toEqual([]);
+    expect(binCollisions([])).toEqual({ problems: [], collisions: new Map() });
+  });
+
+  it.each([
+    [
+      "a file that is not an array",
+      () => ({}),
+      ["bin-collisions.json: must be an array"],
+    ],
+    ["a record that is not an object", () => [null], at("must be an object")],
+    [
+      "a missing key",
+      (r) => void delete r[0].reason,
+      at('is missing "reason"'),
+    ],
+    [
+      "an unknown key",
+      (r) => void (r[0].note = "x"),
+      at('has unknown key "note"'),
+    ],
+    [
+      "a single declarer",
+      (r) => void r[0].declarers.pop(),
+      at('"declarers" must list two or more packages'),
+    ],
+    [
+      "declarers that are not a list",
+      (r) => void (r[0].declarers = {}),
+      at('"declarers" must list two or more packages'),
+    ],
+    [
+      "a declarer missing a key",
+      (r) => void delete r[0].declarers[1].targetSha256,
+      at('declarers[1] is missing "targetSha256"'),
+    ],
+    [
+      "a declarer with an unknown key",
+      (r) => void (r[0].declarers[0].bin = "tool"),
+      at('declarers[0] has unknown key "bin"'),
+    ],
+    [
+      "a declarer field of the wrong type",
+      (r) => void (r[0].declarers[0].version = 1),
+      at('declarers[0] "version" must be a string'),
+    ],
+    [
+      "a path with a parent component",
+      (r) => void (r[0].declarers[1].path = "node_modules/alpha/../beta"),
+      at(`declarers[1] ${path}`),
+    ],
+    [
+      "a path with a backslash",
+      (r) => void (r[0].declarers[1].path = "node_modules/be\\ta"),
+      at(`declarers[1] ${path}`),
+    ],
+    [
+      "a path with a drive",
+      (r) => void (r[0].declarers[1].path = "node_modules/c:beta"),
+      at(`declarers[1] ${path}`),
+    ],
+    [
+      "a path with an empty component",
+      (r) => void (r[0].declarers[1].path = "node_modules//beta"),
+      at(`declarers[1] ${path}`),
+    ],
+    [
+      "an empty name",
+      (r) => void (r[0].declarers[1].name = ""),
+      at('declarers[1] "name" must not be empty'),
+    ],
+    [
+      "a version range",
+      (r) => void (r[0].declarers[1].version = "^1.0.0"),
+      at('declarers[1] "version" must be an exact version'),
+    ],
+    [
+      "an integrity of another form",
+      (r) => void (r[0].declarers[1].integrity = "sha1-abc="),
+      at('declarers[1] "integrity" must be one sha512 integrity'),
+    ],
+    [
+      "a target npm would rewrite",
+      (r) => void (r[0].declarers[1].target = "./cli.js"),
+      at(`declarers[1] ${target}`),
+    ],
+    [
+      "a target above the package",
+      (r) => void (r[0].declarers[1].target = "../cli.js"),
+      at(`declarers[1] ${target}`),
+    ],
+    [
+      "a target with a backslash",
+      (r) => void (r[0].declarers[1].target = "bin\\cli.js"),
+      at(`declarers[1] ${target}`),
+    ],
+    [
+      "an upper-case hash",
+      (r) => void (r[0].declarers[1].targetSha256 = sha256("x").toUpperCase()),
+      at('declarers[1] "targetSha256" must be 64 lowercase hex characters'),
+    ],
+    [
+      "unsorted declarers",
+      (r) => void r[0].declarers.reverse(),
+      at('"declarers" must be unique and sorted by path'),
+    ],
+    [
+      "duplicate declarers",
+      (r) => void (r[0].declarers[1] = r[0].declarers[0]),
+      at('"declarers" must be unique and sorted by path'),
+    ],
+    [
+      "declarers in two .bin directories",
+      (r) =>
+        void (r[0].declarers[1].path = "node_modules/alpha/node_modules/beta"),
+      at('"declarers" must share one .bin directory'),
+    ],
+    [
+      "a winner outside the declarers",
+      (r) => void (r[0].winner = GAMMA),
+      at('"winner" must be the path of one declarer'),
+    ],
+    [
+      "a blank reason",
+      (r) => void (r[0].reason = " "),
+      at('"reason" must be one non-blank line'),
+    ],
+    [
+      "a reason over two lines",
+      (r) => void (r[0].reason = "a\nb"),
+      at('"reason" must be one non-blank line'),
+    ],
+    [
+      "a reason with a line separator",
+      (r) => void (r[0].reason = `a${lineSeparator}b`),
+      at('"reason" must be one non-blank line'),
+    ],
+    [
+      "unsorted records",
+      () => [record("zz"), record()],
+      [
+        "bin-collisions.json[1]: node_modules/.bin/tool is not sorted after node_modules/.bin/zz",
+      ],
+    ],
+    [
+      "duplicate records",
+      () => [record(), record()],
+      ["bin-collisions.json[1]: duplicate record for node_modules/.bin/tool"],
+    ],
+  ])("fails %s", (_, edit, problems) => {
+    expect(faulty(edit)).toEqual(problems);
+  });
+
+  it.each([["../tool"], ["CON"], ["a/b"], [7]])(
+    "fails the bin name %s",
+    (bin) => {
+      expect(faulty((r) => void (r[0].bin = bin))).toEqual([
+        expect.stringContaining(
+          'bin-collisions.json[0]: "bin" must be an allowed bin name: ',
+        ),
+      ]);
+    },
+  );
+});
+
+describe.each(["linux", "win32"])(
+  "recorded bin collisions judged as %s",
+  (platform) => {
+    const windows = platform === "win32";
+    const suffixes = windows ? ["", ".cmd", ".ps1"] : [""];
+
+    // Hand-built and judged explicitly, so both judgements run on every host.
+    async function collided(
+      specs = [spec(ALPHA), spec(BETA)],
+      records = [record()],
+    ) {
+      cases += 1;
+      const dir = join(base, `collision case ${String(cases)}`);
+      const packages = new Map();
+      const lock = {};
+      const add = ({ location, name, bin, files }) => {
+        const path = join(dir, ...location.split("/"));
+        for (const [file, text] of Object.entries(files)) {
+          mkdirSync(dirname(join(path, file)), { recursive: true });
+          writeFileSync(join(path, file), text);
+        }
+        packages.set(location, { path, pkg: { name, version: "1.0.0", bin } });
+        lock[location] = { version: "1.0.0", integrity: sri(name), bin };
+      };
+      for (const s of specs) add(s);
+      const options = () => {
+        const recorded = binCollisions(records);
+        return {
+          problems: recorded.problems,
+          collisions: recorded.collisions,
+          lock,
+        };
+      };
+      const expected = expectedBins(dir, packages, [], platform, options());
+      const cmdShim = windows ? npmCmdShim() : undefined;
+      const write = async (binDir, owner) => {
+        const target = resolve(owner.path, owner.declared);
+        if (windows) return cmdShim(target, owner.to);
+        const entry = join(binDir, basename(owner.to));
+        symlinkSync(relative(binDir, target), entry);
+        links.push(entry);
+        return undefined;
+      };
+      for (const [binDir, want] of expected) {
+        mkdirSync(binDir, { recursive: true });
+        const owners = new Map([...want.values()].map((o) => [o.to, o]));
+        for (const owner of owners.values()) await write(binDir, owner);
+      }
+      const bins = [...expected.keys()];
+      const judge = async () => {
+        const { problems, ...rest } = options();
+        return [
+          ...problems,
+          ...(await binProblems(dir, packages, bins, platform, rest)),
+        ];
+      };
+      const pkgAt = (location) => packages.get(location);
+      return { dir, lock, records, add, judge, pkgAt, write };
+    }
+
+    const bound = (location, fault) =>
+      `bin: node_modules/.bin/tool recorded declarer ${location} ${fault}`;
+
+    it("passes the recorded winner's complete entries", async () => {
+      const { judge } = await collided();
+      expect(await judge()).toEqual([]);
+    });
+
+    it("fails an unrecorded collision", async () => {
+      const { records, judge } = await collided();
+      records.length = 0;
+      expect(await judge()).toContain(
+        "bin: node_modules/.bin/tool is declared by node_modules/alpha and node_modules/beta; collision not modelled",
+      );
+    });
+
+    it("fails an additional declarer", async () => {
+      const { add, judge } = await collided();
+      add(spec(GAMMA));
+      expect(await judge()).toContain(
+        "bin: node_modules/.bin/tool is declared by node_modules/alpha and node_modules/beta and node_modules/gamma; the record names node_modules/alpha and node_modules/beta",
+      );
+    });
+
+    it("fails a recorded declarer that is not installed", async () => {
+      const { records, judge } = await collided();
+      records[0] = record("tool", [ALPHA, BETA, GAMMA]);
+      expect(await judge()).toContain(
+        "bin: node_modules/.bin/tool is declared by node_modules/alpha and node_modules/beta; the record names node_modules/alpha and node_modules/beta and node_modules/gamma",
+      );
+    });
+
+    it("fails a replaced declarer", async () => {
+      const { records, judge } = await collided();
+      records[0] = record("tool", [ALPHA, GAMMA]);
+      expect(await judge()).toContain(
+        "bin: node_modules/.bin/tool is declared by node_modules/alpha and node_modules/beta; the record names node_modules/alpha and node_modules/gamma",
+      );
+    });
+
+    it("fails a stale record once the collision is gone", async () => {
+      const { pkgAt, judge } = await collided();
+      pkgAt(BETA).pkg = { name: "beta", version: "1.0.0" };
+      expect(await judge()).toEqual([
+        "bin: the record for node_modules/.bin/tool matches 0 collisions, not one",
+      ]);
+    });
+
+    it("keeps the same bin at an unrelated level separate", async () => {
+      const nested = `${ALPHA}/node_modules/gamma`;
+      const { judge } = await collided([spec(ALPHA), spec(nested), spec(BETA)]);
+      expect(await judge()).toEqual([]);
+    });
+
+    it("fails an unrecorded collision at another level", async () => {
+      const one = `${ALPHA}/node_modules/gamma`;
+      const two = `${ALPHA}/node_modules/delta`;
+      const { judge } = await collided([
+        spec(ALPHA),
+        spec(two),
+        spec(one),
+        spec(BETA),
+      ]);
+      const problems = await judge();
+      expect(problems).toContain(
+        `bin: node_modules/alpha/node_modules/.bin/tool is declared by ${two} and ${one}; collision not modelled`,
+      );
+      expect(
+        problems.filter((p) => p.startsWith("bin: node_modules/.bin/tool")),
+      ).toEqual([]);
+    });
+
+    describe.each([ALPHA, BETA])("binding of %s", (location) => {
+      const name = location.split("/").pop();
+      const folder = (dir) => join(dir, ...location.split("/"));
+
+      it("fails installed-only version drift", async () => {
+        const { pkgAt, judge } = await collided();
+        pkgAt(location).pkg.version = "1.0.1";
+        expect(await judge()).toContain(
+          bound(
+            location,
+            'has installed version "1.0.1", not the recorded "1.0.0"',
+          ),
+        );
+      });
+
+      it("fails lock-only version drift", async () => {
+        const { lock, judge } = await collided();
+        lock[location].version = "1.0.1";
+        expect(await judge()).toContain(
+          bound(location, 'has lock version "1.0.1", not the recorded "1.0.0"'),
+        );
+      });
+
+      it("fails installed and lock drift against an unchanged record", async () => {
+        const { pkgAt, lock, judge } = await collided();
+        pkgAt(location).pkg.version = "1.0.1";
+        lock[location].version = "1.0.1";
+        const problems = await judge();
+        expect(problems).toContain(
+          bound(
+            location,
+            'has installed version "1.0.1", not the recorded "1.0.0"',
+          ),
+        );
+        expect(problems).toContain(
+          bound(location, 'has lock version "1.0.1", not the recorded "1.0.0"'),
+        );
+      });
+
+      it("fails installed name drift", async () => {
+        const { pkgAt, judge } = await collided();
+        pkgAt(location).pkg.name = "other";
+        expect(await judge()).toContain(
+          bound(
+            location,
+            `has installed name "other", not the recorded "${name}"`,
+          ),
+        );
+      });
+
+      it("fails lock name drift", async () => {
+        const { lock, judge } = await collided();
+        lock[location].name = "other";
+        expect(await judge()).toContain(
+          bound(location, `has lock name "other", not the recorded "${name}"`),
+        );
+      });
+
+      it("fails integrity drift, no integrity and no lock entry", async () => {
+        const { lock, judge } = await collided();
+        lock[location].integrity = sri("z");
+        expect(await judge()).toContain(
+          bound(
+            location,
+            `has lock integrity "${sri("z")}", not the recorded "${sri(name)}"`,
+          ),
+        );
+        delete lock[location].integrity;
+        expect(await judge()).toContain(
+          bound(location, "has no lock integrity"),
+        );
+        delete lock[location];
+        expect(await judge()).toContain(bound(location, "has no lock entry"));
+      });
+
+      it("fails a target spelled differently on disk", async () => {
+        const { dir, judge } = await collided();
+        renameSync(join(folder(dir), "cli.js"), join(folder(dir), "CLI.JS"));
+        expect(await judge()).toContain(
+          bound(location, "has a declared target not spelled cli.js on disk"),
+        );
+      });
+
+      it("fails an intermediate directory spelled differently on disk", async () => {
+        const nested = (at) => ({
+          ...spec(at, { tool: "lib/cli.js" }),
+          files: { "lib/cli.js": script(at.split("/").pop()) },
+        });
+        const records = [record()];
+        for (const d of records[0].declarers) d.target = "lib/cli.js";
+        const { dir, judge } = await collided(
+          [nested(ALPHA), nested(BETA)],
+          records,
+        );
+        expect(await judge()).toEqual([]);
+        renameSync(join(folder(dir), "lib"), join(folder(dir), "LIB"));
+        expect(await judge()).toContain(
+          bound(location, "has a declared target not spelled lib on disk"),
+        );
+      });
+
+      it("fails locked and declared target drift", async () => {
+        const { pkgAt, lock, dir, judge } = await collided();
+        writeFileSync(join(folder(dir), "other.js"), script(name));
+        lock[location].bin = { tool: "other.js" };
+        expect(await judge()).toContain(
+          bound(
+            location,
+            'has lock bin target "other.js", not the recorded "cli.js"',
+          ),
+        );
+        pkgAt(location).pkg.bin = { tool: "other.js" };
+        expect(await judge()).toContain(
+          bound(
+            location,
+            'has declared target "other.js", not the recorded "cli.js"',
+          ),
+        );
+      });
+
+      it("fails a changed target byte", async () => {
+        const { dir, judge } = await collided();
+        appendFileSync(join(folder(dir), "cli.js"), " ");
+        const now = sha256(`${script(name)} `);
+        expect(await judge()).toContain(
+          bound(
+            location,
+            `has target SHA-256 "${now}", not the recorded "${sha256(script(name))}"`,
+          ),
+        );
+      });
+    });
+
+    describe("losing target", () => {
+      const loser = (dir) => join(dir, "node_modules", "beta", "cli.js");
+
+      it("fails a missing loser target", async () => {
+        const { dir, judge } = await collided();
+        unlinkSync(loser(dir));
+        expect(await judge()).toContain(
+          bound(BETA, "has a declared target that cannot be read: ENOENT"),
+        );
+      });
+
+      it("fails a loser target that is a link inside its package", async () => {
+        const { dir, judge } = await collided();
+        renameSync(loser(dir), join(dirname(loser(dir)), "real.js"));
+        symlinkSync("real.js", loser(dir));
+        links.push(loser(dir));
+        expect(await judge()).toContain(
+          bound(BETA, "has a declared target path through a link"),
+        );
+      });
+
+      it("fails a loser target that escapes its package", async () => {
+        const { dir, judge } = await collided();
+        unlinkSync(loser(dir));
+        symlinkSync(join("..", "alpha", "cli.js"), loser(dir));
+        links.push(loser(dir));
+        expect(await judge()).toContain(
+          bound(BETA, "has a declared target path through a link"),
+        );
+      });
+
+      it("fails a loser target reached through an intermediate junction", async () => {
+        const nested = (at) => ({
+          ...spec(at, { tool: "lib/cli.js" }),
+          files: { "lib/cli.js": script(at.split("/").pop()) },
+        });
+        const records = [record()];
+        for (const d of records[0].declarers) d.target = "lib/cli.js";
+        const { dir, judge } = await collided(
+          [nested(ALPHA), nested(BETA)],
+          records,
+        );
+        expect(await judge()).toEqual([]);
+        const lib = join(dirname(loser(dir)), "lib");
+        const real = join(dirname(loser(dir)), "real");
+        renameSync(lib, real);
+        symlinkSync(real, lib, "junction");
+        links.push(lib);
+        expect(await judge()).toContain(
+          bound(BETA, "has a declared target path through a link"),
+        );
+      });
+
+      it("fails a loser target that is not a regular file", async () => {
+        const { dir, judge } = await collided();
+        unlinkSync(loser(dir));
+        mkdirSync(loser(dir));
+        expect(await judge()).toContain(
+          bound(BETA, "has a declared target that is not a regular file"),
+        );
+      });
+    });
+
+    it("admits no owner while any binding fails", async () => {
+      const { pkgAt, judge } = await collided();
+      pkgAt(BETA).pkg.version = "1.0.1";
+      expect(await judge()).toEqual([
+        bound(BETA, 'has installed version "1.0.1", not the recorded "1.0.0"'),
+        "bin: node_modules/.bin has no expected entries",
+        ...suffixes.map(
+          (s) => `bin: node_modules/.bin/tool${s} is not expected`,
+        ),
+      ]);
+    });
+
+    it("fails a missing winner entry", async () => {
+      const { dir, judge } = await collided();
+      unlinkSync(nm(dir, ".bin", "tool"));
+      expect(await judge()).toEqual(["bin: node_modules/.bin/tool is missing"]);
+    });
+
+    it.runIf(!windows)("fails a link to the losing target", async () => {
+      const { dir, judge } = await collided();
+      const entry = nm(dir, ".bin", "tool");
+      unlinkSync(entry);
+      symlinkSync(join("..", "beta", "cli.js"), entry);
+      links.push(entry);
+      expect(await judge()).toEqual([
+        "bin: node_modules/.bin/tool does not point at its declared target",
+      ]);
+    });
+
+    it.runIf(!windows)(
+      "fails an absolute link to the winner's target",
+      async () => {
+        const { dir, judge } = await collided();
+        const entry = nm(dir, ".bin", "tool");
+        unlinkSync(entry);
+        symlinkSync(nm(dir, "alpha", "cli.js"), entry);
+        links.push(entry);
+        expect(await judge()).toEqual([
+          "bin: node_modules/.bin/tool does not point at its declared target",
+        ]);
+      },
+    );
+
+    it.runIf(windows).each([[[""]], [[".cmd"]], [[".ps1"]], [suffixes]])(
+      "fails genuine loser shims in place of %j",
+      async (replaced) => {
+        const { dir, pkgAt, judge, write } = await collided();
+        const bin = nm(dir, ".bin");
+        const kept = new Map(
+          suffixes.map((s) => [s, readFileSync(join(bin, `tool${s}`))]),
+        );
+        const loser = { ...pkgAt(BETA), declared: "cli.js" };
+        await write(bin, { ...loser, to: join(bin, "tool") });
+        for (const s of suffixes)
+          if (!replaced.includes(s))
+            writeFileSync(join(bin, `tool${s}`), kept.get(s));
+        expect(await judge()).toEqual(
+          replaced.map(
+            (s) =>
+              `bin: node_modules/.bin/tool${s} is not the shim npm writes for its declared target`,
+          ),
+        );
+      },
+    );
+  },
+  30_000,
+);
+
+describe("overlaps no record admits", () => {
+  function overlapping(alphaBin, betaBin, attempt, platform = "win32") {
+    cases += 1;
+    const dir = join(base, `overlap case ${String(cases)}`);
+    const packages = new Map();
+    const lock = {};
+    for (const [location, bin] of [
+      [ALPHA, alphaBin],
+      [BETA, betaBin],
+    ]) {
+      const name = location.split("/").pop();
+      const path = join(dir, ...location.split("/"));
+      mkdirSync(path, { recursive: true });
+      writeFileSync(join(path, "cli.js"), script(name));
+      packages.set(location, { path, pkg: { name, version: "1.0.0", bin } });
+      lock[location] = { version: "1.0.0", integrity: sri(name), bin };
+    }
+    const recorded = binCollisions(attempt === null ? [] : [record(attempt)]);
+    const problems = [];
+    expectedBins(dir, packages, problems, platform, {
+      collisions: recorded.collisions,
+      lock,
+    });
+    return [...recorded.problems, ...problems];
+  }
+
+  const unused =
+    "bin: the record for node_modules/.bin/tool matches 0 collisions, not one";
+
+  describe.each(["win32", "linux"])(
+    "case-only names judged as %s",
+    (platform) => {
+      it.each([
+        [
+          "across packages",
+          { Tool: "cli.js" },
+          { tool: "cli.js" },
+          "alpha and node_modules/beta",
+          "Tool and tool",
+        ],
+        [
+          "within one package",
+          { TOOL: "cli.js", tool: "cli.js" },
+          { tool: "cli.js" },
+          "alpha and node_modules/beta",
+          "TOOL and tool",
+        ],
+      ])("fails %s with and without a record", (_, alpha, beta, by, pair) => {
+        const fault = `bin: node_modules/.bin has ${pair}, which differ only by case, declared by node_modules/${by}`;
+        expect(overlapping(alpha, beta, "tool", platform)).toEqual([
+          fault,
+          unused,
+        ]);
+        expect(overlapping(alpha, beta, null, platform)).toEqual([fault]);
+      });
+    },
+  );
+
+  it("fails a bin named like another bin's shim even with a record", () => {
+    expect(
+      overlapping({ tool: "cli.js" }, { "tool.cmd": "cli.js" }, "tool.cmd"),
+    ).toEqual([
+      "bin: node_modules/.bin/tool.cmd is declared by node_modules/alpha and node_modules/beta; collision not modelled",
+      "bin: the record for node_modules/.bin/tool.cmd matches 0 collisions, not one",
+    ]);
+  });
+});
+
+describe("the real playwright collision installed by npm", () => {
+  const installs = [];
+  const expectedEntries = win
+    ? [
+        "playwright",
+        "playwright-core",
+        "playwright-core.cmd",
+        "playwright-core.ps1",
+        "playwright.cmd",
+        "playwright.ps1",
+      ]
+    : ["playwright", "playwright-core"];
+
+  // Three independent clean installs from the cache, with no browser download.
+  it.each([1, 2, 3])(
+    "clean install %i admits the recorded winner and nothing else",
+    async (n) => {
+      const dir = join(base, `playwright install ${String(n)}`);
+      mkdirSync(dir);
+      buildPlaywrightFixture(dir);
+      installs.push(dir);
+      expect((await installHealth(dir)).problems).toEqual([]);
+      const bin = nm(dir, ".bin");
+      expect(readdirSync(bin).sort()).toEqual(expectedEntries);
+      if (win)
+        expect(readFileSync(join(bin, "playwright.cmd"), "utf8")).toContain(
+          String.raw`\@playwright\test\cli.js`,
+        );
+      else
+        expect(readlinkSync(join(bin, "playwright"))).toBe(
+          "../@playwright/test/cli.js",
+        );
+    },
+    180_000,
+  );
+
+  const copy = () => {
+    cases += 1;
+    const dir = join(base, `case${String(cases)}`);
+    cpSync(installs[0], dir, { recursive: true, verbatimSymlinks: true });
+    return dir;
+  };
+
+  it("fails without the record file", async () => {
+    const dir = copy();
+    unlinkSync(join(dir, "bin-collisions.json"));
+    const problems = await check(dir);
+    expect(problems).toContain("bin-collisions.json is missing");
+    expect(problems).toContain(
+      "bin: node_modules/.bin/playwright is declared by node_modules/@playwright/test and node_modules/playwright; collision not modelled",
+    );
+  });
+
+  it("fails a malformed record file", async () => {
+    const dir = copy();
+    writeFileSync(join(dir, "bin-collisions.json"), "[");
+    expect(await check(dir)).toContain(
+      "bin-collisions.json is not valid JSON: Unexpected end of JSON input",
+    );
+  });
+
+  it.each([
+    [
+      "a duplicate winner key",
+      (t) =>
+        t.replace(
+          '"winner": ',
+          '"winner": "node_modules/playwright",\n    "winner": ',
+        ),
+    ],
+    [
+      "a duplicate target key in a declarer",
+      (t) =>
+        t.replace('"target": ', '"target": "other.js",\n        "target": '),
+    ],
+    [
+      "an escaped duplicate winner key",
+      (t) =>
+        t.replace(
+          '"winner": ',
+          String.raw`"winner": "node_modules/playwright",` + '\n    "winner": ',
+        ),
+    ],
+    ["trailing whitespace", (t) => `${t} \n`],
+    ["extra whitespace", (t) => t.replace('"bin": ', '"bin":  ')],
+  ])("fails a record file with %s", async (_, edit) => {
+    const dir = copy();
+    const file = join(dir, "bin-collisions.json");
+    const text = readFileSync(file, "utf8");
+    const edited = edit(text);
+    expect(edited).not.toBe(text);
+    expect(JSON.parse(edited)).toEqual(JSON.parse(text));
+    writeFileSync(file, edited);
+    const problems = await check(dir);
+    expect(problems).toContain("bin-collisions.json is not in canonical form");
+    expect(problems).toContain(
+      "bin: node_modules/.bin/playwright is declared by node_modules/@playwright/test and node_modules/playwright; collision not modelled",
+    );
+  });
+
+  it("fails a record whose version the install does not match", async () => {
+    const dir = copy();
+    const file = join(dir, "bin-collisions.json");
+    const records = JSON.parse(readFileSync(file, "utf8"));
+    records[0].declarers[1].version = "1.64.0";
+    writeJson(file, records);
+    const problems = await check(dir);
+    for (const where of ["installed", "lock"])
+      expect(problems).toContain(
+        `bin: node_modules/.bin/playwright recorded declarer node_modules/playwright has ${where} version "1.65.0", not the recorded "1.64.0"`,
+      );
+  });
 }, 30_000);

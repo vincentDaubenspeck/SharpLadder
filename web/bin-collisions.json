@@ -1,0 +1,25 @@
+[
+  {
+    "bin": "playwright",
+    "declarers": [
+      {
+        "path": "node_modules/@playwright/test",
+        "name": "@playwright/test",
+        "version": "1.65.0",
+        "integrity": "sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==",
+        "target": "cli.js",
+        "targetSha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+      },
+      {
+        "path": "node_modules/playwright",
+        "name": "playwright",
+        "version": "1.65.0",
+        "integrity": "sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==",
+        "target": "cli.js",
+        "targetSha256": "5e79302a6aad7d835d92d5ae6b4244c91cf61b28e94d7917279090e6c231f7a1"
+      }
+    ],
+    "winner": "node_modules/@playwright/test",
+    "reason": "The browser suite imports @playwright/test, which depends on playwright, and both declare the playwright command; this winner is admitted for these package versions with node 26.13.0, npm 11.20.0 and cmd-shim 8.0.0, and the check validates the installed output, not how npm chose it."
+  }
+]

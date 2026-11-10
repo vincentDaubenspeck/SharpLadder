@@ -2,8 +2,10 @@ acnt
 advisoryurl
 analyzerpolicy
 atrule
+bbggrr
 bbox
 bdat
+bsdtar
 bsln
 cacache
 cact
@@ -27,6 +29,7 @@ cyclonedx
 Daubenspeck
 dcode
 docopt
+domcontentloaded
 dvmax
 dvmin
 EBADPLATFORM
@@ -39,6 +42,7 @@ ENOSYS
 esac
 EXDEV
 extensionless
+extractall
 fdsc
 fmtx
 fonteditor
@@ -46,6 +50,7 @@ fontkit
 fpgm
 fvar
 gdef
+gethighcontrast
 glat
 globalconfig
 gloc
@@ -57,10 +62,17 @@ gvar
 hdmx
 healthz
 hhea
+highcontrast
+hkcu
+HKLM
 hmtx
+hotlight
 hsty
 ictcp
+idat
 idents
+iend
+ihdr
 iidfile
 isexe
 jstf
@@ -76,6 +88,7 @@ libicu
 liga
 lightningcss
 loca
+lpsz
 ltsh
 lvmax
 lvmin
@@ -120,6 +133,7 @@ pclt
 pcss
 pipefail
 prophoto
+prss
 pscustomobject
 PSSA
 PSScriptAnalyzer
@@ -133,14 +147,18 @@ regid
 rels
 reuid
 Roslynator
+rrggbb
 rsuser
+runneradmin
 sarif
 sbix
+scanlines
 seccomp
 secno
 Segoe
 serialiser's
 Setext
+sethighcontrast
 setpriv
 sfnt
 SharpLadder
@@ -148,6 +166,7 @@ ShellCheck
 shfmt
 silf
 slnx
+spif
 statx
 styl
 stylesheet
@@ -158,6 +177,7 @@ SYSLIB
 tablist
 tagc
 termwrap
+themeui
 threedface
 toplevel
 trak
@@ -180,6 +200,8 @@ vorg
 wdth
 webref
 wght
+windir
+winldd
 wordmark
 XDEV
 xunit

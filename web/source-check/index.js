@@ -1,8 +1,9 @@
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { browserTreeProblems } from "./browser-tree.js";
 import { eslintCoverage, stylelintCoverage } from "./coverage.js";
-import { programInputs, tsconfigShapeProblems } from "./program.js";
+import { programProblems } from "./program.js";
 import { admitTree } from "./walk.js";
 
 const scriptKinds = new Set(["ts", "tsx"]);
@@ -28,10 +29,18 @@ export async function sourceTreeProblems(webDir, { readdir } = {}) {
       problems.push(...stylelintCoverage(web, tree.root, of(styleKinds)));
     }
   }
-  const tsconfig = join(web, "tsconfig.json");
+  const programs = programProblems(web, undefined, readdir ? { readdir } : {});
+  problems.push(...programs.problems);
+  for (const { files, parser } of programs.linted)
+    problems.push(...(await eslintCoverage(web, files, parser)));
+  const browser = programs.linted.find(
+    (p) => p.tsconfig === "tsconfig.browser.json",
+  );
   problems.push(
-    ...tsconfigShapeProblems(tsconfig),
-    ...programInputs(web, { tsconfig }).problems,
+    ...(await browserTreeProblems(web, {
+      ...(readdir ? { readdir } : {}),
+      ...(browser ? { inputs: browser.inputs } : {}),
+    })),
   );
   return problems;
 }

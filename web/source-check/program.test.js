@@ -1,8 +1,14 @@
 // @vitest-environment node
+import { readdirSync } from "node:fs";
 import { join, sep } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { cleanUp, link, tree } from "./fixture.js";
-import { programInputs, tsconfigShapeProblems } from "./program.js";
+import {
+  programInputs,
+  programProblems,
+  programs,
+  tsconfigShapeProblems,
+} from "./program.js";
 
 afterAll(cleanUp);
 
@@ -17,12 +23,18 @@ const tsconfig = JSON.stringify({
   },
   include: ["src"],
 });
+const app = {
+  tsconfig: "tsconfig.json",
+  include: ["src"],
+  types: [],
+  root: "src",
+  config: [],
+  parser: { projectService: true },
+};
 const fixture = (files, at = "") =>
   programInputs(
     join(tree({ [`${at}tsconfig.json`]: tsconfig, ...files }), at),
-    {
-      config: [],
-    },
+    app,
   ).problems;
 
 // Suites timed at 30_000 call the real TypeScript compiler, which is cold the first time.
@@ -32,12 +44,7 @@ describe("TypeScript program inputs", () => {
     const { problems, inputs } = programInputs(web);
     expect(problems).toEqual([]);
     const kinds = new Set(inputs.map((i) => i.kind));
-    expect([...kinds].sort()).toEqual([
-      "config",
-      "first-party",
-      "lib",
-      "package",
-    ]);
+    expect([...kinds].sort()).toEqual(["first-party", "lib", "package"]);
     const names = inputs.map((i) => i.path.split(sep).slice(-3).join("/"));
     expect(names).toContain("@types/react/index.d.ts");
     expect(names).toContain("typescript/lib/lib.dom.d.ts");
@@ -120,7 +127,7 @@ describe("TypeScript program inputs", () => {
       ...inWeb(typeImport("x")),
     });
     link(join(base, "outside", "x"), join(base, "web", "node_modules", "x"));
-    const { problems } = programInputs(join(base, "web"), { config: [] });
+    const { problems } = programInputs(join(base, "web"), app);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(
       /^program input outside the admitted set: .+\/outside\/x\/index\.d\.ts$/u,
@@ -134,7 +141,7 @@ describe("TypeScript program inputs", () => {
       ...inWeb(typeImport("x")),
     });
     link(join(base, "elsewhere"), join(base, "web", "node_modules"));
-    const { problems } = programInputs(join(base, "web"), { config: [] });
+    const { problems } = programInputs(join(base, "web"), app);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(
       /^program input outside the admitted set: .+\/elsewhere\/x\/index\.d\.ts$/u,
@@ -153,9 +160,158 @@ describe("TypeScript program inputs", () => {
   });
 }, 30_000);
 
+const browserConfig = JSON.stringify({
+  compilerOptions: JSON.parse(tsconfig).compilerOptions,
+  include: ["browser"],
+});
+const browser = {
+  tsconfig: "tsconfig.browser.json",
+  include: ["browser"],
+  types: [],
+  root: "browser",
+  config: ["browser/named.d.mts"],
+  parser: { projectService: false, project: "./tsconfig.browser.json" },
+};
+const both = {
+  "tsconfig.json": tsconfig,
+  "tsconfig.browser.json": browserConfig,
+  "src/a.ts": "export const a = 1;\n",
+  "browser/b.ts": "export const b = 1;\n",
+};
+const twoPrograms = (files) =>
+  programProblems(tree({ ...both, ...files }), [app, browser]).problems;
+
+describe("app and browser programs", () => {
+  it("passes the real programs, each with its own first-party root", () => {
+    const { problems, linted } = programProblems(web);
+    expect(problems).toEqual([]);
+    const [own] = linted.slice(1);
+    const names = own.files.map((f) => f.split(sep).slice(-2).join("/"));
+    expect(names).toContain("web/playwright.config.ts");
+    expect(names).toContain("browser/tokens.pw.ts");
+    expect(names.every((n) => !n.startsWith("src/"))).toBe(true);
+  }, 60_000);
+
+  it("passes two exact fixture programs", () => {
+    expect(twoPrograms({})).toEqual([]);
+  });
+
+  it("fails a browser file added to the app include", () => {
+    expect(
+      twoPrograms({
+        "tsconfig.json": JSON.stringify({
+          ...JSON.parse(tsconfig),
+          include: ["src", "browser"],
+        }),
+      }),
+    ).toEqual([
+      'tsconfig.json include must be ["src"]',
+      "program input outside the admitted set: browser/b.ts",
+    ]);
+  });
+
+  it("fails an app file pulled into the browser program", () => {
+    expect(
+      twoPrograms({
+        "browser/b.ts": 'import { a } from "../src/a";\nexport const b = a;\n',
+      }),
+    ).toEqual(["program input outside the admitted set: src/a.ts"]);
+  });
+
+  it("fails an input outside both sets", () => {
+    expect(
+      twoPrograms({
+        "browser/b.ts":
+          '/// <reference path="../outside.d.ts" />\nexport const b = 1;\n',
+        "outside.d.ts": "declare const leaked: number;\n",
+      }),
+    ).toEqual(["program input outside the admitted set: outside.d.ts"]);
+  });
+
+  it("admits a named declaration and fails an unnamed one", () => {
+    expect(
+      twoPrograms({
+        "browser/b.ts":
+          'import { n } from "./named.mjs";\nimport { u } from "./unnamed.mjs";\nexport const b = n + u;\n',
+        "browser/named.d.mts": "export declare const n: number;\n",
+        "browser/unnamed.d.mts": "export declare const u: number;\n",
+      }),
+    ).toEqual([
+      "program input outside the admitted set: browser/unnamed.d.mts",
+    ]);
+  });
+
+  it("fails a missing browser config", () => {
+    const base = tree({
+      "tsconfig.json": tsconfig,
+      "src/a.ts": "",
+      "browser/b.ts": "",
+    });
+    expect(programProblems(base, [app, browser]).problems).toEqual([
+      "tsconfig.browser.json: missing",
+    ]);
+  });
+
+  it("fails a browser file pulled into the app program", () => {
+    expect(
+      twoPrograms({
+        "src/a.ts": 'import { b } from "../browser/b";\nexport const a = b;\n',
+      }),
+    ).toEqual(["program input outside the admitted set: browser/b.ts"]);
+  });
+
+  it("refuses a .tsx file in the browser program", () => {
+    expect(
+      twoPrograms({
+        "browser/b.ts": 'import { c } from "./c";\nexport const b = c;\n',
+        "browser/c.tsx": "export const c = 1;\n",
+      }),
+    ).toEqual(["program input outside the admitted set: browser/c.tsx"]);
+  });
+
+  it("reports a config discovery read error", () => {
+    const readdir = (dir, options) => {
+      if (dir.endsWith("browser"))
+        throw Object.assign(new Error("denied"), { code: "EPERM" });
+      return readdirSync(dir, options);
+    };
+    const base = tree(both);
+    expect(programProblems(base, [app, browser], { readdir }).problems).toEqual(
+      ["browser: cannot list for TypeScript configs: EPERM"],
+    );
+  });
+
+  it("fails an altered browser include", () => {
+    expect(
+      twoPrograms({
+        "tsconfig.browser.json": JSON.stringify({
+          ...JSON.parse(browserConfig),
+          include: ["browser", "src"],
+        }),
+      }),
+    ).toEqual([
+      'tsconfig.browser.json include must be ["browser"]',
+      "program input outside the admitted set: src/a.ts",
+    ]);
+  });
+
+  it("fails an unknown third config, beside web or inside a root", () => {
+    expect(
+      twoPrograms({
+        "tsconfig.other.json": tsconfig,
+        "browser/tsconfig.json": tsconfig,
+      }),
+    ).toEqual([
+      "browser/tsconfig.json: unknown TypeScript config",
+      "tsconfig.other.json: unknown TypeScript config",
+    ]);
+  });
+}, 30_000);
+
 describe("tsconfig shape", () => {
-  it("accepts the real tsconfig", () => {
-    expect(tsconfigShapeProblems(join(web, "tsconfig.json"))).toEqual([]);
+  it("accepts the real configs", () => {
+    for (const spec of programs)
+      expect(tsconfigShapeProblems(join(web, spec.tsconfig), spec)).toEqual([]);
   });
 
   it("rejects extends, references, aliases and a widened include", () => {
@@ -173,7 +329,7 @@ describe("tsconfig shape", () => {
     });
     expect(tsconfigShapeProblems(join(base, "tsconfig.json"))).toEqual([
       "tsconfig.json top-level keys are compilerOptions, extends, include, references; only compilerOptions and include are allowed",
-      'tsconfig.json include must be ["src","vite.config.ts"]',
+      'tsconfig.json include must be ["src"]',
       "tsconfig.json must not set paths",
       "tsconfig.json must not set baseUrl",
     ]);

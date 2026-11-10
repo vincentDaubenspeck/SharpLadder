@@ -45,7 +45,8 @@ const directoryFlags =
     ? "r"
     : constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_DIRECTORY;
 
-const label = (root, dir) => `src/${shown(root, dir)}`.replace(/\/$/u, "");
+const label = (io, root, dir) =>
+  `${io.name}/${shown(root, dir)}`.replace(/\/$/u, "");
 
 function failure(what, at, error) {
   if (error.code === "EMFILE" || error.code === "ENFILE")
@@ -60,7 +61,7 @@ function failure(what, at, error) {
 
 /** The path must name a real directory, never a link or junction to one. */
 function realDirectory(io, root, dir) {
-  const at = label(root, dir);
+  const at = label(io, root, dir);
   let stat;
   let real;
   try {
@@ -78,7 +79,7 @@ function heldIdentity(io, root, dir, fd) {
   try {
     return identity(io.fstat(fd, { bigint: true }));
   } catch (error) {
-    throw failure("inspect", label(root, dir), error);
+    throw failure("inspect", label(io, root, dir), error);
   }
 }
 
@@ -88,7 +89,7 @@ function heldIdentity(io, root, dir, fd) {
  * second lstat all agree.
  */
 function admit(io, held, root, dir, before) {
-  const at = label(root, dir);
+  const at = label(io, root, dir);
   let fd;
   try {
     fd = io.open(dir, directoryFlags);
@@ -108,11 +109,20 @@ function stillHeld(io, root, { dir, fd, expected }) {
   const now = identity(realDirectory(io, root, dir));
   if (now !== expected || heldIdentity(io, root, dir, fd) !== expected)
     throw new Error(
-      `${label(root, dir)} changed identity while the tree was walked`,
+      `${label(io, root, dir)} changed identity while the tree was walked`,
     );
 }
 
+/** The src rule: fonts only in theme/fonts, everything else by name. */
+function classifySource(name, dir, root) {
+  if (name.endsWith(".woff2") && dir === join(root, ...fontDir))
+    return { kind: "font" };
+  return classifyName(name);
+}
+
 const defaults = {
+  name: "src",
+  classify: classifySource,
   readdir: readdirSync,
   open: openSync,
   close: closeSync,
@@ -129,7 +139,7 @@ export function admitTree(src, seams = {}) {
   const io = { ...defaults, ...seams };
   const top = io.lstat(src, { bigint: true });
   if (top.isSymbolicLink() || !top.isDirectory())
-    throw new Error("src is not a real directory");
+    throw new Error(`${io.name} is not a real directory`);
   const root = realpathSync.native(src);
   const admitted = [];
   const rejected = [];
@@ -145,12 +155,12 @@ export function admitTree(src, seams = {}) {
     try {
       given = io.lstat(src, { bigint: true });
     } catch (error) {
-      throw failure("inspect", "src", error);
+      throw failure("inspect", io.name, error);
     }
     if (given.isSymbolicLink() || !given.isDirectory())
-      throw new Error("src was replaced by a link or non-directory");
+      throw new Error(`${io.name} was replaced by a link or non-directory`);
     if (identity(given) !== first.expected)
-      throw new Error("src changed identity while the tree was walked");
+      throw new Error(`${io.name} changed identity while the tree was walked`);
     const pending = [first];
     while (pending.length > 0) {
       const current = pending.pop();
@@ -162,7 +172,7 @@ export function admitTree(src, seams = {}) {
       try {
         entries = io.readdir(dir, { withFileTypes: true });
       } catch (error) {
-        throw failure("read", label(root, dir), error);
+        throw failure("read", label(io, root, dir), error);
       }
       stillHeld(io, root, current);
       release(current.fd);
@@ -177,7 +187,9 @@ export function admitTree(src, seams = {}) {
         }
         const real = realpathSync.native(path);
         if (!inside(root, real) || real !== path) {
-          reject("does not resolve to its own canonical path inside src");
+          reject(
+            `does not resolve to its own canonical path inside ${io.name}`,
+          );
           continue;
         }
         if (entry.isDirectory() && stat.isDirectory()) {
@@ -189,11 +201,7 @@ export function admitTree(src, seams = {}) {
           reject("neither a regular file nor a directory");
           continue;
         }
-        if (entry.name.endsWith(".woff2") && dir === join(root, ...fontDir)) {
-          admitted.push({ path, kind: "font" });
-          continue;
-        }
-        const { kind, reason } = classifyName(entry.name);
+        const { kind, reason } = io.classify(entry.name, dir, root);
         if (kind) admitted.push({ path, kind });
         else reject(reason);
       }

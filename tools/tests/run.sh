@@ -17,6 +17,7 @@
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
 #   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   m. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
+#   n. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
 #   n. Linux check cases (tools/tests/check-linux-cases.sh): input identity and image selection, stand-in docker
 # Usage: sh tools/tests/run.sh
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
@@ -459,6 +460,10 @@ else
   rc=0
   "$node" "$src/tools/tests/pssa-cases.mjs" "$tmp/pssa" > "$tmp/out" 2>&1 || rc=$?
   count_lines "PSScriptAnalyzer installer cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/browser-cases.mjs" "$tmp/browsers" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "browser provisioning cases" "$rc" "$tmp/out"
 fi
 
 rc=0

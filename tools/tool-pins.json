@@ -138,5 +138,125 @@
   "linux-check": {
     "base": "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
     "platform": "linux/amd64"
+  },
+  "playwright": {
+    "version": "1.65.0",
+    "packages": {
+      "@playwright/test": "sha512-iGURLGuKDLakSEl7Pgfv8h7f+XLT+V861Wfhz0zlEl5nyFuKUopdkFBPKqTllTUp06aOwPuH8iuUEb3yp3MpbQ==",
+      "playwright": "sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==",
+      "playwright-core": "sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA=="
+    },
+    "image": {
+      "registry": "mcr.microsoft.com",
+      "repository": "playwright",
+      "tag": "v1.65.0-noble",
+      "index": "sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d",
+      "platform": "linux/amd64",
+      "digest": "sha256:bc4fbb329a25287ed23e9216c97063646abdd1bf2da669a9895fa3e2078b2302",
+      "recordedOnly": {
+        "linux/arm64": "sha256:ccf917390e8eea6cad2bb493313b9d8db2856ed41c24db0a6727eacc766fd273"
+      },
+      "browsersPath": "/ms-playwright"
+    },
+    "windows": {
+      "platform": "win64",
+      "browsersPath": ".tools/ms-playwright",
+      "archiveCache": ".tools/ms-playwright-archives",
+      "provenance": "URLs from the package's install dry run; each archive was fetched from every listed source and hashed, and all sources agreed; both Chromium archives also match the Chrome for Testing copy, while the other archives come only from mirrors run by one operator.",
+      "builds": {
+        "chromium": {
+          "engine": "chromium",
+          "revision": "1254",
+          "browserVersion": "158.0.8127.18",
+          "dir": "chromium-1254",
+          "archive": "chrome-win64.zip",
+          "root": "chrome-win64",
+          "executable": "chrome-win64/chrome.exe",
+          "bytes": 215820284,
+          "sha256": "b796e8a6231463d1a150ee679fd7cb0168b3728162d2d19bf7bbd867d60d55e2",
+          "urls": [
+            "https://cdn.playwright.dev/builds/cft/158.0.8127.18/win64/chrome-win64.zip",
+            "https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.18/win64/chrome-win64.zip"
+          ]
+        },
+        "chromium-headless-shell": {
+          "engine": "chromium",
+          "revision": "1254",
+          "browserVersion": "158.0.8127.18",
+          "dir": "chromium_headless_shell-1254",
+          "archive": "chrome-headless-shell-win64.zip",
+          "root": "chrome-headless-shell-win64",
+          "executable": "chrome-headless-shell-win64/chrome-headless-shell.exe",
+          "bytes": 129186142,
+          "sha256": "fdd3721ad0299ddd419d170ce8ab89aecf8631d157b85215474b4a70c8dcd061",
+          "urls": [
+            "https://cdn.playwright.dev/builds/cft/158.0.8127.18/win64/chrome-headless-shell-win64.zip",
+            "https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.18/win64/chrome-headless-shell-win64.zip"
+          ]
+        },
+        "firefox": {
+          "engine": "firefox",
+          "revision": "1572",
+          "browserVersion": "159.0",
+          "dir": "firefox-1572",
+          "archive": "firefox-win64.zip",
+          "root": "firefox",
+          "executable": "firefox/firefox.exe",
+          "bytes": 132237406,
+          "sha256": "17abdb829293f482dae4c85be9e0dff5995a66457d8b3ca7a7efc6f5ef9c08c5",
+          "urls": [
+            "https://cdn.playwright.dev/dbazure/download/playwright/builds/firefox/1572/firefox-win64.zip",
+            "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/firefox/1572/firefox-win64.zip",
+            "https://cdn.playwright.dev/builds/firefox/1572/firefox-win64.zip"
+          ]
+        },
+        "webkit": {
+          "engine": "webkit",
+          "revision": "2388",
+          "browserVersion": "27.2",
+          "dir": "webkit-2388",
+          "archive": "webkit-win64.zip",
+          "root": "",
+          "executable": "Playwright.exe",
+          "bytes": 65443702,
+          "sha256": "0b390661995316d8f90fe0f7a0498f3a88c451c097fc8e4047342e1fbd36548b",
+          "urls": [
+            "https://cdn.playwright.dev/dbazure/download/playwright/builds/webkit/2388/webkit-win64.zip",
+            "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/webkit/2388/webkit-win64.zip",
+            "https://cdn.playwright.dev/builds/webkit/2388/webkit-win64.zip"
+          ]
+        },
+        "ffmpeg": {
+          "engine": "ffmpeg",
+          "revision": "1013",
+          "dir": "ffmpeg-1013",
+          "archive": "ffmpeg-win64.zip",
+          "root": "",
+          "executable": "ffmpeg-win64.exe",
+          "bytes": 1663577,
+          "sha256": "0c4ee6c694e9bffea27128ab543ae573466c5245d7d16c054e40115d7d743874",
+          "urls": [
+            "https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1013/ffmpeg-win64.zip",
+            "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/ffmpeg/1013/ffmpeg-win64.zip",
+            "https://cdn.playwright.dev/builds/ffmpeg/1013/ffmpeg-win64.zip"
+          ]
+        },
+        "winldd": {
+          "engine": "winldd",
+          "revision": "1007",
+          "dir": "winldd-1007",
+          "archive": "winldd-win64.zip",
+          "root": "",
+          "executable": "PrintDeps.exe",
+          "bytes": 128684,
+          "sha256": "0069f0d11d4ad6df068a068c003d22fe7dbec192a47bba64b2e115e9c8ce41d8",
+          "urls": [
+            "https://cdn.playwright.dev/dbazure/download/playwright/builds/winldd/1007/winldd-win64.zip",
+            "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/winldd/1007/winldd-win64.zip",
+            "https://cdn.playwright.dev/builds/winldd/1007/winldd-win64.zip"
+          ]
+        }
+      }
+    }
   }
 }
