@@ -1,6 +1,7 @@
 {
   "node": {
     "version": "26.13.0",
+    "cmdShim": "8.0.0",
     "assets": {
       "linux-x64": {
         "url": "https://nodejs.org/dist/v26.13.0/node-v26.13.0-linux-x64.tar.xz",

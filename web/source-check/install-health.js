@@ -1,11 +1,17 @@
 import {
+  copyFileSync,
   existsSync,
   lstatSync,
+  mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
+  rmSync,
 } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import {
   basename,
   dirname,
@@ -460,7 +466,9 @@ function readManifest(path, at, names, problems) {
   }
   try {
     const pkg = JSON.parse(readFileSync(join(path, "package.json"), "utf8"));
-    return isObject(pkg) ? pkg : {};
+    if (isObject(pkg)) return pkg;
+    problems.push(`census: ${at}/package.json is not a JSON object`);
+    return {};
   } catch (e) {
     problems.push(`census: ${at}/package.json cannot be read: ${errorCode(e)}`);
     return {};
@@ -504,8 +512,144 @@ export function censusEquality(packages, actual) {
   return problems;
 }
 
-const outside = (inside) =>
-  inside === "" || inside.startsWith("..") || isAbsolute(inside);
+/** A child named like "..cache" is inside; only the parent component or another drive is not. */
+const above = (inside) =>
+  inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside);
+
+const outside = (inside) => inside === "" || above(inside);
+
+export const within = (root, path) => !above(relative(root, path));
+
+// Windows counts the superscript digits one to three as port numbers too.
+const DEVICE =
+  /^(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])$/i;
+
+/** Windows matches a device on the part before the first dot, trailing spaces ignored. */
+export const windowsDevice = (name) =>
+  DEVICE.test(name.split(".")[0].replace(/ +$/, ""));
+
+const BIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const ALLOWED =
+  'an ASCII letter or digit, then letters, digits, ".", "_" or "-", not ending in "." and not a Windows device name';
+
+/** Only names that are one ordinary file name on every platform; the rest is refused. */
+export const allowedBinName = (name) =>
+  BIN_NAME.test(name) && !name.endsWith(".") && !windowsDevice(name);
+
+const nonEmpty = (v) => typeof v === "string" && v !== "";
+
+/** Own entries of what npm's normaliser makes of one declaration, or undefined when it throws. */
+function normalised(form, say, normalize) {
+  try {
+    const { bin } = normalize(structuredClone(form));
+    return bin === undefined ? [] : Object.entries(bin);
+  } catch (e) {
+    say(
+      `has a bin field npm's normaliser cannot read: ${e?.message ?? String(e)}`,
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Each raw declaration as the name npm derives and the single-bin form to normalise; any shape
+ * outside npm's three forms is reported and yields nothing.
+ */
+function rawBins(pkg, say) {
+  if (!Object.hasOwn(pkg, "bin")) return [];
+  const { bin } = pkg;
+  if (nonEmpty(bin)) {
+    const name =
+      typeof pkg.name === "string"
+        ? /^(?:@[^/]+\/)?([^/]+)$/.exec(pkg.name)?.[1]
+        : undefined;
+    if (name === undefined) {
+      say("declares a string bin without a usable package name");
+      return [];
+    }
+    return [{ key: name, form: { name: pkg.name, bin } }];
+  }
+  if (Array.isArray(bin) && bin.every(nonEmpty))
+    return bin.map((path) => ({
+      key: path.replace(/[\\:]/g, "/").split("/").pop(),
+      form: { bin: [path] },
+    }));
+  if (
+    isObject(bin) &&
+    Object.getPrototypeOf(bin) === Object.prototype &&
+    Object.values(bin).every(nonEmpty)
+  )
+    return Object.entries(bin).map(([key, path]) => ({
+      key,
+      form: { bin: Object.fromEntries([[key, path]]) },
+    }));
+  say(`has a bin field npm's forms do not cover: ${JSON.stringify(bin)}`);
+  return [];
+}
+
+/**
+ * The bins npm links for a package, by name; a declaration npm would drop, rename, merge or
+ * expand from directories.bin is reported and expects nothing.
+ */
+function packageBins(location, pkg, problems, normalize) {
+  const say = (what) => problems.push(`bin: ${location} ${what}`);
+  const bins = new Map();
+  if (isObject(pkg.directories) && Object.hasOwn(pkg.directories, "bin"))
+    say(
+      "declares directories.bin, which npm expands and the verifier does not model",
+    );
+  const raw = rawBins(pkg, say);
+  if (raw.length === 0) return bins;
+  for (const { key, form } of raw) {
+    const allowed = allowedBinName(key);
+    if (!allowed)
+      say(
+        `declares bin ${JSON.stringify(key)}, which is not an allowed bin name: ${ALLOWED}`,
+      );
+    const one = normalised(form, say, normalize);
+    if (!one) return new Map();
+    if (one.length !== 1) {
+      if (allowed)
+        say(
+          `declares bin ${JSON.stringify(key)}, which npm's normaliser drops`,
+        );
+      continue;
+    }
+    const [[name, target]] = one;
+    if (allowed && name !== key)
+      say(
+        `declares bin ${JSON.stringify(key)}, which npm's normaliser renames to ${JSON.stringify(name)}`,
+      );
+    if (bins.has(name)) {
+      say(`declares bin ${JSON.stringify(name)} more than once`);
+      Object.assign(bins.get(name), { ok: false, twice: true });
+      continue;
+    }
+    bins.set(name, { target, ok: allowed && name === key, twice: false });
+  }
+  // The whole field must normalise to exactly the per-declaration results, so nothing is lost.
+  const all = normalised({ name: pkg.name, bin: pkg.bin }, say, normalize);
+  if (!all) return new Map();
+  const same =
+    all.length === bins.size &&
+    all.every(([name, target]) => {
+      const known = bins.get(name);
+      // A name declared twice is already refused, so either target may survive.
+      return known !== undefined && (known.twice || known.target === target);
+    });
+  const listed = (pairs) =>
+    JSON.stringify(
+      Object.fromEntries(pairs.toSorted(([a], [b]) => (a < b ? -1 : 1))),
+    );
+  if (!same) {
+    say(
+      `has bins ${listed(all)} after npm's normaliser, not ${listed([...bins].map(([n, { target }]) => [n, target]))}`,
+    );
+    return new Map();
+  }
+  for (const [name, { ok }] of bins) if (!ok) bins.delete(name);
+  return bins;
+}
 
 /** The declared bin target inside its package, reached through no link. */
 function declaredTarget(pkgPath, declared) {
@@ -535,28 +679,55 @@ function declaredTarget(pkgPath, declared) {
 }
 
 /** The .bin entries bin-links would write for each package, keyed by .bin directory. */
-export function expectedBins(root, packages, problems) {
+export function expectedBins(
+  root,
+  packages,
+  problems,
+  platform = process.platform,
+  { normalize = normalizeBin } = {},
+) {
   const expected = new Map();
+  // Windows resolves names regardless of case, so two spellings are one file there.
+  const same =
+    platform === "win32"
+      ? (want, file) =>
+          [...want.keys()].find((n) => n.toUpperCase() === file.toUpperCase())
+      : (want, file) => (want.has(file) ? file : undefined);
   for (const [location, { path, pkg }] of packages) {
-    // The normaliser rewrites what it is given, so it only ever sees a copy.
-    const declared =
-      normalizeBin({ name: pkg.name, bin: structuredClone(pkg.bin) }).bin ?? {};
-    for (const file of getPaths({ path, pkg, global: false, top: false })) {
-      const dir = resolve(dirname(file));
-      const name = basename(file);
+    for (const [bin, { target }] of packageBins(
+      location,
+      pkg,
+      problems,
+      normalize,
+    )) {
+      // One bin at a time, so each emitted entry is owned by the bin that named it.
+      const [to] = getPaths({
+        path,
+        pkg: { bin: { [bin]: target } },
+        global: false,
+        top: false,
+      });
+      const dir = resolve(dirname(to));
+      const name = basename(to);
       const want = expected.get(dir) ?? new Map();
       expected.set(dir, want);
-      const prior = want.get(name);
-      if (prior) {
-        problems.push(
-          `bin: ${slash(root, file)} is declared by ${prior.location} and ${location}; collision not modelled`,
-        );
-        continue;
+      const names =
+        platform === "win32" ? [name, `${name}.cmd`, `${name}.ps1`] : [name];
+      for (const file of names) {
+        const prior = want.get(same(want, file));
+        if (prior) {
+          problems.push(
+            `bin: ${slash(root, join(dir, file))} is declared by ${prior.location} and ${location}; collision not modelled`,
+          );
+          continue;
+        }
+        want.set(file, {
+          location,
+          path,
+          declared: target,
+          to: join(dir, name),
+        });
       }
-      const bin = Object.keys(declared).find((k) =>
-        [k, `${k}.cmd`, `${k}.ps1`].includes(name),
-      );
-      want.set(name, { location, path, declared: declared[bin] });
     }
   }
   return expected;
@@ -612,10 +783,141 @@ function linkProblem(entry, stat, owner) {
   return undefined;
 }
 
+// The cmd-shim pin sits beside the node pin, so a node bump is reviewed with it.
+const PINS = join(import.meta.dirname, "..", "..", "tools", "tool-pins.json");
+
+/** The cmd-shim version pinned for the pinned node, or a throw naming what is wrong. */
+function pinnedCmdShim(pins = PINS) {
+  let version;
+  try {
+    version = JSON.parse(readFileSync(pins, "utf8")).node?.cmdShim;
+  } catch (e) {
+    throw new Error(`tools/tool-pins.json cannot be read: ${errorCode(e)}`, {
+      cause: e,
+    });
+  }
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version))
+    throw new Error("tools/tool-pins.json has no node.cmdShim version (x.y.z)");
+  return version;
+}
+
+/**
+ * The approved reference generator bundled with the pinned node. It does not prove which npm
+ * wrote the tree; another installer's output either matches byte for byte or fails closed.
+ */
+export function npmCmdShim(execPath = process.execPath, pins = PINS) {
+  const pinned = pinnedCmdShim(pins);
+  const dir = dirname(execPath);
+  const npm = [
+    join(dir, "node_modules", "npm"),
+    join(dir, "..", "lib", "node_modules", "npm"),
+  ].find((p) => existsSync(join(p, "package.json")));
+  if (!npm) throw new Error("the running node has no bundled npm");
+  const shim = join(npm, "node_modules", "cmd-shim");
+  const { version } = JSON.parse(
+    readFileSync(join(shim, "package.json"), "utf8"),
+  );
+  if (version !== pinned)
+    throw new Error(
+      `npm bundles cmd-shim ${String(version)}, not the pinned ${pinned}`,
+    );
+  return createRequire(import.meta.url)(shim);
+}
+
+/** The three files cmd-shim writes, generated in a mirror that keeps only the relative layout. */
+async function generatedShims(root, to, target, cmdShim, temp) {
+  const inTree = {
+    problem: "cannot be compared: the mirror is inside the tree",
+  };
+  let mirror;
+  try {
+    const tree = realpathSync.native(root);
+    // Checked before mkdtemp, so an in-tree temp folder never gains an entry.
+    const parent = realpathSync.native(temp);
+    if (within(tree, parent)) return inTree;
+    mirror = mkdtempSync(join(parent, "bin-shim-"));
+    mirror = realpathSync.native(mirror);
+    if (within(tree, mirror)) return inTree;
+    const from = join(mirror, relative(dirname(dirname(to)), target));
+    const name = basename(to);
+    mkdirSync(dirname(from), { recursive: true });
+    copyFileSync(target, from);
+    await cmdShim(from, join(mirror, ".bin", name));
+    const names = [name, `${name}.cmd`, `${name}.ps1`];
+    const written = readdirSync(join(mirror, ".bin")).sort();
+    if (!isDeepStrictEqual(written, [...names].sort()))
+      return {
+        problem: `cannot be compared: the generator wrote ${written.join(", ")}`,
+      };
+    return {
+      files: new Map(
+        names.map((n) => [n, readFileSync(join(mirror, ".bin", n))]),
+      ),
+    };
+  } catch (e) {
+    return { problem: `cannot be compared: ${errorCode(e)}` };
+  } finally {
+    if (mirror) rmSync(mirror, { recursive: true, force: true });
+  }
+}
+
+/** A Windows .bin entry is byte for byte the shim npm writes for its declared target. */
+async function shimProblem(root, entry, stat, owner, shims) {
+  if (!stat.isFile() || stat.isSymbolicLink())
+    return `is ${kind(stat)}, not a regular file`;
+  const { target, problem } = declaredTarget(owner.path, owner.declared);
+  if (problem) return problem;
+  const route = routeProblem(dirname(entry), target);
+  if (route) return route;
+  try {
+    const inside = relative(
+      realpathSync.native(owner.path),
+      realpathSync.native(target),
+    );
+    if (outside(inside)) return "does not point at its declared target";
+  } catch (e) {
+    return `does not resolve: ${errorCode(e)}`;
+  }
+  const generated = await shims(owner.to, target);
+  if (generated.problem) return generated.problem;
+  let bytes;
+  try {
+    bytes = readFileSync(entry);
+  } catch (e) {
+    return `cannot be read: ${errorCode(e)}`;
+  }
+  return bytes.equals(generated.files.get(basename(entry)))
+    ? undefined
+    : "is not the shim npm writes for its declared target";
+}
+
 /** Each .bin holds exactly the entries bin-links would write for the packages at its level. */
-export function binProblems(root, packages, bins, platform = process.platform) {
+export async function binProblems(
+  root,
+  packages,
+  bins,
+  platform = process.platform,
+  { loadShim = npmCmdShim, temp = tmpdir() } = {},
+) {
   const problems = [];
-  const expected = expectedBins(root, packages, problems);
+  const expected = expectedBins(root, packages, problems, platform);
+  let cmdShim;
+  const generated = new Map();
+  const shims = (to, target) => {
+    if (!generated.has(to))
+      generated.set(
+        to,
+        (async () => {
+          try {
+            cmdShim ??= loadShim();
+          } catch (e) {
+            return { problem: `cannot be compared: ${e.message}` };
+          }
+          return generatedShims(root, to, target, cmdShim, temp);
+        })(),
+      );
+    return generated.get(to);
+  };
   const found = new Set();
   for (const dir of bins) {
     found.add(resolve(dir));
@@ -638,9 +940,7 @@ export function binProblems(root, packages, bins, platform = process.platform) {
       const problem = !owner
         ? "is not expected"
         : platform === "win32"
-          ? !stat.isFile() || stat.isSymbolicLink()
-            ? `is ${kind(stat)}, not a regular file`
-            : undefined
+          ? await shimProblem(root, entry, stat, owner, shims)
           : linkProblem(entry, stat, owner);
       if (problem) problems.push(`bin: ${at}/${name} ${problem}`);
     }
@@ -697,7 +997,12 @@ export async function installHealth(
     else if (!isObject(lock.packages))
       problems.push("the lock has no packages map");
     else if (pkg !== undefined)
-      problems.push(...rootDrift(pkg, lock.packages[""]));
+      problems.push(
+        ...rootDrift(
+          pkg,
+          Object.hasOwn(lock.packages, "") ? lock.packages[""] : undefined,
+        ),
+      );
   }
   const heard = (level, ...args) => {
     if (level === "warn" || level === "error")
@@ -718,22 +1023,30 @@ export async function installHealth(
   } finally {
     process.off("log", heard);
   }
-  // Arborist drops dot entries and unreadable folders, so the census vouches for completeness.
-  const counted = census(root);
-  problems.push(
-    ...counted.problems,
-    ...binProblems(root, counted.packages, counted.bins),
-  );
-  const tally = { census: counted.packages.size, bins: counted.bins.length };
-  if (!actual || !virtual) return { problems, excused: new Map(), tally };
-  tally.arborist = actual.inventory.size - 1;
-  const compared = compareTrees(actual, virtual, host);
-  problems.push(
-    ...censusEquality(counted.packages, actual),
-    ...compared.problems,
-    ...diskProblems(actual, root),
-  );
-  return { problems, excused: compared.excused, tally };
+  // A check that throws is a problem, never a crash that skips the rest of the report.
+  try {
+    // Arborist drops dot entries and unreadable folders, so the census vouches for completeness.
+    const counted = census(root);
+    problems.push(
+      ...counted.problems,
+      ...(await binProblems(root, counted.packages, counted.bins)),
+    );
+    const tally = { census: counted.packages.size, bins: counted.bins.length };
+    if (!actual || !virtual) return { problems, excused: new Map(), tally };
+    tally.arborist = actual.inventory.size - 1;
+    const compared = compareTrees(actual, virtual, host);
+    problems.push(
+      ...censusEquality(counted.packages, actual),
+      ...compared.problems,
+      ...diskProblems(actual, root),
+    );
+    return { problems, excused: compared.excused, tally };
+  } catch (e) {
+    problems.push(
+      `the install could not be checked: ${e?.code ?? ""} ${e?.message ?? String(e)}`,
+    );
+    return { problems, excused: new Map() };
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

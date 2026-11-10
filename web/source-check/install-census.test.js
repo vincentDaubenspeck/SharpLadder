@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildFixture, writeJson } from "./install-fixture.js";
 import {
@@ -23,6 +23,10 @@ import {
   censusEquality,
   expectedBins,
   installHealth,
+  npmCmdShim,
+  within,
+  allowedBinName,
+  windowsDevice,
 } from "./install-health.js";
 
 const win = process.platform === "win32";
@@ -497,7 +501,7 @@ describe(".bin contents", () => {
     );
   });
 
-  it("fails two packages declaring one name in one .bin", () => {
+  it("fails two packages declaring one name in one .bin", async () => {
     const { packages, bins } = census(clean);
     const abbrev = packages.get("node_modules/abbrev");
     const twin = new Map(packages);
@@ -505,7 +509,7 @@ describe(".bin contents", () => {
       ...abbrev,
       pkg: { ...abbrev.pkg, bin: { "node-which": "package.json" } },
     });
-    expect(binProblems(clean, twin, bins)).toContain(
+    expect(await binProblems(clean, twin, bins)).toContain(
       "bin: node_modules/.bin/node-which is declared by node_modules/abbrev and node_modules/which; collision not modelled",
     );
   });
@@ -642,7 +646,7 @@ describe("Linux .bin links", () => {
 
   it.runIf(linux)(
     "keeps a declared path that climbs out inside the package",
-    () => {
+    async () => {
       const { packages, bins } = census(clean);
       const which = packages.get("node_modules/which");
       const moved = new Map(packages);
@@ -650,7 +654,7 @@ describe("Linux .bin links", () => {
         ...which,
         pkg: { ...which.pkg, bin: { "node-which": "../isexe/index.js" } },
       });
-      expect(binProblems(clean, moved, bins)).toContain(
+      expect(await binProblems(clean, moved, bins)).toContain(
         "bin: node_modules/.bin/node-which has a declared target that cannot be read: ENOENT",
       );
     },
@@ -672,46 +676,944 @@ describe("Linux .bin links", () => {
         { path: pkg, pkg: { name: "example", bin: "bin/cli.js" } },
       ],
     ]);
-    const pointAt = (to) => {
+    const pointAt = async (to) => {
       const entry = join(bin, "example");
       symlinkSync(typeof to === "string" ? to : relative(bin, to.at), entry);
       links.push(entry);
-      return binProblems(dir, packages, [bin], "linux").filter((p) =>
-        p.startsWith("bin: node_modules/.bin/example "),
-      );
+      return binProblems(dir, packages, [bin], "linux");
     };
     return { dir, pkg, cli, pointAt };
   }
 
-  it("passes the link text bin-links writes", () => {
+  it("passes the link text bin-links writes", async () => {
     const { cli, pointAt } = routed();
-    expect(pointAt({ at: cli })).toEqual([]);
+    expect(await pointAt({ at: cli })).toEqual([]);
   });
 
-  it("fails a link that reaches the declared target through an outside link", () => {
+  it("fails a link that reaches the declared target through an outside link", async () => {
     const { dir, pkg, pointAt } = routed();
     mkdirSync(join(dir, "external"));
     link(join(pkg, "bin"), join(dir, "external", "return"));
-    expect(pointAt({ at: join(dir, "external", "return", "cli.js") })).toEqual([
-      "bin: node_modules/.bin/example does not point at its declared target",
-    ]);
-  });
-
-  it("fails a link that leaves node_modules and returns through real folders", () => {
-    const { pointAt } = routed();
     expect(
-      pointAt(join("..", "..", "node_modules", "example", "bin", "cli.js")),
+      await pointAt({ at: join(dir, "external", "return", "cli.js") }),
     ).toEqual([
       "bin: node_modules/.bin/example does not point at its declared target",
     ]);
   });
 
-  it("fails a package folder that is itself a link", () => {
+  it("fails a link that leaves node_modules and returns through real folders", async () => {
+    const { pointAt } = routed();
+    expect(
+      await pointAt(
+        join("..", "..", "node_modules", "example", "bin", "cli.js"),
+      ),
+    ).toEqual([
+      "bin: node_modules/.bin/example does not point at its declared target",
+    ]);
+  });
+
+  it("fails a package folder that is itself a link", async () => {
     const { dir, pkg, cli, pointAt } = routed();
     renameSync(pkg, join(dir, "moved"));
     link(join(dir, "moved"), pkg);
-    expect(pointAt({ at: cli })).toEqual([
+    expect(await pointAt({ at: cli })).toEqual([
       "bin: node_modules/.bin/example points at its declared target through a link",
     ]);
   });
+}, 30_000);
+
+describe("a bin and a name that looks like its shim", () => {
+  // Judged as Linux, where both names are real bins with their own targets.
+  function twins() {
+    cases += 1;
+    const dir = join(base, `case${String(cases)}`);
+    const pkg = nm(dir, "example");
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, "a.js"), "");
+    writeFileSync(join(pkg, "b.js"), "");
+    const bin = nm(dir, ".bin");
+    mkdirSync(bin);
+    const packages = new Map([
+      [
+        "node_modules/example",
+        {
+          path: pkg,
+          pkg: {
+            name: "example",
+            bin: { example: "a.js", "example.cmd": "b.js" },
+          },
+        },
+      ],
+    ]);
+    const point = (name, file) => {
+      const entry = join(bin, name);
+      symlinkSync(relative(bin, join(pkg, file)), entry);
+      links.push(entry);
+    };
+    return { dir, bin, packages, point };
+  }
+
+  it("checks each entry against its own target", async () => {
+    const { dir, bin, packages, point } = twins();
+    point("example", "a.js");
+    point("example.cmd", "b.js");
+    expect(await binProblems(dir, packages, [bin], "linux")).toEqual([]);
+  });
+
+  it("fails entries swapped between the two targets", async () => {
+    const { dir, bin, packages, point } = twins();
+    point("example", "b.js");
+    point("example.cmd", "a.js");
+    expect(await binProblems(dir, packages, [bin], "linux")).toEqual([
+      "bin: node_modules/.bin/example does not point at its declared target",
+      "bin: node_modules/.bin/example.cmd does not point at its declared target",
+    ]);
+  });
+
+  it("reports the shim collision when judged as Windows", () => {
+    const { dir, packages } = twins();
+    const problems = [];
+    expectedBins(dir, packages, problems, "win32");
+    expect(problems).toEqual([
+      "bin: node_modules/.bin/example.cmd is declared by node_modules/example and node_modules/example; collision not modelled",
+    ]);
+  });
+});
+
+describe("Windows .bin shims", () => {
+  const suffixes = ["", ".cmd", ".ps1"];
+  const node = "#!/usr/bin/env node\nconsole.log(1);\n";
+  const tool = (location, bin, files) => ({ location, pkg: { bin }, files });
+  const standard = () => [
+    tool(
+      "node_modules/example",
+      { example: "bin/cli.js" },
+      { "bin/cli.js": node },
+    ),
+    tool("node_modules/other", { other: "index.js" }, { "index.js": node }),
+  ];
+
+  // Hand-built under a folder with spaces and judged as Windows, so these run on every host.
+  async function shimmed(specs = standard()) {
+    cases += 1;
+    const dir = join(base, `shim case ${String(cases)}`);
+    const packages = new Map();
+    for (const { location, pkg, files } of specs) {
+      const path = join(dir, ...location.split("/"));
+      for (const [file, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(path, file)), { recursive: true });
+        writeFileSync(join(path, file), text);
+      }
+      packages.set(location, { path, pkg });
+    }
+    const expected = expectedBins(dir, packages, [], "win32");
+    const cmdShim = npmCmdShim();
+    for (const want of expected.values()) {
+      const targets = new Map(
+        [...want.values()].map(({ path, declared, to }) => [
+          to,
+          resolve(path, declared),
+        ]),
+      );
+      for (const [to, target] of targets) await cmdShim(target, to);
+    }
+    const bins = [...expected.keys()];
+    const judge = (options) =>
+      binProblems(dir, packages, bins, "win32", options);
+    return { dir, bins, judge };
+  }
+
+  const shim = (dir, name) => nm(dir, ".bin", name);
+  const each = suffixes.map((suffix) => `example${suffix}`);
+  const wrong = (name) =>
+    `bin: node_modules/.bin/${name} is not the shim npm writes for its declared target`;
+
+  it("passes the shims npm writes", async () => {
+    const { judge } = await shimmed();
+    expect(await judge()).toEqual([]);
+  });
+
+  const tampers = {
+    "one byte changed": (b) => {
+      const c = Buffer.from(b);
+      c[Math.floor(c.length / 2)] ^= 1;
+      return c;
+    },
+    "an appended command": (b) =>
+      Buffer.concat([b, Buffer.from("echo extra\n")]),
+    "the target moved to another package": (b) =>
+      Buffer.from(
+        b
+          .toString("utf8")
+          .replaceAll("example/bin/cli.js", "other/index.js")
+          .replaceAll("example\\bin\\cli.js", "other\\index.js"),
+      ),
+    "its line endings flipped": (b) => {
+      const text = b.toString("utf8");
+      return Buffer.from(
+        text.includes("\r\n")
+          ? text.replaceAll("\r\n", "\n")
+          : text.replaceAll("\n", "\r\n"),
+      );
+    },
+  };
+
+  for (const [tamper, change] of Object.entries(tampers))
+    it.each(each)(`fails %s with ${tamper}`, async (name) => {
+      const { dir, judge } = await shimmed();
+      const before = readFileSync(shim(dir, name));
+      const after = change(before);
+      expect(after.equals(before)).toBe(false);
+      writeFileSync(shim(dir, name), after);
+      expect(await judge()).toEqual([wrong(name)]);
+    });
+
+  it("fails a .cmd that npm wrote for another package's bin", async () => {
+    const { dir, judge } = await shimmed();
+    writeFileSync(
+      shim(dir, "example.cmd"),
+      readFileSync(shim(dir, "other.cmd")),
+    );
+    expect(await judge()).toEqual([wrong("example.cmd")]);
+  });
+
+  it("fails shims left over from an older shebang", async () => {
+    const { dir, judge } = await shimmed();
+    writeFileSync(
+      nm(dir, "example", "bin", "cli.js"),
+      "#!/usr/bin/env python3\n",
+    );
+    expect(await judge()).toEqual(each.map(wrong));
+  });
+
+  it.each([
+    ["arguments", "#!/usr/bin/env node --no-warnings --stack-size=2000\n"],
+    ["an env assignment", "#!/usr/bin/env -S NODE_ENV=production node\n"],
+    ["no env", "#!/bin/sh -e\r\nexit 0\r\n"],
+    ["no shebang", "console.log(1);\n"],
+  ])("passes the shims npm writes for a target with %s", async (_, text) => {
+    const { judge } = await shimmed([
+      tool(
+        "node_modules/example",
+        { example: "bin/cli.js" },
+        { "bin/cli.js": text },
+      ),
+    ]);
+    expect(await judge()).toEqual([]);
+  });
+
+  const scoped = () => [
+    tool("node_modules/@scope/tool", { tool: "cli.js" }, { "cli.js": node }),
+    tool(
+      "node_modules/@scope/tool/node_modules/inner",
+      { inner: "lib/inner.js" },
+      { "lib/inner.js": node },
+    ),
+  ];
+
+  it("passes scoped and nested packages", async () => {
+    const { bins, judge } = await shimmed(scoped());
+    expect(bins).toHaveLength(2);
+    expect(await judge()).toEqual([]);
+  });
+
+  it("fails a nested shim that npm wrote for the scoped package", async () => {
+    const { dir, judge } = await shimmed(scoped());
+    writeFileSync(
+      nm(dir, "@scope", "tool", "node_modules", ".bin", "inner.ps1"),
+      readFileSync(shim(dir, "tool.ps1")),
+    );
+    expect(await judge()).toEqual([
+      "bin: node_modules/@scope/tool/node_modules/.bin/inner.ps1 is not the shim npm writes for its declared target",
+    ]);
+  });
+
+  it("fails a missing shim and an extra one", async () => {
+    const { dir, judge } = await shimmed();
+    unlinkSync(shim(dir, "example.ps1"));
+    writeFileSync(shim(dir, "example.sh"), "");
+    expect(await judge()).toEqual([
+      "bin: node_modules/.bin/example.ps1 is missing",
+      "bin: node_modules/.bin/example.sh is not expected",
+    ]);
+  });
+
+  it("fails every shim of a missing declared target", async () => {
+    const { dir, judge } = await shimmed();
+    unlinkSync(nm(dir, "example", "bin", "cli.js"));
+    expect(await judge()).toEqual(
+      each.map(
+        (name) =>
+          `bin: node_modules/.bin/${name} has a declared target that cannot be read: ENOENT`,
+      ),
+    );
+  });
+
+  it("fails a declared target reached through a junction in its package", async () => {
+    const { dir, judge } = await shimmed();
+    const pkg = nm(dir, "example");
+    renameSync(join(pkg, "bin"), join(pkg, "real"));
+    link(join(pkg, "real"), join(pkg, "bin"));
+    expect(await judge()).toEqual(
+      each.map(
+        (name) =>
+          `bin: node_modules/.bin/${name} has a declared target path through a link`,
+      ),
+    );
+  });
+
+  it("fails a package folder that is a junction", async () => {
+    const { dir, judge } = await shimmed();
+    renameSync(nm(dir, "example"), join(dir, "moved"));
+    link(join(dir, "moved"), nm(dir, "example"));
+    expect(await judge()).toEqual(
+      each.map(
+        (name) =>
+          `bin: node_modules/.bin/${name} points at its declared target through a link`,
+      ),
+    );
+  });
+
+  it("fails closed when the generator is unavailable", async () => {
+    const { judge } = await shimmed();
+    const loadShim = () => {
+      throw new Error("no generator");
+    };
+    expect(await judge({ loadShim })).toEqual(
+      [...each, ...suffixes.map((suffix) => `other${suffix}`)].map(
+        (name) =>
+          `bin: node_modules/.bin/${name} cannot be compared: no generator`,
+      ),
+    );
+  });
+
+  it("fails closed when the generator writes something else", async () => {
+    const { judge } = await shimmed();
+    const loadShim = () => async (_, to) => {
+      mkdirSync(dirname(to), { recursive: true });
+      writeFileSync(to, "");
+    };
+    expect(await judge({ loadShim })).toEqual(
+      [...each, ...suffixes.map((suffix) => `other${suffix}`)].map(
+        (name) =>
+          `bin: node_modules/.bin/${name} cannot be compared: the generator wrote ${name.replace(/\.(cmd|ps1)$/, "")}`,
+      ),
+    );
+  });
+
+  // Counts generator calls, so a rejected mirror is shown to stop before generation.
+  const spied = () => {
+    const real = npmCmdShim();
+    const calls = [];
+    const loadShim = () => async (from, to) => {
+      calls.push(to);
+      return real(from, to);
+    };
+    return { calls, loadShim };
+  };
+  const inTree = [...each, ...suffixes.map((suffix) => `other${suffix}`)].map(
+    (name) =>
+      `bin: node_modules/.bin/${name} cannot be compared: the mirror is inside the tree`,
+  );
+
+  it("generates in a temp folder outside the tree", async () => {
+    const { judge } = await shimmed();
+    cases += 1;
+    const temp = join(base, `temp${String(cases)}`);
+    mkdirSync(temp);
+    const { calls, loadShim } = spied();
+    expect(await judge({ loadShim, temp })).toEqual([]);
+    expect(calls).toHaveLength(2);
+    expect(readdirSync(temp)).toEqual([]);
+  });
+
+  it.each([
+    ["an ordinary child", "cache", false],
+    ["a child named like the parent", "..cache", false],
+    ["a junction to a child", "cache", true],
+  ])(
+    "refuses a temp folder that is %s of the tree",
+    async (_, name, junction) => {
+      const { dir, judge } = await shimmed();
+      const child = join(dir, name);
+      mkdirSync(child);
+      let temp = child;
+      if (junction) {
+        cases += 1;
+        temp = join(base, `junction${String(cases)}`);
+        link(child, temp);
+      }
+      const { calls, loadShim } = spied();
+      expect(await judge({ loadShim, temp })).toEqual(inTree);
+      expect(calls).toEqual([]);
+      expect(readdirSync(child)).toEqual([]);
+    },
+  );
+
+  it.runIf(win)(
+    "refuses a temp folder named by its short alias",
+    async (ctx) => {
+      const { dir, judge } = await shimmed();
+      const child = join(dir, "a long temporary folder");
+      mkdirSync(child);
+      const r = spawnSync(
+        join(process.env.SystemRoot ?? "C:/Windows", "System32", "cmd.exe"),
+        ["/d", "/s", "/c", `"for %I in ("${child}") do @echo %~sI"`],
+        { encoding: "utf8", timeout: 30_000, windowsVerbatimArguments: true },
+      );
+      const temp = r.stdout.trim();
+      if (r.status !== 0 || temp === "" || temp === child)
+        ctx.skip("this volume does not create 8.3 short names");
+      const { calls, loadShim } = spied();
+      expect(await judge({ loadShim, temp })).toEqual(inTree);
+      expect(calls).toEqual([]);
+      expect(readdirSync(child)).toEqual([]);
+    },
+  );
+
+  it("tells a child named like the parent from the parent itself", () => {
+    const root = join(base, "web");
+    expect(within(root, root)).toBe(true);
+    expect(within(root, join(root, "..cache", "x"))).toBe(true);
+    expect(within(root, join(root, "..", "x"))).toBe(false);
+    expect(within(root, dirname(root))).toBe(false);
+    if (win) expect(within("C:\\web", "D:\\web\\x")).toBe(false);
+  });
+
+  // A host that cannot create file symlinks cannot build these fixtures, so they skip there.
+  const fileLinks = (() => {
+    const probe = mkdtempSync(join(tmpdir(), "file-link-"));
+    try {
+      writeFileSync(join(probe, "a"), "");
+      symlinkSync(join(probe, "a"), join(probe, "b"), "file");
+      return true;
+    } catch {
+      return false;
+    } finally {
+      rmSync(probe, { recursive: true, force: true });
+    }
+  })();
+  const fileLink = (target, path) => {
+    symlinkSync(target, path, "file");
+    links.push(path);
+  };
+
+  (fileLinks ? it : it.skip).each(each)(
+    "fails %s replaced by a file symlink to the same bytes",
+    async (name) => {
+      const { dir, judge } = await shimmed();
+      const copy = join(dir, `copy of ${name}`);
+      writeFileSync(copy, readFileSync(shim(dir, name)));
+      unlinkSync(shim(dir, name));
+      fileLink(copy, shim(dir, name));
+      expect(await judge()).toEqual([
+        `bin: node_modules/.bin/${name} is a link, not a regular file`,
+      ]);
+    },
+  );
+
+  (fileLinks ? it : it.skip)(
+    "fails a declared target that is a symlink out of its package",
+    async () => {
+      const { dir, judge } = await shimmed();
+      const cli = nm(dir, "example", "bin", "cli.js");
+      unlinkSync(cli);
+      fileLink(nm(dir, "other", "index.js"), cli);
+      expect(await judge()).toEqual(
+        each.map(
+          (name) =>
+            `bin: node_modules/.bin/${name} has a declared target path through a link`,
+        ),
+      );
+    },
+  );
+
+  it("fails two bins whose names differ only by case", () => {
+    const root = join(base, "fold");
+    const packages = new Map(
+      ["Foo", "foo"].map((name) => [
+        `node_modules/${name}-tool`,
+        {
+          path: join(root, "node_modules", `${name}-tool`),
+          pkg: { bin: { [name]: "cli.js" } },
+        },
+      ]),
+    );
+    const problems = [];
+    expectedBins(root, packages, problems, "win32");
+    expect(problems).toEqual(
+      suffixes.map(
+        (suffix) =>
+          `bin: node_modules/.bin/foo${suffix} is declared by node_modules/Foo-tool and node_modules/foo-tool; collision not modelled`,
+      ),
+    );
+    const sensitive = [];
+    expectedBins(root, packages, sensitive, "linux");
+    expect(sensitive).toEqual([]);
+  });
+
+  describe.each(["win32", "linux"])("bin names judged as %s", (platform) => {
+    const judged = (bin, name = "tool") => {
+      const root = join(base, "names");
+      const problems = [];
+      const expected = expectedBins(
+        root,
+        new Map([
+          [
+            `node_modules/${name}`,
+            { path: join(root, "node_modules", name), pkg: { name, bin } },
+          ],
+        ]),
+        problems,
+        platform,
+      );
+      const names = [...expected.values()].flatMap((want) => [...want.keys()]);
+      return { problems, names };
+    };
+
+    it.each([
+      "../evil",
+      "sub/evil",
+      "sub\\evil",
+      "a:b",
+      "NUL",
+      "con.txt",
+      "Lpt9.cmd",
+      "..",
+      ".",
+      "evil.",
+      "evil ",
+      "evil\u0007",
+      "",
+    ])("refuses %j before any path is built", (key) => {
+      const { problems, names } = judged({ [key]: "cli.js", ok: "cli.js" });
+      expect(problems).toEqual([
+        `bin: node_modules/tool declares bin ${JSON.stringify(key)}, which is not an allowed bin name: ${ALLOWED}`,
+      ]);
+      expect(names.filter((n) => !n.startsWith("ok"))).toEqual([]);
+      expect(names).toContain("ok");
+    });
+
+    it("accepts plain names, a scoped package's own name and an array", () => {
+      expect(
+        judged({ "con-tool": "a.js", com0: "b.js", "a.b_c-d": "c.js" })
+          .problems,
+      ).toEqual([]);
+      expect(judged("cli.js", "@scope/tool").problems).toEqual([]);
+      expect(judged(["bin/one.js", "lib/two"]).problems).toEqual([]);
+    });
+  });
+
+  it("loads only npm's own cmd-shim at the expected version", () => {
+    cases += 1;
+    const dir = join(base, `case${String(cases)}`);
+    const exe = join(dir, "node.exe");
+    mkdirSync(dir);
+    expect(() => npmCmdShim(exe)).toThrow(
+      "the running node has no bundled npm",
+    );
+    const npm = join(dir, "node_modules", "npm");
+    mkdirSync(npm, { recursive: true });
+    writeJson(join(npm, "package.json"), { name: "npm" });
+    expect(() => npmCmdShim(exe)).toThrow("ENOENT");
+    mkdirSync(join(npm, "node_modules", "cmd-shim"), { recursive: true });
+    writeJson(join(npm, "node_modules", "cmd-shim", "package.json"), {
+      name: "cmd-shim",
+      version: "7.0.0",
+    });
+    expect(() => npmCmdShim(exe)).toThrow(
+      "npm bundles cmd-shim 7.0.0, not the pinned 8.0.0",
+    );
+    expect(typeof npmCmdShim()).toBe("function");
+  });
+
+  it.each([
+    ["missing", "", "tools/tool-pins.json cannot be read: ENOENT"],
+    ["not JSON", "{", "tools/tool-pins.json cannot be read: "],
+    ["without the pin", { node: { version: "26.13.0" } }, "no node.cmdShim"],
+    ["with a range", { node: { cmdShim: "^8.0.0" } }, "no node.cmdShim"],
+    [
+      "with another version",
+      { node: { cmdShim: "7.0.0" } },
+      "not the pinned 7.0.0",
+    ],
+  ])("fails closed on a pins file %s", (_, content, message) => {
+    cases += 1;
+    const dir = join(base, `case${String(cases)}`);
+    mkdirSync(dir);
+    const pins = join(dir, "tool-pins.json");
+    if (typeof content === "string") {
+      if (content !== "") writeFileSync(pins, content);
+    } else writeJson(pins, content);
+    expect(() => npmCmdShim(process.execPath, pins)).toThrow(message);
+  });
+
+  it("refuses a shim generator whose pin is wrong before generating", async () => {
+    cases += 1;
+    const dir = join(base, `case${String(cases)}`);
+    mkdirSync(dir);
+    const pins = join(dir, "tool-pins.json");
+    writeJson(pins, { node: { cmdShim: "7.0.0" } });
+    const { judge } = await shimmed();
+    const problems = await judge({
+      loadShim: () => npmCmdShim(process.execPath, pins),
+    });
+    expect(problems.length).toBeGreaterThan(0);
+    for (const p of problems)
+      expect(p).toMatch(
+        /cannot be compared: npm bundles cmd-shim 8\.0\.0, not the pinned 7\.0\.0$/,
+      );
+  });
+}, 30_000);
+
+const ALLOWED =
+  'an ASCII letter or digit, then letters, digits, ".", "_" or "-", not ending in "." and not a Windows device name';
+const at = "bin: node_modules/tool";
+
+describe("bin name rule", () => {
+  it.each([
+    "CON",
+    "nul",
+    "NUL.tar.gz",
+    "nul .txt",
+    "NUL  ",
+    "COM\u00b9",
+    "LPT\u00b2",
+    "COM\u00b3.txt",
+    "com\u00b9.CMD",
+    "lpt9",
+  ])("treats %j as a Windows device", (name) => {
+    expect(windowsDevice(name)).toBe(true);
+  });
+
+  it.each([
+    "COM10",
+    "CONSOLE",
+    "NULL",
+    "COM",
+    "LPT",
+    "AUXILIARY",
+    "com1x",
+    "com0",
+    "con-tool",
+  ])("does not treat %j as a Windows device", (name) => {
+    expect(windowsDevice(name)).toBe(false);
+  });
+
+  it.each([
+    "COM\u00b9",
+    "LPT\u00b2",
+    "COM\u00b3.txt",
+    "com\u00b9.CMD",
+    "NUL.tar.gz",
+    "nul .txt",
+    "caf\u00e9",
+    "a b",
+    "a$b",
+    "_x",
+    "-x",
+    ".hidden",
+    "..x",
+    "x.",
+    "__proto__",
+  ])("refuses %j", (name) => {
+    expect(allowedBinName(name)).toBe(false);
+  });
+
+  it.each([
+    "COM10",
+    "CONSOLE",
+    "NULL",
+    "COM",
+    "LPT",
+    "AUXILIARY",
+    "com1x",
+    "com0",
+    "a.b_c-d",
+    "2to3",
+    "constructor",
+    "toString",
+  ])("accepts %j", (name) => {
+    expect(allowedBinName(name)).toBe(true);
+  });
+});
+
+describe.each(["win32", "linux"])(
+  "raw bin declarations judged as %s",
+  (platform) => {
+    const judged = (pkg) => {
+      const root = join(tmpdir(), "raw-bins");
+      const problems = [];
+      const expected = expectedBins(
+        root,
+        new Map([
+          [
+            "node_modules/tool",
+            { path: join(root, "node_modules", "tool"), pkg },
+          ],
+        ]),
+        problems,
+        platform,
+      );
+      const names = [...expected.values()].flatMap((want) => [...want.keys()]);
+      return { problems, names };
+    };
+    const shims = (name) =>
+      platform === "win32" ? [name, `${name}.cmd`, `${name}.ps1`] : [name];
+
+    it.each([true, false, null, 0, 123, "", [null], [123], [""], [[]], [{}]])(
+      "reports the bin field %j and expects nothing from it",
+      (bin) => {
+        const { problems, names } = judged({ name: "tool", bin });
+        expect(problems).toEqual([
+          `${at} has a bin field npm's forms do not cover: ${JSON.stringify(bin)}`,
+        ]);
+        expect(names).toEqual([]);
+      },
+    );
+
+    it.each([123, "", null, {}, [], true])(
+      "reports an object bin whose target is %j",
+      (target) => {
+        const { problems, names } = judged({
+          name: "tool",
+          bin: { example: target, ok: "cli.js" },
+        });
+        expect(problems).toEqual([
+          `${at} has a bin field npm's forms do not cover: ${JSON.stringify({ example: target, ok: "cli.js" })}`,
+        ]);
+        expect(names).toEqual([]);
+      },
+    );
+
+    it("takes an empty object or array as no bins", () => {
+      expect(judged({ name: "tool", bin: {} })).toEqual({
+        problems: [],
+        names: [],
+      });
+      expect(judged({ name: "tool", bin: [] })).toEqual({
+        problems: [],
+        names: [],
+      });
+    });
+
+    it("refuses a bin named __proto__, which npm itself loses", () => {
+      const bin = JSON.parse('{"__proto__":"lib/index.js","ok":"cli.js"}');
+      const { problems, names } = judged({ name: "tool", bin });
+      expect(problems).toEqual([
+        `${at} declares bin "__proto__", which is not an allowed bin name: ${ALLOWED}`,
+      ]);
+      expect(names).toEqual(shims("ok"));
+    });
+
+    it.each(["constructor", "toString", "hasOwnProperty"])(
+      "expects a bin named %s like any other",
+      (name) => {
+        const { problems, names } = judged({
+          name: "tool",
+          bin: JSON.parse(`{"${name}":"cli.js"}`),
+        });
+        expect(problems).toEqual([]);
+        expect(names).toEqual(shims(name));
+      },
+    );
+
+    it.each(["/", ".", "\\"])(
+      "reports a bin whose target npm's normaliser drops: %j",
+      (target) => {
+        const { problems, names } = judged({
+          name: "tool",
+          bin: { example: target, ok: "cli.js" },
+        });
+        expect(problems).toEqual([
+          `${at} declares bin "example", which npm's normaliser drops`,
+        ]);
+        expect(names).toEqual(shims("ok"));
+      },
+    );
+
+    it("reports a refused name that npm would shorten onto a declared one", () => {
+      const { problems, names } = judged({
+        name: "tool",
+        bin: { "sub/evil": "a.js", evil: "b.js", ok: "cli.js" },
+      });
+      expect(problems).toEqual([
+        `${at} declares bin "sub/evil", which is not an allowed bin name: ${ALLOWED}`,
+        `${at} declares bin "evil" more than once`,
+      ]);
+      expect(names).toEqual(shims("ok"));
+    });
+
+    it("reports two array paths with one basename", () => {
+      const { problems, names } = judged({
+        name: "tool",
+        bin: ["a/cli.js", "b/cli.js"],
+      });
+      expect(problems).toEqual([`${at} declares bin "cli.js" more than once`]);
+      expect(names).toEqual([]);
+    });
+
+    const withNormalize = (normalize) => {
+      const root = join(tmpdir(), "raw-bins");
+      const problems = [];
+      const expected = expectedBins(
+        root,
+        new Map([
+          [
+            "node_modules/tool",
+            {
+              path: join(root, "node_modules", "tool"),
+              pkg: { name: "tool", bin: { ok: "cli.js", two: "two.js" } },
+            },
+          ],
+        ]),
+        problems,
+        platform,
+        { normalize },
+      );
+      return { problems, size: expected.size };
+    };
+    // The real normaliser for single declarations, a faulty one for the whole field.
+    const wholeOnly = (change) => (pkg) =>
+      Object.keys(pkg.bin).length > 1
+        ? { ...pkg, bin: { ...pkg.bin, ...change } }
+        : pkg;
+
+    it("reports a whole field that normalises to more than its parts", () => {
+      expect(withNormalize(wholeOnly({ ghost: "g.js" }))).toEqual({
+        problems: [
+          `${at} has bins {"ghost":"g.js","ok":"cli.js","two":"two.js"} after npm's normaliser, not {"ok":"cli.js","two":"two.js"}`,
+        ],
+        size: 0,
+      });
+    });
+
+    it("reports a whole field that normalises to other targets", () => {
+      expect(withNormalize(wholeOnly({ ok: "elsewhere.js" }))).toEqual({
+        problems: [
+          `${at} has bins {"ok":"elsewhere.js","two":"two.js"} after npm's normaliser, not {"ok":"cli.js","two":"two.js"}`,
+        ],
+        size: 0,
+      });
+    });
+
+    it("reports a normaliser that throws", () => {
+      const thrower = () => {
+        throw new TypeError("broken");
+      };
+      expect(withNormalize(thrower)).toEqual({
+        problems: [
+          `${at} has a bin field npm's normaliser cannot read: broken`,
+        ],
+        size: 0,
+      });
+    });
+
+    it("reports a string bin without a usable package name", () => {
+      for (const name of [undefined, 7, "a/b/c", "../x"])
+        expect(judged({ name, bin: "cli.js" }).problems).toEqual([
+          `${at} declares a string bin without a usable package name`,
+        ]);
+    });
+
+    it.each([
+      { directories: { bin: "bin" } },
+      { bin: false, directories: { bin: "bin" } },
+      { bin: { ok: "cli.js" }, directories: { bin: "bin" } },
+    ])("reports directories.bin, which npm expands: %j", (fields) => {
+      const { problems } = judged({ name: "tool", ...fields });
+      expect(problems).toContain(
+        `${at} declares directories.bin, which npm expands and the verifier does not model`,
+      );
+    });
+  },
+);
+
+describe("raw bin declarations in an installed tree", () => {
+  const manifest = (dir) => nm(dir, "abbrev", "package.json");
+  const declare = (dir, text) => {
+    const pkg = JSON.parse(readFileSync(manifest(dir), "utf8"));
+    const body = JSON.stringify({ ...pkg, bin: "BIN" }, null, 2);
+    writeFileSync(manifest(dir), body.replace('"BIN"', text));
+  };
+
+  it.each([
+    "true",
+    '{ "example": 123 }',
+    '{ "__proto__": "index.js" }',
+    "[null]",
+  ])("reports the bin field %s", async (text) => {
+    const dir = fixtureCopy();
+    declare(dir, text);
+    const problems = await check(dir);
+    expect(
+      problems.filter((p) => p.startsWith("bin: node_modules/abbrev ")),
+    ).toHaveLength(1);
+  });
+
+  it("reports a package.json that is not an object", async () => {
+    const dir = fixtureCopy();
+    writeFileSync(manifest(dir), "[]\n");
+    expect(await check(dir)).toContain(
+      "census: node_modules/abbrev/package.json is not a JSON object",
+    );
+  });
+
+  it("reports a check that throws after loading", async () => {
+    const broken = {
+      get inventory() {
+        throw new Error("inventory unavailable");
+      },
+    };
+    const arborist = () => ({
+      loadActual: async () => broken,
+      loadVirtual: async () => broken,
+    });
+    const { problems } = await installHealth(clean, { arborist });
+    expect(problems.at(-1)).toMatch(
+      /^the install could not be checked: .*inventory unavailable$/,
+    );
+  });
+}, 30_000);
+
+describe("Windows .bin shims written by npm", () => {
+  const judged = async (dir) => {
+    const { packages, bins } = census(dir);
+    return binProblems(dir, packages, bins);
+  };
+
+  it.runIf(win)("passes the fixture's shims", async () => {
+    expect(await judged(clean)).toEqual([]);
+  });
+
+  it.runIf(win)("fails each shim with one byte appended", async () => {
+    const dir = fixtureCopy();
+    const names = ["node-which", "node-which.cmd", "node-which.ps1"];
+    for (const name of names) {
+      const file = nm(dir, ".bin", name);
+      writeFileSync(
+        file,
+        Buffer.concat([readFileSync(file), Buffer.from(" ")]),
+      );
+    }
+    expect(await judged(dir)).toEqual(
+      names.map(
+        (name) =>
+          `bin: node_modules/.bin/${name} is not the shim npm writes for its declared target`,
+      ),
+    );
+  });
+
+  it.runIf(win)(
+    "fails a declared target reached through a junction",
+    async () => {
+      const dir = fixtureCopy();
+      const which = nm(dir, "which");
+      renameSync(join(which, "bin"), join(which, "real"));
+      link(join(which, "real"), join(which, "bin"));
+      expect(await check(dir)).toContain(
+        "bin: node_modules/.bin/node-which.cmd has a declared target path through a link",
+      );
+    },
+  );
 }, 30_000);

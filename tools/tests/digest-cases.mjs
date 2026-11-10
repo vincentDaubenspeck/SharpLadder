@@ -44,4 +44,9 @@ for (const [name, tool] of Object.entries(pins)) {
 console.log(`${bad.length === 0 ? "PASS" : "FAIL"} digest: every pinned asset has a well-formed digest`);
 for (const b of bad) console.log(`  ${b}`);
 if (bad.length > 0) failed++;
+// The Windows shim check compares against this cmd-shim, so the pin must be present and exact.
+const cmdShim = pins.node?.cmdShim;
+const shimOk = typeof cmdShim === "string" && /^\d+\.\d+\.\d+$/.test(cmdShim);
+console.log(`${shimOk ? "PASS" : "FAIL"} pins: node.cmdShim is an exact x.y.z version`);
+if (!shimOk) failed++;
 process.exitCode = failed > 0 ? 1 : 0;
