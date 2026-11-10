@@ -47,13 +47,9 @@ jobs:
           path: ${{ runner.temp }}/sbom.cdx.json
           if-no-files-found: error
           retention-days: 14
-      - name: Install PSScriptAnalyzer (exact version)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $pins = Get-Content -Raw -LiteralPath tools/tool-pins.json | ConvertFrom-Json
-          Install-Module -Name PSScriptAnalyzer -RequiredVersion $pins.psscriptanalyzer.version `
-            -Repository PSGallery -Scope CurrentUser -Force
+      - name: Install PSScriptAnalyzer (exact version, checksum verified)
+        shell: bash
+        run: node tools/install-psscriptanalyzer.mjs
       - name: Repository checks
         run: |
           command -v iconv

@@ -51,8 +51,13 @@ sh tools/check.sh
 missing or wrong-version tool fails the check with install guidance.
 `sh tools/check-linux.sh [<commit>]` runs the same checks for a commit in a
 digest-pinned Ubuntu container through Docker, with logs in a per-run folder
-under `.tools/check-linux/` (kept when a step fails); `--self-test` proves a
-wrong download checksum is rejected before anything is extracted.
+under `.tools/check-linux/` (kept when a step fails). The tools come from a
+local image built from the commit's tooling inputs and reused, by image ID,
+while those inputs stay the same; it is a versioned recipe, not a
+bit-for-bit reproducible image, since apt resolves packages when it is built.
+`--rebuild` builds it afresh, apt included; `--offline-prepare` runs only the
+tool preparation with no network; `--self-test` proves a wrong download
+checksum is rejected before anything is extracted.
 
 The licence allowlist check (`npm run license:check` in `web/`, also part of
 the full check) runs licensee over every installed package, development

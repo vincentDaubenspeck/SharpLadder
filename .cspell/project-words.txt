@@ -61,6 +61,7 @@ hmtx
 hsty
 ictcp
 idents
+iidfile
 isexe
 jstf
 jzazbz
@@ -94,9 +95,11 @@ msvc
 Newtonsoft
 nologo
 NONBLOCK
+noninteractive
 NOPASSWD
 norc
 NOSYSTEM
+notcontains
 notdef
 noto
 notosansdisplay
@@ -127,6 +130,7 @@ rcap
 realpath
 rebeccapurple
 regid
+rels
 reuid
 Roslynator
 rsuser

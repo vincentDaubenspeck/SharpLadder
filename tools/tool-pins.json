@@ -98,7 +98,20 @@
     "requirements": "tools/requirements-yamllint.txt"
   },
   "psscriptanalyzer": {
-    "version": "1.25.0"
+    "version": "1.25.0",
+    "package": {
+      "url": "https://www.powershellgallery.com/api/v2/package/PSScriptAnalyzer/1.25.0",
+      "sha256": "14e634c828eb98efb9f40b2918ba90f139ed5eccdf663a2a747736d996995d60"
+    }
+  },
+  "pwsh": {
+    "version": "7.6.9",
+    "assets": {
+      "linux-x64": {
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/powershell-7.6.9-linux-x64.tar.gz",
+        "sha256": "1da6d6d6035d651f20e70ddee7c4c15ac6ab8b9fb40ee92240d91263f28a884b"
+      }
+    }
   },
   "nuget-license": {
     "version": "4.0.18",
@@ -120,5 +133,9 @@
         "sha512": "7a114c318fa7f1d9822991b534b2814d0e78386ceda816b371f5141acefe741d87ccb606ede06cadac8f9ac5070e32b708a67bbd1619ff5e5a7858a27874ef48"
       }
     }
+  },
+  "linux-check": {
+    "base": "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
+    "platform": "linux/amd64"
   }
 }
