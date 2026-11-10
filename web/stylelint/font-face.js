@@ -267,8 +267,15 @@ export async function checkFontFaces(root, { isFonts, options, fail }) {
       );
     keys.add(key);
 
-    const target = join(dirname(root.source.input.file), parsed.path);
-    const rel = shown(repoReal, target);
+    // Only the stylesheet is resolved, as when it was matched to fonts.css; links below it stay
+    // visible to readInRepo.
+    let rel;
+    try {
+      const sheet = realpathSync.native(root.source.input.file);
+      rel = shown(repoReal, join(dirname(sheet), parsed.path));
+    } catch {
+      rel = undefined;
+    }
     const owner = files.get(rel);
     if (!owner) {
       fail(

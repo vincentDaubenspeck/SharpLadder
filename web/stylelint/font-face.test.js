@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, renameSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,6 +27,17 @@ async function lintFonts(sheet, { inventory, at, prepare } = {}) {
   const r = await lintAs(paths, target, sheet);
   expect(r.invalid).toEqual([]);
   return r.all.map((w) => w.text).join("\n");
+}
+
+/** The 8.3 alias of a directory, or undefined where the platform or the volume has none. */
+function shortAlias(dir) {
+  if (process.platform !== "win32") return undefined;
+  const alias = execFileSync(
+    "cmd.exe",
+    ["/d", "/c", `for %I in ("${dir}") do @echo %~sI`],
+    { encoding: "utf8", windowsVerbatimArguments: true },
+  ).trim();
+  return alias.toLowerCase() === dir.toLowerCase() ? undefined : alias;
 }
 
 const passes = async (sheet, options) =>
@@ -433,5 +445,26 @@ describe("F2 url() admission in src", () => {
     );
     if (!linked)
       ctx.annotate("file symlink needs a privilege here; Linux covers it");
+  });
+
+  // Windows runners hand out temp paths with 8.3 components, which the rule must see through.
+  it("A126 fonts.css named through an 8.3 short path still binds its fonts", async (ctx) => {
+    const { paths } = makeRoot();
+    const alias = shortAlias(paths.repoRoot);
+    ctx.skip(
+      alias === undefined,
+      "no 8.3 short names on this platform or volume",
+    );
+    const short = Object.fromEntries(
+      Object.entries(paths).map(([k, v]) => [
+        k,
+        alias + v.slice(paths.repoRoot.length),
+      ]),
+    );
+    const sheet = fontsSheet();
+    write(short.fontsFile, sheet);
+    const r = await lintAs(short, short.fontsFile, sheet);
+    expect(r.invalid).toEqual([]);
+    expect(r.all.map((w) => w.text).join("\n")).toBe("");
   });
 });

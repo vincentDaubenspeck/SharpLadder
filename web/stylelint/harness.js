@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -111,7 +112,8 @@ export function fontsSheet(faces = shippedFonts.map((f) => fontFace(f))) {
 
 /** The repository copy sits one level up, so inventory source paths resolve as in production. */
 export function makeRoot({ inventory } = {}) {
-  const repo = mkdtempSync(join(tmpdir(), "sl-tokens-"));
+  // Stylelint globs its file list by long names, so a short-name temp root would match nothing.
+  const repo = realpathSync.native(mkdtempSync(join(tmpdir(), "sl-tokens-")));
   const root = join(repo, "web");
   const paths = {
     src: join(root, "src"),

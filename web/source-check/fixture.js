@@ -2,6 +2,7 @@
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   rmdirSync,
   symlinkSync,
@@ -15,7 +16,9 @@ const bases = [];
 const links = [];
 
 export function tree(files) {
-  const base = mkdtempSync(join(tmpdir(), "sl-source-check-"));
+  const base = realpathSync.native(
+    mkdtempSync(join(tmpdir(), "sl-source-check-")),
+  );
   bases.push(base);
   for (const [path, text] of Object.entries(files)) {
     const full = join(base, path);

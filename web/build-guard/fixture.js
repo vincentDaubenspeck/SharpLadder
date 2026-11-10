@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   rmdirSync,
   symlinkSync,
@@ -87,7 +88,7 @@ export function link(target, path) {
 
 // Lays out base/web (the project root) and base/outside; paths starting "../" land beside web.
 export function fixture(files, { modules = true, tokens = true } = {}) {
-  const base = mkdtempSync(join(tmpdir(), "sl-guard-"));
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), "sl-guard-")));
   bases.push(base);
   const root = join(base, "web");
   mkdirSync(root);
