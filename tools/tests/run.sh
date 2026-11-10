@@ -5,7 +5,7 @@
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
 #   c. CRLF line endings and a missing final newline fail the encoding check; lock files and
-#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt
+#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt; .ttf and .woff2 are binary
 #   d. tools/checks/text.sh and text.ps1 give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.sh, check.ps1 and pre-push
@@ -193,6 +193,20 @@ else
   fail "the licence text exemption covers one folder level only"
 fi
 git rm -q -r --cached web && rm -r web
+
+# Font files are binary: CR bytes, invalid UTF-8 and no final newline are not text faults.
+mkdir fonts
+printf '\000\001\000\000\r\n\377' > fonts/sample.ttf
+printf 'wOF2\000\001\r\n\377' > fonts/sample.woff2
+git add fonts
+run_checks "font files with CR and non-UTF-8 bytes" 0
+if [ "$(git check-attr text -- fonts/sample.ttf fonts/sample.woff2)" = "$(printf '%s\n' \
+  'fonts/sample.ttf: text: unset' 'fonts/sample.woff2: text: unset')" ]; then
+  pass "font files are marked binary"
+else
+  fail "font files are marked binary"
+fi
+git rm -q -r --cached fonts && rm -r fonts
 
 # Shell and PowerShell report a named stage; ESLint reports by exit code.
 if [ -z "$node" ]; then

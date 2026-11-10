@@ -72,8 +72,28 @@ text rules. Each record's reserved font names are a reviewed declaration bound t
 its licence hash by `declarationHash`: SHA-256 over the UTF-8 bytes of the
 lowercase hex `licenceText.sha256` string concatenated with
 `JSON.stringify(reservedFontNames)` in declared order. It is an
-edit-consistency tripwire, not proof of review. No asset ships yet; output
-mode (`--output` with `--owned`) checks a build output against the inventory.
+edit-consistency tripwire, not proof of review. Each shipped font's recorded
+face (family, weight, width, style, coverage and retained legal names) is
+checked against the file's own tables with fontkit, and each converted WOFF2
+is reproduced from its committed TTF original with the pinned
+fonteditor-core encoder and must match its recorded hash. The expected
+`@font-face` rules are generated from the inventory's face bindings alone and
+minified with the build's own settings; their SHA-256 and length are recorded in
+`web/assets/licences/font-slice.json`, which must be updated after a reviewed
+binding change. Output mode (`--output` with `--owned`) checks a build output
+against the inventory: the original bytes of the trailing `@font-face` rules of
+the single top-level `@layer base` block must equal the generated rules, and no
+other face may appear anywhere.
+
+The production build (`npm run build` in `web/`, part of the full check) runs
+the CSS token lint, ESLint and TypeScript, then `web/build-guard/build.mjs`.
+Colour values live only in `web/src/theme/tokens.css`; the build guard checks
+each stylesheet's Lightning CSS syntax tree from source through the minified
+output, admits only inventoried assets, and fails a CSS asset over 30,000 bytes
+gzipped or fonts over 1,600,000 bytes in total. The font face admission runs
+on the bundle in the pipeline and again on the files on disk after the terminal
+step. Its provenance manifest, ledger and admitted font slice are written to
+`web/.cache/build-evidence/`, outside the build output.
 
 The .NET build settings live in `Directory.Build.props`, analyzer versions in
 `Directory.Packages.props` (central package management), rule severities in

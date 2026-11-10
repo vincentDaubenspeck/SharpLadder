@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { resolveConfig } from "vite";
 import { releaseBuild } from "./build.mjs";
-import { cleanUp, fixture, link } from "./fixture.js";
+import { cleanUp, fixture, link, releaseRoot } from "./fixture.js";
 import {
   layerViolations,
   pinnedPlugins,
@@ -37,7 +37,7 @@ const quiet = (options = {}) => ({ logLevel: "silent", ...options });
 
 // Fixture builds go to the fixture's own dist, which Vite empties because it sits inside root.
 const release = (files, options = {}) =>
-  releaseBuild(quiet({ root: fixture(files).root, ...options }));
+  releaseRoot(fixture(files).root, options);
 
 const failure = (promise) =>
   promise.then(
@@ -56,7 +56,7 @@ const main = (code) => ({ "src/main.tsx": `${code}\n` });
 const sheets = {
   "src/tokens.css": "@layer tokens { :root { --gap: 1px } }\n",
   "src/base.css": "@layer base { body { margin: 0 } }\n",
-  "src/Card.module.css": "@layer components { .card { color: red } }\n",
+  "src/Card.module.css": "@layer components { .card { margin: 0 } }\n",
   "src/overrides.css": "@layer overrides { .wide { width: 100% } }\n",
 };
 
@@ -70,17 +70,27 @@ const kinds = (record) =>
 // Suites timed at 30_000 run a real Vite build, which loads Vite cold the first time.
 
 describe("output admission: clean builds", () => {
-  it("builds the real app to exactly the page and one chunk", async () => {
+  it("builds the real app to its page, chunk, stylesheet, fonts and licences", async () => {
     const outDir = mkdtempSync(join(tmpdir(), "sl-out-"));
     outs.push(outDir);
     const record = await releaseBuild(
       quiet({ build: { outDir, emptyOutDir: true } }),
     );
     expect(kinds(record)).toEqual([
-      expect.stringMatching(/^asset:index\.html$/u),
+      "asset:assets/cascadia-code-regular.woff2",
+      "asset:assets/licences/cascadia-code/OFL.txt",
+      "asset:assets/licences/noto-sans-display/OFL.txt",
+      "asset:assets/licences/noto-sans/OFL.txt",
+      "asset:assets/noto-sans-display.woff2",
+      "asset:assets/noto-sans.woff2",
+      expect.stringMatching(/^asset:assets\/style-[\w-]+\.css$/u),
+      "asset:index.html",
       expect.stringMatching(/^chunk:assets\/index-[\w-]+\.js$/u),
     ]);
-    expect(walkDist(outDir).size).toBe(2);
+    expect(walkDist(outDir).size).toBe(9);
+    expect(record.report.fontTotal).toBe(1552676);
+    expect(record.report.fonts).toHaveLength(3);
+    expect(record.report.css[0].gzip).toBeLessThanOrEqual(30000);
   });
 
   // Post order is terminal: no other resolved plugin orders its generateBundle after the guard.
@@ -94,7 +104,7 @@ describe("output admission: clean builds", () => {
       .map(({ name }) => name);
     expect(post).toEqual(["sharpladder:build-guard"]);
     expect(config.plugins.map(({ name }) => name)).toEqual(pinnedPlugins);
-    expect(pinnedPlugins).toHaveLength(42);
+    expect(pinnedPlugins).toHaveLength(43);
   });
 
   // An allowlist, not a strip list, so no unknown agent variable reaches the clean child.
@@ -194,7 +204,7 @@ describe("output admission: layer order", () => {
     const outputs = new Set();
     for (const order of orders) {
       const { root } = fixture({ ...sheets, ...entry(order) });
-      const record = await releaseBuild(quiet({ root }));
+      const record = await releaseRoot(root);
       const [css] = [...record.files.keys()].filter((f) => f.endsWith(".css"));
       const text = readFileSync(join(record.outDir, css), "utf8");
       expect(layerViolations(text)).toEqual([]);
@@ -250,7 +260,7 @@ describe("output admission: layer order", () => {
     const error = await failure(
       release({
         ...main('import s from "./a.module.css";\nconsole.log(s);'),
-        "src/a.module.css": ".x { color: red }\na { color: red }\n",
+        "src/a.module.css": ".x { margin: 0 }\na { margin: 0 }\n",
       }),
     );
     expect(error?.message).toMatch(/a\.module\.css:3:0/u);

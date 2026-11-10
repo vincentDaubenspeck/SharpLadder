@@ -12,7 +12,7 @@ export function composedConfig(tokenOptions) {
       "color-named": "never",
       "no-duplicate-selectors": true,
       "declaration-no-important": true,
-      "at-rule-allowed-list": ["layer", "media"],
+      "at-rule-allowed-list": ["layer", "media", "font-face"],
       "value-keyword-case": [
         "lower",
         {

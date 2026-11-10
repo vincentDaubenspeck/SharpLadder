@@ -403,7 +403,6 @@ describe("tokens.css", () => {
     ["A41", "--header-bg", "rgb(243 245 248 / 87%)"],
     ["A41", "--header-bg", "rgb(243 245 248 / 89%)"],
     ["A41", "--header-bg", "#F3F5F8E0"],
-    ["A42", "--split", "1px solid #fff"],
     ["A42", "--prose", "68ch red"],
     ["A43", "--bg", "#f3f5f8 !important"],
     ["A51", "--radius-pill", "1rem"],
@@ -443,6 +442,58 @@ describe("tokens.css", () => {
     ));
   it("A54 passes the source spelling", () =>
     passes(replaced("--fs-fixture-a", "0.8438rem")));
+}, 30_000);
+
+describe("runtime-only --split", () => {
+  const grid = (value) =>
+    inComponent(`display: grid; grid-template-columns: ${value};`);
+  const declared = "--split is set at run time and never declared";
+  const inBase = "@layer base {\n  body {\n    --split: 22.5rem;\n  }\n}\n";
+  const inRoot = "  :root {\n    --split: 22.5rem;\n  }";
+
+  it.each([
+    ["tokens.css", (p) => p.tokensFile, fixtureTokens({ extra: inRoot })],
+    ["a module", componentAt, inModule("--split: 22.5rem;")],
+    ["a global sheet", (p) => join(p.src, "theme", "base.css"), inBase],
+  ])(
+    "A42 a declaration of --split fails in %s",
+    async (_label, place, code) => {
+      const r = await lint(at(place, code));
+      expect(r.invalid).toEqual([]);
+      expect(r.contract.map((w) => w.text).join()).toContain(declared);
+    },
+  );
+
+  it.each(["minmax(0, 1fr) 22.5rem", "1fr 2fr", "repeat(2, 1fr)"])(
+    "A42 var(--split, %s) in grid-template-columns passes",
+    (fallback) => passes(grid(`var(--split, ${fallback})`)),
+  );
+
+  const invalid = "fallback is not a grid-template-columns value";
+  const only = "allowed only in grid-template-columns";
+  it.each([
+    ["missing fallback", grid("var(--split)"), "needs a fallback"],
+    ["empty fallback", grid("var(--split,)"), "needs a fallback"],
+    ["blank fallback", grid("var(--split, )"), "needs a fallback"],
+    ["invalid fallback", grid("var(--split, red)"), invalid],
+    ["invalid fallback", grid("var(--split, 1px solid)"), invalid],
+    [
+      "part of a value",
+      grid("var(--split, 1fr) 2fr"),
+      "must be the whole value",
+    ],
+    ["in width", inComponent("width: var(--split, 1fr);"), only],
+    ["in margin", inComponent("margin: var(--split, 1rem);"), only],
+    [
+      "in grid-template-rows",
+      inComponent("grid-template-rows: var(--split, 1fr);"),
+      only,
+    ],
+  ])("A42 --split fails: %s", async (_label, c, message) => {
+    const r = await lint(c);
+    expect(r.invalid).toEqual([]);
+    expect(r.contract.map((w) => w.text).join()).toContain(message);
+  });
 }, 30_000);
 
 describe("inline disable comments", () => {
@@ -565,7 +616,7 @@ describe("layers and structure", () => {
       at(entryAt, "@layer base {\n  body {\n    color: var(--text);\n  }\n}\n"),
     ));
   it("A44 the entry stylesheet with the order statement passes", () =>
-    passes(at(entryAt, "@layer tokens, base, components, overrides;\n")));
+    passes(at(entryAt, fixtureTokens())));
   it("A58 a base reset with font: inherit passes", () =>
     passes(
       at(
@@ -617,7 +668,7 @@ describe("adversarial cases through the production lint", () => {
     ["custom property in a module", inComponent("--x: url(x);")],
     [
       "custom property in tokens.css",
-      asTokens(fixtureTokens({ light: { "--split": "url(x)" } })),
+      asTokens(fixtureTokens({ light: { "--prose": "url(x)" } })),
     ],
     ["@supports parameters", media('supports (background: url("x"))')],
     ["@media parameters", media('media url("x")')],
@@ -679,7 +730,7 @@ describe("adversarial cases through the production lint", () => {
   );
 
   it("the canonical entry statement first passes", () =>
-    passes(at(entryAt, `${order}\n${based}`)));
+    passes(at(entryAt, fixtureTokens())));
   it("a reordered entry statement fails", () =>
     rejected(
       at(entryAt, "@layer base, tokens, components, overrides;\n"),

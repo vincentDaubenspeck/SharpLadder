@@ -275,6 +275,7 @@
     },
     {
       "name": "--split",
+      "runtime": true,
       "properties": ["grid-template-columns"]
     }
   ]

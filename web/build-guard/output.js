@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postcss from "postcss";
 import { GuardError } from "./classify.js";
+import { contractViolations } from "./contract.js";
 import { layerOrder } from "./prelude.js";
 
 // A drift check on the resolved pipeline, not authentication: a plugin can claim any name.
@@ -39,6 +40,7 @@ export const pinnedPlugins = [
   "vite:dynamic-import-vars",
   "vite:import-glob",
   "vite:react:config-post",
+  "sharpladder:css-minify",
   "vite:build-import-analysis",
   "native:import-analysis-build",
   "vite:terser",
@@ -51,6 +53,51 @@ export const pinnedPlugins = [
   "vite:css-analysis",
   "vite:import-analysis",
 ];
+
+// The pipeline Rolldown runs once Vite expands per-environment and option-supplied plugins.
+const pinnedEnvironmentPlugins = [
+  "vite:watch-package-data",
+  "builtin:vite-alias",
+  "sharpladder:build-guard",
+  "vite:react-babel",
+  "vite:react-refresh-fbm",
+  "vite:react-refresh",
+  "builtin:vite-module-preload-polyfill",
+  "vite:resolve-builtin:get-environment",
+  "builtin:vite-resolve",
+  "vite:html-inline-proxy",
+  "vite:css",
+  "builtin:vite-transform",
+  "builtin:vite-json",
+  "vite:wasm-helper",
+  "vite:worker",
+  "vite:asset",
+  "vite:react-virtual-preamble",
+  "vite:define",
+  "vite:css-post",
+  "vite:build-html",
+  "vite:worker-import-meta-url",
+  "vite:asset-import-meta-url",
+  "vite:prepare-out-dir",
+  "builtin:vite-dynamic-import-vars",
+  "builtin:vite-import-glob",
+  "vite:react:config-post",
+  "sharpladder:css-minify",
+  "vite:build-import-analysis",
+  "builtin:vite-build-import-analysis",
+  "vite:terser",
+  "vite:license",
+  "builtin:vite-reporter",
+  "builtin:vite-load-fallback",
+];
+
+/** The effective pipeline, judged before any module loads. */
+export function pipelineViolations(plugins) {
+  const names = plugins.map((plugin) => plugin?.name);
+  return JSON.stringify(names) === JSON.stringify(pinnedEnvironmentPlugins)
+    ? []
+    : [`the build pipeline differs from the pinned list: ${names.join(", ")}`];
+}
 
 // Vite's own client aliases; any other alias could redirect an import past the guard.
 const builtinAliases = ["/^\\/?@vite\\/env/", "/^\\/?@vite\\/client/"];
@@ -85,6 +132,7 @@ export function configViolations(config) {
   if (JSON.stringify(aliases) !== JSON.stringify(builtinAliases)) {
     found.push(`resolve.alias differs from Vite's own: ${aliases.join(", ")}`);
   }
+  found.push(...contractViolations(config));
   return found;
 }
 
@@ -123,6 +171,8 @@ export function layerViolations(css) {
 
 const chunkName = /^assets\/[^/]+\.js$/u;
 const cssName = /^assets\/[^/]+\.css$/u;
+// The shape alone admits nothing; only the asset validator can admit these.
+const assetName = /^assets\/(?:[^/]+\.woff2|licences\/[^/]+\/OFL\.txt)$/u;
 
 const contentOf = (fileName, content) => {
   if (typeof content !== "string" && !(content instanceof Uint8Array)) {
@@ -131,9 +181,17 @@ const contentOf = (fileName, content) => {
   return content;
 };
 
+// Without an admission no font or licence file is admitted.
+const noAssets = (actual) =>
+  [...actual.keys()]
+    .filter((name) => assetName.test(name))
+    .map((name) => `output has an unowned file ${name}`);
+
 // Hashes every output and fails on anything outside the admitted shape.
-export function snapshot(bundle) {
+export function snapshot(bundle, admit = noAssets) {
   const files = new Map();
+  const bytes = new Map();
+  const owned = new Map();
   const counts = { chunk: 0, page: 0, sheet: 0 };
   for (const [key, out] of Object.entries(bundle)) {
     const { fileName, type } = out;
@@ -145,6 +203,8 @@ export function snapshot(bundle) {
     } else if (type === "asset" && fileName === "index.html") {
       counts.page += 1;
       content = contentOf(fileName, out.source);
+    } else if (type === "asset" && assetName.test(fileName)) {
+      content = contentOf(fileName, out.source);
     } else if (type === "asset" && cssName.test(fileName)) {
       counts.sheet += 1;
       content = contentOf(fileName, out.source);
@@ -153,8 +213,13 @@ export function snapshot(bundle) {
     } else {
       fail(`unexpected ${String(type)} output ${fileName}`);
     }
-    files.set(fileName, { type, sha256: sha256(content) });
+    const hash = sha256(content);
+    files.set(fileName, { type, sha256: hash });
+    bytes.set(fileName, Buffer.from(content));
+    if (!assetName.test(fileName)) owned.set(fileName, hash);
   }
+  const found = admit(bytes, owned);
+  if (found.length > 0) fail(`asset admission: ${found.join("; ")}`);
   if (counts.chunk !== 1) fail(`expected one chunk, found ${counts.chunk}`);
   if (counts.page !== 1) fail(`expected one index.html, found ${counts.page}`);
   if (counts.sheet > 1) {
@@ -196,7 +261,7 @@ export function walkDist(outDir) {
       if (stat.isDirectory()) visit(path, `${name}/`);
       else if (stat.isFile()) {
         const content = attempt(`read ${name}`, () => readFileSync(path));
-        files.set(name, { sha256: sha256(content) });
+        files.set(name, { sha256: sha256(content), bytes: content });
       } else fail(`${name} is not a regular file`);
     }
   };

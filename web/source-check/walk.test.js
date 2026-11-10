@@ -70,6 +70,25 @@ describe("source tree admission", () => {
     });
   });
 
+  it("admits a woff2 file only in theme/fonts, as a font", () => {
+    const base = tree({
+      ...current,
+      "src/theme/fonts/a.woff2": "",
+      "src/theme/b.woff2": "",
+      "src/theme/fonts/c.WOFF2": "",
+      "src/theme/fonts/d.ttf": "",
+    });
+    const { admitted } = admitTree(join(base, "src"));
+    expect(
+      admitted.filter((f) => f.kind === "font").map((f) => f.path),
+    ).toEqual([join(base, "src", "theme", "fonts", "a.woff2")]);
+    expect(reasons(base)).toEqual({
+      "theme/b.woff2": "extension is not admitted",
+      "theme/fonts/c.WOFF2": "extension is not admitted",
+      "theme/fonts/d.ttf": "extension is not admitted",
+    });
+  });
+
   it("finds a bad file in a nested directory and rejects dot directories", () => {
     const base = tree({
       ...current,

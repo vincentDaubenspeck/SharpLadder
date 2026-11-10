@@ -7,11 +7,13 @@ import {
   colourFunctions,
   deprecatedColours,
   matchesColourGrammar,
+  matchesGridColumns,
   namedColours,
   systemColours,
 } from "./colours.js";
 import { classify, mediaParams } from "./context.js";
 import { isOpaqueAlpha, isOutlineOffset, isThickness } from "./decimal.js";
+import { checkFontFaces } from "./font-face.js";
 import { fixtureRegistry, productionRegistry } from "./registry.js";
 
 const {
@@ -188,6 +190,14 @@ function resourceFunction(nodes) {
   return found;
 }
 
+// The formatter lower-cases hex digits, and their case never changes the colour.
+function hexFolded(value) {
+  return value.replace(/#[0-9a-f]+\b/gi, (hex) => hex.toLowerCase());
+}
+
+// Set from script at run time, so no stylesheet may declare it and every use carries a fallback.
+const runtimeOnly = "--split";
+
 function canonical(path) {
   try {
     return realpathSync.native(path);
@@ -361,6 +371,9 @@ function rule(primary, options = {}) {
           tokensFile: stringOption,
           entryFile: stringOption,
           headerModule: stringOption,
+          fontsFile: stringOption,
+          inventoryFile: stringOption,
+          repoRoot: stringOption,
         },
       },
     );
@@ -381,6 +394,7 @@ function rule(primary, options = {}) {
     const isTokens = here !== undefined && here === tokensPath;
     const isEntry = same(options.entryFile);
     const isHeader = same(options.headerModule);
+    const isFonts = same(options.fontsFile);
     const isModule =
       file !== undefined &&
       basename(file).toLowerCase().endsWith(".module.css");
@@ -420,6 +434,7 @@ function rule(primary, options = {}) {
       const name = nameNode.value;
       const token = registry.tokens.get(name);
       if (!token) return fail(decl, `${name} is not in the token registry`);
+      if (name === runtimeOnly) return runtimeUse(fn, rest, comma, decl, pos);
       if (!declared.has(name))
         return fail(decl, `${name} is not declared in tokens.css`);
       if (!pos.allows(token)) {
@@ -434,6 +449,30 @@ function rule(primary, options = {}) {
       const fallback =
         comma === undefined ? [] : rest.slice(rest.indexOf(comma) + 1);
       if (significant(fallback).length > 0) fallbackCheck(fallback);
+      return undefined;
+    }
+
+    function runtimeUse(fn, rest, comma, decl, pos) {
+      if (registry.tokens.get(runtimeOnly)?.runtime !== true)
+        return fail(decl, `${runtimeOnly} is not a runtime registry entry`);
+      if (pos.prop !== "grid-template-columns")
+        return fail(
+          decl,
+          `${runtimeOnly} is allowed only in grid-template-columns`,
+        );
+      const whole = significant(valueParser(rawValue(decl)).nodes);
+      if (whole.length !== 1 || whole[0].sourceIndex !== fn.sourceIndex)
+        return fail(decl, `var(${runtimeOnly}, ...) must be the whole value`);
+      const fallback =
+        comma === undefined ? [] : rest.slice(rest.indexOf(comma) + 1);
+      if (significant(fallback).length === 0)
+        return fail(decl, `var(${runtimeOnly}) needs a fallback`);
+      if (!matchesGridColumns(valueParser.stringify(fallback).trim()))
+        return fail(
+          decl,
+          `var(${runtimeOnly}) fallback is not a grid-template-columns value`,
+        );
+      scan(fallback, pos, decl);
       return undefined;
     }
 
@@ -722,7 +761,7 @@ function rule(primary, options = {}) {
           if (!context)
             return fail(decl, `${name} is in an unrecognised context`);
           const expected = context.dark ? token.dark : token.light;
-          if (value !== expected) {
+          if (hexFolded(value) !== hexFolded(expected)) {
             return fail(
               decl,
               `${name} must be exactly ${expected} in the ${context.name} context`,
@@ -746,9 +785,11 @@ function rule(primary, options = {}) {
 
     const want = isTokens
       ? ["tokens"]
-      : isModule
-        ? ["components"]
-        : ["base", "overrides"];
+      : isFonts
+        ? ["base"]
+        : isModule
+          ? ["components"]
+          : ["base", "overrides"];
     const top = root.nodes.filter((n) => n.type !== "comment");
 
     // The one order statement fixes layer precedence; any other could reorder it from elsewhere.
@@ -790,7 +831,12 @@ function rule(primary, options = {}) {
       return undefined;
     });
 
+    const inFontFace = (decl) =>
+      decl.parent?.type === "atrule" &&
+      decl.parent.name.toLowerCase() === "font-face";
     root.walkDecls((decl) => {
+      // Descriptors are checked against the bound font file, not as properties.
+      if (inFontFace(decl)) return undefined;
       const raw = rawValue(decl);
       if (decl.prop.includes("\\") || raw.includes("\\")) {
         return fail(decl, "escape in a declaration");
@@ -804,6 +850,11 @@ function rule(primary, options = {}) {
       const resource = resourceFunction(nodes);
       if (resource !== undefined)
         return fail(decl, `${resource}() is not allowed in a stylesheet`);
+      if (decl.prop === runtimeOnly)
+        return fail(
+          decl,
+          `${runtimeOnly} is set at run time and never declared`,
+        );
       if (decl.prop.startsWith("--")) {
         if (!isTokens)
           return fail(decl, "custom property declared outside tokens.css");
@@ -896,10 +947,11 @@ function rule(primary, options = {}) {
 
     if (isTokens) {
       for (const [name] of registry.tokens) {
-        if (!declared.has(name))
+        if (name !== runtimeOnly && !declared.has(name))
           fail(root, `${name} is missing from tokens.css`);
       }
     }
+    return checkFontFaces(root, { isFonts, options, fail });
   };
 }
 

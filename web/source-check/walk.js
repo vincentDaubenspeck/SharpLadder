@@ -32,6 +32,9 @@ export function classifyName(name) {
   return { reason: "extension is not admitted" };
 }
 
+// Font files are bytes, never program input; the asset check binds each one to the inventory.
+const fontDir = ["theme", "fonts"];
+
 const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 const identity = (stat) => `${stat.dev}:${stat.ino}`;
@@ -184,6 +187,10 @@ export function admitTree(src, seams = {}) {
         }
         if (!(entry.isFile() && stat.isFile())) {
           reject("neither a regular file nor a directory");
+          continue;
+        }
+        if (entry.name.endsWith(".woff2") && dir === join(root, ...fontDir)) {
+          admitted.push({ path, kind: "font" });
           continue;
         }
         const { kind, reason } = classifyName(entry.name);

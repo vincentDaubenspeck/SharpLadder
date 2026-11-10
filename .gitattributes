@@ -4,6 +4,7 @@
 *.jpg binary
 *.jpeg binary
 *.woff2 binary
+*.ttf binary
 *.ico binary
 
 web/package-lock.json linguist-generated=true

@@ -66,6 +66,7 @@ export function guardContext(root) {
   }
   const modules = join(root, "node_modules");
   return {
+    root: realRoot,
     srcKey,
     htmlKey: pathKey(join(realRoot, "index.html")),
     modulesKey: existsSync(modules) ? pathKey(realpath(modules)) : null,

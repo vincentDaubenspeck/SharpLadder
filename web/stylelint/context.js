@@ -86,6 +86,12 @@ const contexts = [
     selectors: [
       [":root:not([data-theme])", ":root[data-theme]"],
       [":root:not([data-theme]) .work", ":root[data-theme] .work"],
+      [
+        ":root:not([data-theme])",
+        ":root:not([data-theme]) .work",
+        ":root[data-theme]",
+        ":root[data-theme] .work",
+      ],
     ],
   },
 ];

@@ -24,9 +24,9 @@ describe("Vite CSS module build", () => {
   });
 
   it("builds a module whose rules carry a local class", async () => {
-    const output = [await buildWith(".card a { color: red }")].flat();
+    const output = [await buildWith(".card a { margin: 0 }")].flat();
     const files = output.flatMap(({ output: chunks }) => chunks);
     const css = files.find(({ fileName }) => fileName.endsWith(".css"));
-    expect(css.source).toMatch(/_card a\s*\{\s*color:\s*red/u);
+    expect(css.source).toMatch(/_card a\s*\{\s*margin:\s*0/u);
   });
 }, 30_000);

@@ -4,7 +4,7 @@
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
 #   c. CRLF line endings and a missing final newline fail the encoding check; lock files and
-#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt
+#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt; .ttf and .woff2 are binary
 #   d. tools/checks/text.ps1 and text.sh give the same result on each fixture
 #   e. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   f. Missing tools fail, and failures reach check.ps1, check.sh and pre-push
@@ -197,6 +197,20 @@ try {
   } else { Write-Fail 'the licence text exemption covers one folder level only' }
   [void](Invoke-Program 'git' @('rm', '-q', '-r', '--cached', 'web'))
   Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'web') -Recurse
+
+  # Font files are binary: CR bytes, invalid UTF-8 and no final newline are not text faults.
+  New-Item -ItemType Directory -Path (Join-Path -Path $repo -ChildPath 'fonts') | Out-Null
+  [IO.File]::WriteAllBytes((Join-Path -Path $repo -ChildPath 'fonts/sample.ttf'), [byte[]](0, 1, 0, 0, 13, 10, 255))
+  [IO.File]::WriteAllBytes((Join-Path -Path $repo -ChildPath 'fonts/sample.woff2'), [byte[]](119, 79, 70, 50, 0, 1, 13, 10, 255))
+  [void](Invoke-Program 'git' @('add', 'fonts'))
+  Test-Check 'font files with CR and non-UTF-8 bytes' 0
+  $attr = Invoke-Program 'git' @('check-attr', 'text', '--', 'fonts/sample.ttf', 'fonts/sample.woff2')
+  $want = @('fonts/sample.ttf: text: unset', 'fonts/sample.woff2: text: unset') -join "`n"
+  if ($attr.All.Trim() -ceq $want) {
+    Write-Pass 'font files are marked binary'
+  } else { Write-Fail 'font files are marked binary' }
+  [void](Invoke-Program 'git' @('rm', '-q', '-r', '--cached', 'fonts'))
+  Remove-Item -LiteralPath (Join-Path -Path $repo -ChildPath 'fonts') -Recurse
 
   # Shell and PowerShell report a named stage; ESLint reports by exit code.
   $fx = Join-Path -Path $tmp -ChildPath 'fx'

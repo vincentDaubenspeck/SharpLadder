@@ -1,0 +1,28 @@
+@layer base {
+  @font-face {
+    font-family: "Noto Sans";
+    src: url("./fonts/noto-sans.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-stretch: 62.5% 100%;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "Noto Sans Display";
+    src: url("./fonts/noto-sans-display.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-stretch: 62.5% 100%;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "SL Code";
+    src: url("./fonts/cascadia-code-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: swap;
+  }
+}

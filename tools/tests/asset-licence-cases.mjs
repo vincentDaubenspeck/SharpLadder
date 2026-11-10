@@ -46,6 +46,11 @@ const inventoryFile = join(
   "asset-inventory.json",
 );
 write(inventoryFile, inventory);
+// The slice record is mandatory; an empty inventory generates an empty slice.
+write(
+  join(dirname(inventoryFile), "font-slice.json"),
+  JSON.stringify({ sha256: hash(""), byteLength: 0 }),
+);
 const output = join(work, "dist");
 const page = "<!doctype html>\n";
 write(join(output, "index.html"), page);

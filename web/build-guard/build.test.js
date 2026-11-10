@@ -27,15 +27,15 @@ describe("build guard: configuration", () => {
     ]);
   });
 
-  it("fails any worker build", () => {
+  it("fails any worker build", async () => {
     const context = {
       error: (text) => {
         throw new Error(text);
       },
     };
-    expect(() => guard({ worker: true }).buildStart.call(context)).toThrow(
-      /unexpected worker build/u,
-    );
+    await expect(
+      guard({ worker: true }).buildStart.call(context),
+    ).rejects.toThrow(/unexpected worker build/u);
   });
 });
 
@@ -100,7 +100,7 @@ describe("build guard: module ids", () => {
       await rejects(
         {
           ...main(`import "./Card.module.css${suffix}";`),
-          "src/Card.module.css": ".card { color: red }\n",
+          "src/Card.module.css": ".card { margin: 0 }\n",
         },
         /query or fragment/u,
       );
@@ -113,7 +113,7 @@ describe("build guard: module ids", () => {
       await rejects(
         {
           ...main(`import "./a.module.${ext}";`),
-          [`src/a.module.${ext}`]: ".card { color: red }\n",
+          [`src/a.module.${ext}`]: ".card { margin: 0 }\n",
         },
         /must be \.module\.css|is not \.ts, \.tsx or \.css/u,
       );
@@ -130,7 +130,7 @@ describe("build guard: module ids", () => {
 
 describe("build guard: source constructs", () => {
   const css = {
-    "src/a.module.css": ".a { color: red }\n",
+    "src/a.module.css": ".a { margin: 0 }\n",
     "src/a.ts": "export {};\n",
   };
 
@@ -174,17 +174,17 @@ describe("build guard: source constructs", () => {
 
   it.each([
     ['.a { composes: b from "./o.module.css"; }', /composes/u],
-    [".a { composes: b; } .b { color: red }", /composes/u],
+    [".a { composes: b; } .b { margin: 0 }", /composes/u],
     [".a { COMPOSES: b from global; }", /composes/u],
-    ['@import "./x.css";\n.a { color: red }', /@import/u],
+    ['@import "./x.css";\n.a { margin: 0 }', /@import/u],
     [".a { compos\\65s: b; }", /escaped property/u],
   ])("fails on the stylesheet %s", async (sheet, pattern) => {
     await rejects(
       {
         ...main('import "./a.module.css";'),
         "src/a.module.css": `${sheet}\n`,
-        "src/o.module.css": ".b { color: red }\n",
-        "src/x.css": "body { color: red }\n",
+        "src/o.module.css": ".b { margin: 0 }\n",
+        "src/x.css": "body { margin: 0 }\n",
       },
       pattern,
     );
@@ -270,9 +270,20 @@ describe("build guard: index.html", () => {
 }, 30_000);
 
 describe("build guard: clean builds", () => {
-  it("builds the real app", async () => {
+  it("builds the real app with its fonts and licence texts", async () => {
     const files = outputFiles(await buildRoot(join(import.meta.dirname, "..")));
-    expect(files).toContain("index.html");
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "index.html",
+        "assets/noto-sans.woff2",
+        "assets/noto-sans-display.woff2",
+        "assets/cascadia-code-regular.woff2",
+        "assets/licences/noto-sans/OFL.txt",
+        "assets/licences/noto-sans-display/OFL.txt",
+        "assets/licences/cascadia-code/OFL.txt",
+      ]),
+    );
+    expect(files).toHaveLength(9);
   });
 
   it("builds a component that reads a CSS module", async () => {
@@ -292,7 +303,7 @@ describe("build guard: clean builds", () => {
           "}",
           "",
         ].join("\n"),
-        "src/Card.module.css": ".card { color: red }\n",
+        "src/Card.module.css": ".card { margin: 0 }\n",
       }),
     );
     expect(files.some((f) => f.endsWith(".css"))).toBe(true);
@@ -304,5 +315,46 @@ describe("build guard: clean builds", () => {
     writeFileSync(join(root, "src", "global.css"), "body { margin: 0 }\n");
     const files = outputFiles(await buildRoot(root));
     expect(files.some((f) => f.endsWith(".css"))).toBe(true);
+  });
+}, 30_000);
+
+describe("build guard: stylesheet bytes", () => {
+  const sheet = (bytes) => ({
+    ...main('import "./a.css";'),
+    "src/a.css": Buffer.from(bytes),
+  });
+  const cases = [
+    [
+      "a BOM followed by a newline",
+      "﻿\n.a { margin: 0 }\n",
+      /a\.css starts with a byte order mark at byte 0/u,
+    ],
+    [
+      "a BOM followed by an at-rule",
+      "﻿@layer base { .a { margin: 0 } }\n",
+      /a\.css starts with a byte order mark at byte 0/u,
+    ],
+    [
+      "CRLF line ends",
+      ".a {\r\n  margin: 0;\r\n}\r\n",
+      /a\.css holds a carriage return at byte 4/u,
+    ],
+    [
+      "a lone CR",
+      ".a { margin: 0 }\r.b { margin: 0 }\n",
+      /a\.css holds a carriage return at byte 16/u,
+    ],
+  ];
+  for (const [name, text, pattern] of cases) {
+    it(`fails ${name} before compiling`, async () => {
+      await rejects(sheet(text), pattern);
+    });
+  }
+
+  it("keeps an interior U+FEFF outside the byte rule", async () => {
+    const files = outputFiles(
+      await buildFixture(sheet('.a { content: "﻿" }\n')),
+    );
+    expect(files).toContain("index.html");
   });
 }, 30_000);

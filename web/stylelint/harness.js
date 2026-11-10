@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,11 +33,10 @@ export function fixtureTokens({ light = {}, omit = [], extra = "" } = {}) {
   const lightLines = [];
   const darkLines = [];
   for (const [name, token] of registry.tokens) {
-    if (omit.includes(name)) continue;
+    if (omit.includes(name) || token.runtime) continue;
     let value = token.value ?? token.light ?? "#286773";
     if (token.category === "font-stack")
       value = '"Inter", system-ui, sans-serif';
-    if (name === "--split") value = "22.5rem";
     lightLines.push(`    ${name}: ${light[name] ?? value};`);
     if (token.dark !== undefined) darkLines.push(`    ${name}: ${token.dark};`);
   }
@@ -40,6 +45,8 @@ export function fixtureTokens({ light = {}, omit = [], extra = "" } = {}) {
     return registry.tokens.get(name)?.light !== undefined;
   });
   return [
+    "@layer tokens, base, components, overrides;",
+    "",
     "@layer tokens {",
     "  :root {",
     ...lightLines,
@@ -67,17 +74,74 @@ export function fixtureTokens({ light = {}, omit = [], extra = "" } = {}) {
   ].join("\n");
 }
 
-export function makeRoot() {
-  const root = mkdtempSync(join(tmpdir(), "sl-tokens-"));
+export const shippedFonts = [
+  "noto-sans.woff2",
+  "noto-sans-display.woff2",
+  "cascadia-code-regular.woff2",
+];
+
+/** The production faces, one per shipped file, as fonts.css declares them. */
+const fontFaces = {
+  "noto-sans.woff2": ["Noto Sans", "100 900", "62.5% 100%"],
+  "noto-sans-display.woff2": ["Noto Sans Display", "100 900", "62.5% 100%"],
+  "cascadia-code-regular.woff2": ["SL Code", "400", "100%"],
+};
+
+/** One face; an override replaces a descriptor value, and null leaves the descriptor out. */
+export function fontFace(file, overrides = {}) {
+  const [family, weight, stretch] = fontFaces[file];
+  const descriptors = {
+    "font-family": `"${family}"`,
+    src: `url("./fonts/${file}") format("woff2")`,
+    "font-weight": weight,
+    "font-style": "normal",
+    "font-stretch": stretch,
+    "font-display": "swap",
+    ...overrides,
+  };
+  const lines = Object.entries(descriptors)
+    .filter(([, value]) => value !== null)
+    .map(([name, value]) => `    ${name}: ${value};`);
+  return ["  @font-face {", ...lines, "  }"].join("\n");
+}
+
+export function fontsSheet(faces = shippedFonts.map((f) => fontFace(f))) {
+  return ["@layer base {", faces.join("\n\n"), "}", ""].join("\n");
+}
+
+/** The repository copy sits one level up, so inventory source paths resolve as in production. */
+export function makeRoot({ inventory } = {}) {
+  const repo = mkdtempSync(join(tmpdir(), "sl-tokens-"));
+  const root = join(repo, "web");
   const paths = {
     src: join(root, "src"),
     tokensFile: join(root, "src", "theme", "tokens.css"),
-    entryFile: join(root, "src", "index.css"),
+    entryFile: join(root, "src", "theme", "tokens.css"),
     headerModule: join(root, "fixtures", "header", "Header.module.css"),
+    fontsFile: join(root, "src", "theme", "fonts.css"),
+    inventoryFile: join(root, "assets", "licences", "asset-inventory.json"),
+    repoRoot: repo,
   };
   write(paths.tokensFile, fixtureTokens());
-  write(paths.entryFile, "@layer tokens, base, components, overrides;\n");
+  const fonts = join(paths.src, "theme", "fonts");
+  mkdirSync(fonts, { recursive: true });
+  for (const file of shippedFonts)
+    copyFileSync(join(web, "src", "theme", "fonts", file), join(fonts, file));
+  write(
+    paths.inventoryFile,
+    JSON.stringify(inventory ?? productionInventory(), null, 2),
+  );
+  write(paths.fontsFile, fontsSheet());
   return { root, paths };
+}
+
+export function productionInventory() {
+  return JSON.parse(
+    readFileSync(
+      join(web, "assets", "licences", "asset-inventory.json"),
+      "utf8",
+    ),
+  );
 }
 
 export function write(path, text) {

@@ -7,10 +7,27 @@ const web = (relative) =>
 export const productionPaths = {
   src: web("src"),
   tokensFile: web("src/theme/tokens.css"),
-  entryFile: web("src/index.css"),
+  entryFile: web("src/theme/tokens.css"),
   headerModule: web("src/components/AppHeader.module.css"),
+  fontsFile: web("src/theme/fonts.css"),
+  inventoryFile: web("assets/licences/asset-inventory.json"),
+  repoRoot: web(".."),
 };
 
-export function ruleOptions({ tokensFile, entryFile, headerModule }) {
-  return { tokensFile, entryFile, headerModule };
+export function ruleOptions({
+  tokensFile,
+  entryFile,
+  headerModule,
+  fontsFile,
+  inventoryFile,
+  repoRoot,
+}) {
+  return {
+    tokensFile,
+    entryFile,
+    headerModule,
+    fontsFile,
+    inventoryFile,
+    repoRoot,
+  };
 }

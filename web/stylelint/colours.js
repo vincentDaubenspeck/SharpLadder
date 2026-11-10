@@ -50,18 +50,33 @@ function colourFunctionsOf(types, functions) {
 const { data, types, functions } = loadWebref();
 
 // css-tree's bundled grammar is a different snapshot; only the pinned webref syntax decides.
+const gridColumns = data.properties.find(
+  (p) => p.name === "grid-template-columns",
+)?.syntax;
+if (!gridColumns) throw new Error("webref has no grid-template-columns syntax");
+
 const lexer = fork({
   types: Object.fromEntries(
     [...data.types, ...data.functions]
       .filter((entry) => entry.syntax)
       .map((entry) => [entry.name, entry.syntax]),
   ),
+  properties: { "grid-template-columns": gridColumns },
 }).lexer;
 
 /** A parse error counts as a mismatch, so a value css-tree cannot read fails closed. */
 export function matchesColourGrammar(text) {
   try {
     return lexer.matchType("color", text).error === null;
+  } catch {
+    return false;
+  }
+}
+
+/** Judged by the pinned webref syntax, so a fallback the property cannot take fails. */
+export function matchesGridColumns(text) {
+  try {
+    return lexer.matchProperty("grid-template-columns", text).error === null;
   } catch {
     return false;
   }

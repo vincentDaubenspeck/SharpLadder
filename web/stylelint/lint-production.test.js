@@ -28,6 +28,9 @@ describe("stylesheet discovery", () => {
       state: "not-applicable",
       lines: [notApplicable],
     });
+  });
+
+  it("the production lint passes the shipped stylesheets through the CLI", () => {
     const cli = spawnSync(
       process.execPath,
       [fileURLToPath(new URL("lint-production.js", import.meta.url))],
@@ -37,8 +40,7 @@ describe("stylesheet discovery", () => {
     if (cli.error) throw cli.error;
     if (cli.signal) throw new Error(`the lint was killed by ${cli.signal}.`);
     expect(cli.status).toBe(0);
-    expect(cli.stdout.trim()).toBe(notApplicable);
-    expect(cli.stdout).not.toContain("PASS");
+    expect(cli.stdout.trim()).toBe("");
   });
 
   it("A69 a discovery error fails", async () => {
@@ -133,7 +135,31 @@ describe("production lint with stylesheets", () => {
 }, 30_000);
 
 describe("production registry", () => {
-  it("loads the extracted inventory and catalogue and lacks only radius", () => {
-    expect(productionRegistry().missing).toEqual(["radius"]);
+  it("loads every registry part", () => {
+    expect(productionRegistry().missing).toEqual([]);
+  });
+
+  it("fixes the eight radius names with exact values", () => {
+    const radius = [...productionRegistry().tokens].filter(
+      ([, t]) => t.category === "radius",
+    );
+    expect(Object.fromEntries(radius.map(([n, t]) => [n, t.value]))).toEqual({
+      "--r": "0.625rem",
+      "--r-sm": "0.5rem",
+      "--r-2": "0.125rem",
+      "--r-3": "0.1875rem",
+      "--r-4": "0.25rem",
+      "--r-6": "0.375rem",
+      "--r-9": "0.5625rem",
+      "--r-pill": "62.4375rem",
+    });
+  });
+
+  it("names 186 declared tokens and the one runtime-only --split", () => {
+    const tokens = [...productionRegistry().tokens];
+    const runtime = tokens.filter(([, t]) => t.runtime === true);
+    expect(runtime.map(([n]) => n)).toEqual(["--split"]);
+    expect(runtime[0][1].value).toBeUndefined();
+    expect(tokens).toHaveLength(187);
   });
 });

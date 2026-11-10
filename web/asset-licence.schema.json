@@ -6,12 +6,20 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "allowedLicences", "noticesContract", "assets"],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "allowedLicences": { "const": ["OFL-1.1"] },
-    "noticesContract": { "$ref": "#/definitions/noticesContract" },
+    "schemaVersion": {
+      "const": 1
+    },
+    "allowedLicences": {
+      "const": ["OFL-1.1"]
+    },
+    "noticesContract": {
+      "$ref": "#/definitions/noticesContract"
+    },
     "assets": {
       "type": "array",
-      "items": { "$ref": "#/definitions/asset" }
+      "items": {
+        "$ref": "#/definitions/asset"
+      }
     }
   },
   "definitions": {
@@ -46,11 +54,21 @@
         "consumerReads"
       ],
       "properties": {
-        "assetsAreNoticesSource": { "const": true },
-        "servedWithEachShippedAsset": { "const": ["copyright", "licenceText"] },
-        "siteLicenceGrantsExcludeAssets": { "const": true },
-        "consumer": { "const": "notices-page-generator" },
-        "consumerReads": { "const": "web/assets/licences/asset-inventory.json" }
+        "assetsAreNoticesSource": {
+          "const": true
+        },
+        "servedWithEachShippedAsset": {
+          "const": ["copyright", "licenceText"]
+        },
+        "siteLicenceGrantsExcludeAssets": {
+          "const": true
+        },
+        "consumer": {
+          "const": "notices-page-generator"
+        },
+        "consumerReads": {
+          "const": "web/assets/licences/asset-inventory.json"
+        }
       }
     },
     "originalFile": {
@@ -58,9 +76,15 @@
       "additionalProperties": false,
       "required": ["id", "acquisitionPath", "sha256"],
       "properties": {
-        "id": { "$ref": "#/definitions/id" },
-        "acquisitionPath": { "$ref": "#/definitions/relativePath" },
-        "sha256": { "$ref": "#/definitions/sha256" }
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "acquisitionPath": {
+          "$ref": "#/definitions/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/definitions/sha256"
+        }
       }
     },
     "licenceText": {
@@ -68,12 +92,20 @@
       "additionalProperties": false,
       "required": ["sourcePath", "sha256", "distributionPath"],
       "properties": {
-        "sourcePath": { "$ref": "#/definitions/relativePath" },
-        "sha256": { "$ref": "#/definitions/sha256" },
+        "sourcePath": {
+          "$ref": "#/definitions/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/definitions/sha256"
+        },
         "distributionPath": {
           "oneOf": [
-            { "$ref": "#/definitions/relativePath" },
-            { "type": "null" }
+            {
+              "$ref": "#/definitions/relativePath"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       }
@@ -84,25 +116,67 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["kind"],
-          "properties": { "kind": { "const": "none" } }
+          "properties": {
+            "kind": {
+              "const": "none"
+            }
+          }
         },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "tool", "version", "options", "inputs"],
           "properties": {
-            "kind": { "const": "subset" },
-            "tool": { "$ref": "#/definitions/text" },
-            "version": { "$ref": "#/definitions/text" },
+            "kind": {
+              "const": "subset"
+            },
+            "tool": {
+              "$ref": "#/definitions/text"
+            },
+            "version": {
+              "$ref": "#/definitions/text"
+            },
             "options": {
               "type": "array",
-              "items": { "$ref": "#/definitions/text" }
+              "items": {
+                "$ref": "#/definitions/text"
+              }
             },
             "inputs": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "$ref": "#/definitions/id" }
+              "items": {
+                "$ref": "#/definitions/id"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "tool", "version", "options", "inputs"],
+          "properties": {
+            "kind": {
+              "const": "woff2"
+            },
+            "tool": {
+              "$ref": "#/definitions/text"
+            },
+            "version": {
+              "$ref": "#/definitions/text"
+            },
+            "options": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "inputs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "$ref": "#/definitions/id"
+              }
             }
           }
         }
@@ -111,11 +185,44 @@
     "distributedFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["distPath", "sha256", "fromOriginal"],
+      "required": [
+        "distPath",
+        "sha256",
+        "fromOriginal",
+        "sourcePath",
+        "byteLength",
+        "face",
+        "coverage"
+      ],
       "properties": {
-        "distPath": { "$ref": "#/definitions/relativePath" },
-        "sha256": { "$ref": "#/definitions/sha256" },
-        "fromOriginal": { "$ref": "#/definitions/id" }
+        "distPath": {
+          "$ref": "#/definitions/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/definitions/sha256"
+        },
+        "fromOriginal": {
+          "$ref": "#/definitions/id"
+        },
+        "sourcePath": {
+          "type": "string",
+          "pattern": "^web/src/theme/fonts/[a-z0-9]+(?:-[a-z0-9]+)*\\.woff2$"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "face": {
+          "$ref": "#/definitions/face"
+        },
+        "coverage": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/codePointRange"
+          }
+        }
       }
     },
     "asset": {
@@ -141,9 +248,15 @@
         "shipped"
       ],
       "properties": {
-        "schemaVersion": { "const": 1 },
-        "id": { "$ref": "#/definitions/id" },
-        "family": { "$ref": "#/definitions/text" },
+        "schemaVersion": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "family": {
+          "$ref": "#/definitions/text"
+        },
         "upstreamSource": {
           "type": "string",
           "pattern": "^https://[A-Za-z0-9.-]+/[A-Za-z0-9_./-]+$"
@@ -153,55 +266,160 @@
           "pattern": "^[0-9a-f]{40}$"
         },
         "upstreamTag": {
-          "oneOf": [{ "$ref": "#/definitions/text" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/definitions/text"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "originalFiles": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/definitions/originalFile" }
+          "items": {
+            "$ref": "#/definitions/originalFile"
+          }
         },
-        "copyright": { "$ref": "#/definitions/text" },
-        "licence": { "const": "OFL-1.1" },
-        "licenceText": { "$ref": "#/definitions/licenceText" },
+        "copyright": {
+          "$ref": "#/definitions/text"
+        },
+        "licence": {
+          "const": "OFL-1.1"
+        },
+        "licenceText": {
+          "$ref": "#/definitions/licenceText"
+        },
         "reservedFontNames": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/text" }
+          "items": {
+            "$ref": "#/definitions/text"
+          }
         },
         "declarationHash": {
           "description": "Lowercase hex SHA-256 over the UTF-8 bytes of licenceText.sha256 (its lowercase hex string, not the digest bytes) concatenated with JSON.stringify(reservedFontNames) in declared order; an edit-consistency tripwire, not proof of review.",
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
-        "renamedIdentity": { "type": "boolean" },
-        "distributedFamilyName": {
-          "oneOf": [{ "$ref": "#/definitions/text" }, { "type": "null" }]
+        "renamedIdentity": {
+          "type": "boolean"
         },
-        "transformation": { "$ref": "#/definitions/transformation" },
+        "distributedFamilyName": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transformation": {
+          "$ref": "#/definitions/transformation"
+        },
         "distributedFiles": {
           "type": "array",
-          "items": { "$ref": "#/definitions/distributedFile" }
+          "items": {
+            "$ref": "#/definitions/distributedFile"
+          }
         },
-        "shipped": { "type": "boolean" }
+        "shipped": {
+          "type": "boolean"
+        }
       },
-      "if": { "properties": { "shipped": { "const": false } } },
+      "if": {
+        "properties": {
+          "shipped": {
+            "const": false
+          }
+        }
+      },
       "then": {
         "properties": {
-          "distributedFiles": { "maxItems": 0 },
-          "distributedFamilyName": { "type": "null" },
-          "renamedIdentity": { "const": false },
+          "distributedFiles": {
+            "maxItems": 0
+          },
+          "distributedFamilyName": {
+            "type": "null"
+          },
+          "renamedIdentity": {
+            "const": false
+          },
           "licenceText": {
-            "properties": { "distributionPath": { "type": "null" } }
+            "properties": {
+              "distributionPath": {
+                "type": "null"
+              }
+            }
           }
         }
       },
       "else": {
         "properties": {
-          "distributedFiles": { "minItems": 1 },
-          "distributedFamilyName": { "type": "string" },
+          "distributedFiles": {
+            "minItems": 1
+          },
+          "distributedFamilyName": {
+            "type": "string"
+          },
           "licenceText": {
-            "properties": { "distributionPath": { "type": "string" } }
+            "properties": {
+              "distributionPath": {
+                "type": "string"
+              }
+            }
           }
+        }
+      }
+    },
+    "codePointRange": {
+      "type": "string",
+      "pattern": "^U\\+(?:[0-9A-F]{4,6})(?:-[0-9A-F]{4,6})?$"
+    },
+    "face": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["familyAlias", "weightRange", "style", "stretch", "format"],
+      "properties": {
+        "familyAlias": {
+          "$ref": "#/definitions/text"
+        },
+        "weightRange": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "style": {
+          "enum": ["normal", "italic"]
+        },
+        "stretch": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 50,
+              "maximum": 200
+            },
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number",
+                "minimum": 50,
+                "maximum": 200
+              }
+            }
+          ]
+        },
+        "format": {
+          "const": "woff2"
         }
       }
     }

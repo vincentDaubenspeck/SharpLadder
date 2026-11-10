@@ -5,12 +5,20 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import Ajv from "ajv";
+import { ident, parse, walk } from "css-tree";
+import { publicBase } from "./build-guard/contract.js";
+import { minifySheet } from "./build-guard/provenance.js";
+import { tokenPolicyProblems } from "./build-guard/token-policy.js";
+import { conversionProblems } from "./fonts/convert.js";
+import { verifyEntry } from "./fonts/metadata.js";
 import { inside } from "./source-check/paths.js";
 
 const web = import.meta.dirname;
 const repo = join(web, "..");
 const licencesDir = "web/assets/licences";
 const inventoryPath = `${licencesDir}/asset-inventory.json`;
+// After a reviewed binding change, record the values the metadata check reports for the new faces.
+const sliceRecordPath = `${licencesDir}/font-slice.json`;
 // The schema is policy, so it always comes from this checkout, never from the tree checked.
 const schema = JSON.parse(
   readFileSync(join(web, "asset-licence.schema.json"), "utf8"),
@@ -103,6 +111,10 @@ function readRepoFile(io, rootReal, rel) {
   return io.readFile(path);
 }
 
+/** The same link-free canonical read, for checks that bind a source path to the inventory. */
+export const readInRepo = (rootReal, rel) =>
+  readRepoFile(defaults, rootReal, rel);
+
 /** Anything but a regular file could change what is served without changing a hash. */
 function walkFiles(io, top, label, problems) {
   const files = new Map();
@@ -126,7 +138,7 @@ function walkFiles(io, top, label, problems) {
       } else if (stat.isDirectory()) {
         visit(path, `${rel}/`);
       } else if (stat.isFile()) {
-        files.set(rel, sha256(io.readFile(path)));
+        files.set(rel, io.readFile(path));
       } else {
         problems.push(`${label}/${rel} is not a regular file`);
       }
@@ -186,7 +198,7 @@ function reservesAName(notice) {
   return false;
 }
 
-function checkRecord(io, rootReal, asset, production, problems) {
+function checkRecord(io, rootReal, asset, problems) {
   const at = `asset ${asset.id}`;
   const originals = new Map();
   for (const file of asset.originalFiles) {
@@ -265,15 +277,14 @@ function checkRecord(io, rootReal, asset, production, problems) {
         problems.push(`${at}: distributed family keeps reserved name ${name}`);
     }
   }
-  if (modified)
+  // No subsetter is pinned, so a subset output could not be reproduced.
+  if (asset.transformation.kind === "subset")
     problems.push(
-      `${at}: modified fonts cannot ship until binary naming verification lands`,
+      `${at}: a subset font cannot ship without a pinned subset tool`,
     );
-  if (production)
-    problems.push(`${at}: no font ships until the build guard admits fonts`);
 }
 
-function checkMetadata(io, rootReal, production, problems) {
+function checkMetadata(io, rootReal, problems) {
   let inventory;
   try {
     const bytes = readRepoFile(io, rootReal, inventoryPath);
@@ -291,12 +302,13 @@ function checkMetadata(io, rootReal, production, problems) {
   for (const asset of inventory.assets) {
     if (ids.has(asset.id)) problems.push(`asset id ${asset.id} is not unique`);
     ids.add(asset.id);
-    checkRecord(io, rootReal, asset, production, problems);
+    checkRecord(io, rootReal, asset, problems);
   }
 
   // The licence folder holds the inventory and the declared texts, nothing unreviewed.
   const declared = new Set([
     inventoryPath,
+    sliceRecordPath,
     ...inventory.assets.map((a) => a.licenceText.sourcePath),
   ]);
   try {
@@ -312,7 +324,41 @@ function checkMetadata(io, rootReal, production, problems) {
   } catch (error) {
     problems.push(`cannot list ${licencesDir}: ${error.message}`);
   }
-  return assetOutputs(inventory, problems);
+  const expected = generateFaces(inventory);
+  problems.push(...expected.problems);
+  if (expected.bytes !== null)
+    checkSliceRecord(io, rootReal, expected, problems);
+  return { claims: assetOutputs(inventory, problems), inventory, expected };
+}
+
+/** Shipped bytes are judged against their declared face, and converted ones are reproduced. */
+async function checkFonts(io, rootReal, inventory, reproduce, problems) {
+  for (const asset of inventory.assets.filter((a) => a.shipped)) {
+    for (const file of asset.distributedFiles) {
+      const label = `asset ${asset.id}: ${file.sourcePath}`;
+      if (file.face.familyAlias !== asset.distributedFamilyName)
+        problems.push(
+          `${label}: face alias is not the distributed family name`,
+        );
+      let bytes;
+      try {
+        bytes = readRepoFile(io, rootReal, file.sourcePath);
+      } catch (error) {
+        problems.push(`${label}: cannot read: ${error.message}`);
+        continue;
+      }
+      if (sha256(bytes) !== file.sha256)
+        problems.push(`${label}: bytes differ from the recorded hash`);
+      problems.push(...(await verifyEntry(file, bytes, label)));
+    }
+  }
+  if (!reproduce) return;
+  const read = (rel) => readRepoFile(io, rootReal, rel);
+  try {
+    problems.push(...(await conversionProblems(inventory, read)));
+  } catch (error) {
+    problems.push(`font conversion cannot run: ${error.message}`);
+  }
 }
 
 /** Every output path has one owner, keyed by case so a case-insensitive host cannot merge two. */
@@ -350,17 +396,361 @@ function assetOutputs(inventory, problems) {
   return claims;
 }
 
-function checkOutput(io, assetClaims, output, owned, problems) {
-  if (owned === null) {
-    problems.push("output mode needs the build-guard-owned outputs (--owned)");
+/** Every character outside a small plain set is a hex escape, so no binding text becomes syntax. */
+export const cssString = (text) =>
+  `"${[...text]
+    .map((c) =>
+      /^[A-Za-z0-9 ._/-]$/u.test(c) ? c : `\\${c.codePointAt(0).toString(16)} `,
+    )
+    .join("")}"`;
+
+const faceStyles = new Set(["normal", "italic"]);
+const faceFormats = new Set(["woff2"]);
+// Each segment starts with a letter or digit, so the URL has no dot segment, query or escape.
+const plainDistPath =
+  /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u;
+// A control character in a family alias is invisible in review, so it is refused.
+const hasControl = (text) =>
+  [...text].some((c) => {
+    const n = c.codePointAt(0);
+    return n < 0x20 || (n >= 0x7f && n <= 0x9f);
+  });
+
+/** One CSS number or two separated by U+0020; an equal pair is one, never left to the minifier. */
+function faceRange(value, [low, high], unit, label, problems) {
+  const pair = Array.isArray(value) ? value : [value, value];
+  if (
+    pair.length !== 2 ||
+    !pair.every((n) => typeof n === "number" && Number.isFinite(n)) ||
+    pair[0] < low ||
+    pair[1] > high ||
+    pair[0] > pair[1]
+  ) {
+    problems.push(`${label} is not an ascending range within ${low}-${high}`);
+    return null;
+  }
+  return pair[0] === pair[1]
+    ? `${pair[0]}${unit}`
+    : `${pair[0]}${unit} ${pair[1]}${unit}`;
+}
+
+/**
+ * The expected @font-face bytes, from the validated inventory bindings and the reviewed public
+ * base alone, in inventory order and through C2's own minifier; emitted CSS is never an input.
+ */
+export function generateFaces(inventory) {
+  const problems = [];
+  const rules = [];
+  const urls = new Set();
+  const files = new Set();
+  for (const asset of inventory.assets.filter((a) => a.shipped)) {
+    for (const file of asset.distributedFiles) {
+      const label = `asset ${asset.id}: ${file.distPath} face`;
+      const face = file.face ?? {};
+      if (files.has(file.distPath))
+        problems.push(`${label}: the file is bound twice`);
+      files.add(file.distPath);
+      const family = face.familyAlias;
+      if (
+        typeof family !== "string" ||
+        family === "" ||
+        family.trim() !== family ||
+        hasControl(family) ||
+        !family.isWellFormed()
+      )
+        problems.push(`${label}: the family alias is not plain text`);
+      if (!faceStyles.has(face.style))
+        problems.push(`${label}: style ${String(face.style)} is unsupported`);
+      if (!faceFormats.has(face.format))
+        problems.push(`${label}: format ${String(face.format)} is unsupported`);
+      const path = file.distPath;
+      if (
+        typeof path !== "string" ||
+        !plainDistPath.test(path) ||
+        !path.endsWith(`.${String(face.format)}`)
+      )
+        problems.push(`${label}: the dist path gives no plain URL`);
+      const url = `${publicBase}${path}`;
+      if (urls.has(url)) problems.push(`${label}: URL ${url} is not unique`);
+      urls.add(url);
+      const weight = faceRange(
+        face.weightRange,
+        [1, 1000],
+        "",
+        `${label}: weight`,
+        problems,
+      );
+      const stretch = faceRange(
+        face.stretch,
+        [50, 200],
+        "%",
+        `${label}: stretch`,
+        problems,
+      );
+      if (problems.length > 0) continue;
+      rules.push(
+        `@font-face {\n  font-family: ${cssString(family)};\n  src: url(${cssString(url)}) format("${face.format}");\n  font-weight: ${weight};\n  font-style: ${face.style};\n  font-stretch: ${stretch};\n  font-display: swap;\n}\n`,
+      );
+    }
+  }
+  if (problems.length > 0) return { problems, bytes: null, count: 0 };
+  if (rules.length === 0) return { problems, bytes: Buffer.alloc(0), count: 0 };
+  try {
+    return {
+      problems,
+      bytes: Buffer.from(minifySheet(rules.join("\n")), "utf8"),
+      count: rules.length,
+    };
+  } catch (error) {
+    return {
+      problems: [`the expected faces do not compile: ${error.message}`],
+      bytes: null,
+      count: 0,
+    };
+  }
+}
+
+/** The recorded hash and length of the expected faces, one value for every platform's CI. */
+function checkSliceRecord(io, rootReal, expected, problems) {
+  let record;
+  try {
+    record = parseJson(
+      readRepoFile(io, rootReal, sliceRecordPath).toString("utf8"),
+    );
+  } catch (error) {
+    problems.push(`${sliceRecordPath}: ${error.message}`);
     return;
   }
-  const claims = new Map(assetClaims);
+  if (
+    Object.keys(record ?? {}).join() !== "sha256,byteLength" ||
+    typeof record.sha256 !== "string" ||
+    !hex64.test(record.sha256) ||
+    !Number.isInteger(record.byteLength)
+  ) {
+    problems.push(
+      `${sliceRecordPath}: expected {"sha256": "<hex>", "byteLength": <integer>}`,
+    );
+    return;
+  }
+  if (
+    record.sha256 !== sha256(expected.bytes) ||
+    record.byteLength !== expected.bytes.length
+  )
+    problems.push(
+      `${sliceRecordPath}: the expected faces are ${expected.bytes.length} bytes with sha256 ${sha256(expected.bytes)}, not the recorded value`,
+    );
+}
+
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+const canonicalHeader = Buffer.from("@layer base{");
+const closeBrace = 0x7d;
+const semicolon = 0x3b;
+const atName = (node) => ident.decode(node.name).toLowerCase();
+const bareIdent = (raw) =>
+  ident.decode(raw.replace(/\/\*[\s\S]*?\*\//gu, "").trim());
+
+/**
+ * Structure of one emitted stylesheet, judged on its original text before anything is
+ * normalised: returns the byte span of its trailing faces, or null.
+ */
+function sheetFaces(bytes, count, label, problems) {
+  if (bytes.subarray(0, 3).equals(bom)) {
+    problems.push(`${label} starts with a byte-order mark`);
+    return null;
+  }
+  if (/^@charset/iu.test(bytes.subarray(0, 8).toString("latin1"))) {
+    problems.push(`${label} starts with @charset`);
+    return null;
+  }
+  let text;
+  try {
+    text = strictUtf8.decode(bytes);
+  } catch {
+    problems.push(`${label} is not strict UTF-8`);
+    return null;
+  }
+  const errors = [];
+  let ast;
+  try {
+    ast = parse(text, {
+      positions: true,
+      parseAtrulePrelude: false,
+      parseRulePrelude: false,
+      parseValue: false,
+      parseCustomProperty: false,
+      onParseError: (error) => errors.push(error.message),
+    });
+  } catch (error) {
+    errors.push(error.message);
+  }
+  if (errors.length > 0) {
+    problems.push(`${label} does not parse: ${errors.join("; ")}`);
+    return null;
+  }
+  // Parser offsets count UTF-16 units; slicing and comparison are in bytes.
+  const at = (offset) => Buffer.byteLength(text.slice(0, offset), "utf8");
+  const faces = [];
+  let charset = false;
+  walk(ast, {
+    visit: "Atrule",
+    enter(node) {
+      const name = atName(node);
+      if (name === "font-face") faces.push(node);
+      else if (name === "charset") charset = true;
+    },
+  });
+  if (charset) {
+    problems.push(`${label} holds an @charset rule`);
+    return null;
+  }
+  if (faces.length === 0) return { slice: null, faces: 0 };
+  const found = problems.length;
+  const fail = (why) => problems.push(`${label}: ${why}`);
+  if (faces.length !== count)
+    fail(`${faces.length} @font-face rules, ${count} bound`);
+  const bases = ast.children
+    .toArray()
+    .filter(
+      (node) =>
+        node.type === "Atrule" &&
+        atName(node) === "layer" &&
+        node.block &&
+        node.prelude?.type === "Raw" &&
+        bareIdent(node.prelude.value) === "base",
+    );
+  if (bases.length !== 1) {
+    fail(`${bases.length} top-level @layer base blocks, not one`);
+    return null;
+  }
+  const [base] = bases;
+  const open = at(base.block.loc.start.offset);
+  const start = at(base.loc.start.offset);
+  if (!bytes.subarray(start, open + 1).equals(canonicalHeader))
+    fail("the @layer base header is not the canonical @layer base{");
+  const kids = base.block.children.toArray();
+  const trailing = kids.slice(Math.max(kids.length - count, 0));
+  if (
+    trailing.length !== count ||
+    faces.some((face) => !trailing.includes(face))
+  )
+    fail(
+      "an @font-face is not among the trailing children of the top-level @layer base",
+    );
+  if (problems.length > found) return null;
+  for (const face of trailing) {
+    const end = at(face.loc.end.offset);
+    if (
+      !face.block ||
+      bytes[end - 1] !== closeBrace ||
+      face.block.children.toArray().some((d) => d.type !== "Declaration")
+    )
+      fail("an @font-face is not a closed block of declarations only");
+  }
+  for (let i = 1; i < trailing.length; i++)
+    if (at(trailing[i - 1].loc.end.offset) !== at(trailing[i].loc.start.offset))
+      fail("the @font-face rules are not contiguous");
+  const first = at(trailing[0].loc.start.offset);
+  const last = at(trailing.at(-1).loc.end.offset);
+  const previous = kids[kids.length - count - 1];
+  if (
+    previous === undefined
+      ? first !== open + 1
+      : at(previous.loc.end.offset) !== first ||
+        ![closeBrace, semicolon].includes(bytes[first - 1])
+  )
+    fail(
+      "the byte before the first @font-face does not end the preceding rule",
+    );
+  const close = at(base.loc.end.offset);
+  if (
+    at(base.block.loc.end.offset) !== close ||
+    close !== last + 1 ||
+    bytes[last] !== closeBrace
+  )
+    fail("the @layer base block is not closed right after the last @font-face");
+  if (problems.length > found) return null;
+  return {
+    slice: { start: first, end: last },
+    faces: count,
+  };
+}
+
+/**
+ * Every shipped font loads through the one admitted slice: the original bytes of the trailing
+ * faces of the top-level @layer base must equal the generated faces, with nothing normalised.
+ */
+function fontBindingProblems(checked, actual, problems) {
+  const { expected } = checked;
+  if (expected.bytes === null) {
+    problems.push("no output is admitted without the expected faces");
+    return null;
+  }
+  const holders = [];
+  let slice = null;
+  for (const [path, bytes] of actual) {
+    if (!path.endsWith(".css")) continue;
+    const label = `output ${path}`;
+    const sheet = Buffer.from(bytes);
+    const found = sheetFaces(sheet, expected.count, label, problems);
+    let admitted = null;
+    if (found?.slice) {
+      holders.push(path);
+      const { start, end } = found.slice;
+      const bytesAt = sheet.subarray(start, end);
+      if (bytesAt.equals(expected.bytes)) {
+        admitted = found.slice;
+        slice = {
+          path,
+          start,
+          end,
+          byteLength: end - start,
+          sha256: sha256(bytesAt),
+        };
+      } else {
+        let i = 0;
+        while (i < bytesAt.length && bytesAt[i] === expected.bytes[i]) i++;
+        problems.push(
+          `${label}: the @font-face bytes at [${start}, ${end}) differ from the bound faces at byte ${start + i}`,
+        );
+      }
+    }
+    // The whole original sheet is scanned; only an exactly admitted slice skips the name checks.
+    for (const problem of tokenPolicyProblems(sheet, admitted))
+      problems.push(`${label}: ${problem}`);
+  }
+  if (holders.length > 1)
+    problems.push(`@font-face rules are emitted in ${holders.join(", ")}`);
+  if (expected.count > 0 && holders.length === 0)
+    problems.push("no emitted stylesheet holds the bound @font-face rules");
+  return slice;
+}
+
+/** Output bytes against the declared owners; the font binding is judged from the same bytes. */
+function outputProblems(checked, actual, owned, problems) {
+  const claims = new Map(checked.claims);
   for (const [path, hash] of owned)
     claim(claims, path, hash, "the build guard", problems);
   const expected = new Map(
     [...claims.values()].map(({ path, hash }) => [path, hash]),
   );
+  for (const [path, bytes] of actual) {
+    const want = expected.get(path);
+    if (want === undefined) problems.push(`output has an unowned file ${path}`);
+    else if (want !== sha256(bytes))
+      problems.push(`output ${path} differs from its hash`);
+  }
+  for (const path of expected.keys()) {
+    if (!actual.has(path)) problems.push(`output is missing ${path}`);
+  }
+  return fontBindingProblems(checked, actual, problems);
+}
+
+function checkOutput(io, checked, output, owned, problems) {
+  if (owned === null) {
+    problems.push("output mode needs the build-guard-owned outputs (--owned)");
+    return;
+  }
   let actual;
   try {
     const top = realDirectory(io, output, "output directory");
@@ -369,15 +759,7 @@ function checkOutput(io, assetClaims, output, owned, problems) {
     problems.push(`cannot read the output: ${error.message}`);
     return;
   }
-  for (const [path, hash] of actual) {
-    const want = expected.get(path);
-    if (want === undefined) problems.push(`output has an unowned file ${path}`);
-    else if (want !== hash)
-      problems.push(`output ${path} differs from its hash`);
-  }
-  for (const path of expected.keys()) {
-    if (!actual.has(path)) problems.push(`output is missing ${path}`);
-  }
+  outputProblems(checked, actual, owned, problems);
 }
 
 function readOwned(file) {
@@ -397,27 +779,62 @@ function readOwned(file) {
   return new Map(Object.entries(files));
 }
 
+async function checkTree(io, root, reproduce, problems) {
+  let rootReal;
+  try {
+    rootReal = realDirectory(io, resolve(root), "repository root");
+  } catch (error) {
+    problems.push(`cannot use the repository root: ${error.message}`);
+    return null;
+  }
+  const result = checkMetadata(io, rootReal, problems);
+  if (result === null) return null;
+  await checkFonts(io, rootReal, result.inventory, reproduce, problems);
+  return { ...result, rootReal };
+}
+
 /**
  * Returns the problems found; an empty list in metadata mode says nothing about shipping.
  * Production records are those of this checkout; fixtures pass another root.
  */
-export function checkAssets(
+export async function checkAssets(
   { root = repo, output = null, owned = null } = {},
   seams = {},
 ) {
   const io = { ...defaults, ...seams };
   const problems = [];
-  let rootReal;
-  try {
-    rootReal = realDirectory(io, resolve(root), "repository root");
-  } catch (error) {
-    return [`cannot use the repository root: ${error.message}`];
-  }
-  const production = rootReal === realpathSync.native(repo);
-  const claims = checkMetadata(io, rootReal, production, problems);
-  if (output !== null && claims !== null)
-    checkOutput(io, claims, resolve(output), owned, problems);
+  const result = await checkTree(io, root, true, problems);
+  if (result === null) return problems;
+  if (output !== null)
+    checkOutput(io, result, resolve(output), owned, problems);
   return problems;
+}
+
+/**
+ * The build guard's entry to the same policy: it emits the licence texts this returns and
+ * submits its in-memory output to check(). Conversion is reproduced by the metadata lane.
+ */
+export async function assetAdmission({ root }) {
+  const problems = [];
+  const result = await checkTree(defaults, root, false, problems);
+  if (result === null || problems.length > 0) return { problems };
+  const licenceTexts = [];
+  for (const asset of result.inventory.assets.filter((a) => a.shipped)) {
+    const { sourcePath, sha256: hash, distributionPath } = asset.licenceText;
+    const bytes = readRepoFile(defaults, result.rootReal, sourcePath);
+    if (sha256(bytes) !== hash)
+      return {
+        problems: [`asset ${asset.id}: licence text changed while read`],
+      };
+    licenceTexts.push({ path: distributionPath, bytes });
+  }
+  const admit = (actual, owned) => {
+    const found = [];
+    const slice = outputProblems(result, actual, owned, found);
+    return { problems: found, slice };
+  };
+  const check = (actual, owned) => admit(actual, owned).problems;
+  return { problems, licenceTexts, check, admit, inventory: result.inventory };
 }
 
 const invoked =
@@ -445,7 +862,7 @@ if (invoked) {
       if ((values.output === undefined) !== (values.owned === undefined))
         throw new Error("--output and --owned go together");
       if (values.output !== undefined) mode = "output";
-      problems = checkAssets({
+      problems = await checkAssets({
         root: values.root,
         output: values.output ?? null,
         owned: values.owned === undefined ? null : readOwned(values.owned),

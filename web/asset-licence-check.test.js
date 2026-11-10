@@ -14,7 +14,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { checkAssets } from "./asset-licence-check.js";
+import {
+  assetAdmission,
+  checkAssets,
+  generateFaces,
+} from "./asset-licence-check.js";
 import { snapshot } from "./build-guard/output.js";
 
 const web = import.meta.dirname;
@@ -57,7 +61,15 @@ const monoNotice = ofl(
 );
 const sansNotice = ofl("Copyright 2026 Fixture Authors.");
 const notices = { "sample-mono": monoNotice, "sample-sans": sansNotice };
-const font = "fixture font bytes\n";
+// Real bytes, so the metadata verifier judges a fixture the way it judges a shipped file.
+const font = readFileSync(
+  join(web, "src/theme/fonts/cascadia-code-regular.woff2"),
+);
+const production = JSON.parse(
+  readFileSync(join(web, "assets/licences/asset-inventory.json"), "utf8"),
+);
+const realFace = production.assets.find((a) => a.id === "cascadia-code")
+  .distributedFiles[0];
 
 const mono = () => ({
   schemaVersion: 1,
@@ -103,6 +115,7 @@ const sans = () => ({
 });
 
 const fontPath = (id) => `assets/fonts/${id}/Regular.woff2`;
+const sourcePath = (id) => `web/src/theme/fonts/${id}.woff2`;
 const shipped = (record) => ({
   ...record,
   shipped: true,
@@ -116,6 +129,10 @@ const shipped = (record) => ({
       distPath: fontPath(record.id),
       sha256: hash(font),
       fromOriginal: "regular",
+      sourcePath: sourcePath(record.id),
+      byteLength: font.length,
+      face: { ...realFace.face, familyAlias: record.family },
+      coverage: realFace.coverage,
     },
   ],
 });
@@ -153,9 +170,18 @@ function repoFixture(records, { text, texts = notices } = {}) {
     join(licences, "asset-inventory.json"),
     text ?? JSON.stringify(inventory(assets), null, 2),
   );
+  const { bytes } = generateFaces(inventory(assets));
+  if (bytes !== null)
+    write(
+      join(licences, "font-slice.json"),
+      JSON.stringify({ sha256: hash(bytes), byteLength: bytes.length }),
+    );
   for (const record of assets) {
     if (texts[record.id] !== undefined)
       write(join(licences, record.id, "OFL.txt"), texts[record.id]);
+    for (const file of record.distributedFiles ?? [])
+      if (typeof file.sourcePath === "string")
+        write(join(root, file.sourcePath), font);
   }
   return { base, root, licences };
 }
@@ -182,7 +208,9 @@ function outputFixture(assets, options = {}) {
   const fixture = repoFixture(assets, options);
   const output = join(fixture.base, "dist");
   const owned = {};
-  for (const [path, content] of Object.entries(built)) {
+  const { bytes, count } = generateFaces(inventory(assets.map(sealed)));
+  const sheets = count > 0 ? { "assets/app.css": `@layer base{${bytes}}` } : {};
+  for (const [path, content] of Object.entries({ ...built, ...sheets })) {
     write(join(output, path), content);
     owned[path] = hash(content);
   }
@@ -216,22 +244,22 @@ const fails = (problems, pattern) =>
 // Suites timed at 30_000 spawn the check or the stage runner; Node loads them cold.
 
 describe("asset licence metadata", () => {
-  it("A71 the production inventory passes, and says it is no shipping acceptance", () => {
+  it("A71 the production inventory passes, and says it is no shipping acceptance", async () => {
     const r = run([]);
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/not a shipping acceptance/u);
     expect(r.stdout).not.toMatch(/output closure valid/u);
   });
 
-  it("A72 unshipped metadata-only records pass in an isolated root", () => {
-    expect(check(repoFixture([mono(), sans()]))).toEqual([]);
+  it("A72 unshipped metadata-only records pass in an isolated root", async () => {
+    expect(await check(repoFixture([mono(), sans()]))).toEqual([]);
   });
 
-  it("A73 malformed JSON fails", () => {
-    fails(check(repoFixture([mono()], { text: "{ " })), /JSON/u);
+  it("A73 malformed JSON fails", async () => {
+    fails(await check(repoFixture([mono()], { text: "{ " })), /JSON/u);
   });
 
-  it("A74 unknown fields, wrong types and short identifiers fail", () => {
+  it("A74 unknown fields, wrong types and short identifiers fail", async () => {
     const cases = [
       [{ ...mono(), note: "x" }, /additional properties/u],
       [{ ...mono(), shipped: "no" }, /boolean/u],
@@ -247,145 +275,158 @@ describe("asset licence metadata", () => {
       [{ ...mono(), originalFiles: [] }, /originalFiles/u],
     ];
     for (const [record, pattern] of cases)
-      fails(check(repoFixture([record])), pattern);
+      fails(await check(repoFixture([record])), pattern);
     const extra = repoFixture([], {
       text: JSON.stringify({ ...inventory([]), extra: true }),
     });
-    fails(check(extra), /additional properties/u);
+    fails(await check(extra), /additional properties/u);
   });
 
-  it("A75 unknown, disallowed and compound licence identifiers fail", () => {
+  it("A75 unknown, disallowed and compound licence identifiers fail", async () => {
     for (const licence of ["OFL-9.9", "MIT", "OFL-1.1 OR MIT", "ofl-1.1"])
-      fails(check(repoFixture([{ ...mono(), licence }])), /licence/u);
+      fails(await check(repoFixture([{ ...mono(), licence }])), /licence/u);
     const wider = repoFixture([], {
       text: JSON.stringify({
         ...inventory([]),
         allowedLicences: ["OFL-1.1", "MIT"],
       }),
     });
-    fails(check(wider), /allowedLicences/u);
+    fails(await check(wider), /allowedLicences/u);
   });
 
-  it("A76 only transformation kinds none and subset are accepted", () => {
+  it("A76 only transformation kinds none, subset and woff2 are accepted", async () => {
     fails(
-      check(repoFixture([{ ...mono(), transformation: { kind: "rename" } }])),
+      await check(
+        repoFixture([{ ...mono(), transformation: { kind: "rename" } }]),
+      ),
       /transformation/u,
     );
     const partial = { kind: "subset", tool: "t", version: "1", options: [] };
     fails(
-      check(repoFixture([{ ...mono(), transformation: partial }])),
+      await check(repoFixture([{ ...mono(), transformation: partial }])),
       /transformation/u,
     );
     const ghost = { ...partial, inputs: ["missing"] };
     fails(
-      check(repoFixture([{ ...mono(), transformation: ghost }])),
+      await check(repoFixture([{ ...mono(), transformation: ghost }])),
       /input missing is not an original/u,
     );
   });
 
-  it("A77 unshipped records carry no distribution; shipped ones need files", () => {
+  it("A77 unshipped records carry no distribution; shipped ones need files", async () => {
     const leaked = { ...shipped(mono()), shipped: false };
-    fails(check(repoFixture([leaked])), /distributedFiles/u);
+    fails(await check(repoFixture([leaked])), /distributedFiles/u);
     const named = { ...mono(), distributedFamilyName: "Sample Mono" };
-    fails(check(repoFixture([named])), /distributedFamilyName/u);
+    fails(await check(repoFixture([named])), /distributedFamilyName/u);
     const empty = { ...shipped(mono()), distributedFiles: [] };
-    fails(check(repoFixture([empty])), /distributedFiles/u);
+    fails(await check(repoFixture([empty])), /distributedFiles/u);
   });
 
-  it("A78 duplicate ids and overlapping output paths fail", () => {
+  it("A78 duplicate ids and overlapping output paths fail", async () => {
     fails(
-      check(repoFixture([mono(), mono()])),
+      await check(repoFixture([mono(), mono()])),
       /id sample-mono is not unique/u,
     );
     const a = outputFixture([shipped(mono())]);
     const clash = shipped(sans());
     clash.distributedFiles[0].distPath = fontPath("sample-mono");
     const both = outputFixture([shipped(mono()), clash]);
-    fails(check(both), /owned by both/u);
+    fails(await check(both), /owned by both/u);
     const cased = shipped(sans());
     cased.distributedFiles[0].distPath = fontPath("Sample-Mono");
-    fails(check(outputFixture([shipped(mono()), cased])), /owned by both/u);
+    fails(
+      await check(outputFixture([shipped(mono()), cased])),
+      /owned by both/u,
+    );
     const guard = new Map([...a.owned, [fontPath("sample-mono"), hash(font)]]);
-    fails(check({ ...a, owned: guard }), /owned by both the build guard/u);
+    fails(
+      await check({ ...a, owned: guard }),
+      /owned by both the build guard/u,
+    );
   });
 
-  it("A79 licence texts must match, carry the notice and be declared", () => {
+  it("A79 licence texts must match, carry the notice and be declared", async () => {
     const altered = repoFixture([mono()], {
       texts: { "sample-mono": `${monoNotice} ` },
     });
-    fails(check(altered), /licence text hash does not match/u);
-    fails(check(repoFixture([mono()], { texts: {} })), /cannot read licence/u);
+    fails(await check(altered), /licence text hash does not match/u);
+    fails(
+      await check(repoFixture([mono()], { texts: {} })),
+      /cannot read licence/u,
+    );
     const stray = repoFixture([mono()]);
     write(join(stray.licences, "sample-mono", "NOTES.txt"), "x\n");
-    fails(check(stray), /NOTES.txt is not declared/u);
+    fails(await check(stray), /NOTES.txt is not declared/u);
     fails(
-      check(repoFixture([{ ...mono(), copyright: "Copyright 1999 Nobody." }])),
+      await check(
+        repoFixture([{ ...mono(), copyright: "Copyright 1999 Nobody." }]),
+      ),
       /does not carry the copyright/u,
     );
     fails(
-      check(repoFixture([{ ...mono(), reservedFontNames: [] }])),
+      await check(repoFixture([{ ...mono(), reservedFontNames: [] }])),
       /reserves a font name/u,
     );
     const moved = {
       ...mono(),
       licenceText: { ...mono().licenceText, sourcePath: "web/OFL.txt" },
     };
-    fails(check(repoFixture([moved])), /must be stored at/u);
+    fails(await check(repoFixture([moved])), /must be stored at/u);
   });
 
-  it("A90 each reserved name appears verbatim in the notice", () => {
+  it("A90 each reserved name appears verbatim in the notice", async () => {
     const named = (reservedFontNames) =>
       check(repoFixture([{ ...mono(), reservedFontNames }]));
     fails(
-      named(["Other Mono"]),
+      await named(["Other Mono"]),
       /reserved name Other Mono is not in the notice/u,
     );
     fails(
-      named(["sample mono"]),
+      await named(["sample mono"]),
       /reserved name sample mono is not in the notice/u,
     );
-    fails(named(["Sample Mono", "Sample Mono"]), /duplicate items/u);
-    fails(named([" "]), /reservedFontNames\/0/u);
+    fails(await named(["Sample Mono", "Sample Mono"]), /duplicate items/u);
+    fails(await named([" "]), /reservedFontNames\/0/u);
     const two = withNotice(
       'Copyright 2026 Fixture Authors, with Reserved Font Names "Sample Mono" and "Sample Code".',
     );
-    expect(check(two(["Sample Mono", "Sample Code"]))).toEqual([]);
+    expect(await check(two(["Sample Mono", "Sample Code"]))).toEqual([]);
     // Whitespace is compared exactly, so differently spaced text is another name.
     for (const name of ["Sample\tMono", "Sample  Mono"]) {
       const spaced = withNotice(
         `Copyright 2026 Fixture Authors, with Reserved Font Name ${name}.`,
       );
       fails(
-        check(spaced(["Sample Mono"])),
+        await check(spaced(["Sample Mono"])),
         /reserved name Sample Mono is not in the notice/u,
       );
     }
   });
 
-  it("A93 the notice ends at exactly one licence body marker", () => {
+  it("A93 the notice ends at exactly one licence body marker", async () => {
     const copyright = "Copyright 2026 Fixture Authors.";
     const missing = withText(
       copyright,
       sansNotice.replace("SIL OPEN FONT LICENSE", "SIL Open Font License"),
     );
     fails(
-      check(missing([])),
+      await check(missing([])),
       /must hold "SIL OPEN FONT LICENSE Version 1\.1" exactly once/u,
     );
     const twice = withText(copyright, `${sansNotice}${body.join("\n")}`);
-    fails(check(twice([])), /exactly once/u);
+    fails(await check(twice([])), /exactly once/u);
     const spaced = withText(
       copyright,
       sansNotice.replace("SIL OPEN FONT LICENSE", "SIL  OPEN FONT LICENSE"),
     );
-    fails(check(spaced([])), /exactly once/u);
+    fails(await check(spaced([])), /exactly once/u);
     // The term in the licence body below the marker never asks for a list.
-    expect(check(repoFixture([sans()]))).toEqual([]);
+    expect(await check(repoFixture([sans()]))).toEqual([]);
   });
 
-  it("A94 a reservation needs a list; only a listed negative covers its own occurrence", () => {
+  it("A94 a reservation needs a list; only a listed negative covers its own occurrence", async () => {
     fails(
-      check(repoFixture([{ ...mono(), reservedFontNames: [] }])),
+      await check(repoFixture([{ ...mono(), reservedFontNames: [] }])),
       /the notice reserves a font name but the list is empty/u,
     );
     for (const negative of [
@@ -393,26 +434,37 @@ describe("asset licence metadata", () => {
       "with no Reserved Font Names.",
     ]) {
       const only = withNotice(`Copyright 2026 Fixture Authors, ${negative}`);
-      expect(check(only([]))).toEqual([]);
+      expect(await check(only([]))).toEqual([]);
     }
     const mixed = withNotice(
       "Copyright 2026 Fixture Authors, with no Reserved Font Name. Copyright 2027 Other Authors, with Reserved Font Name Other Mono.",
     );
-    fails(check(mixed([])), /reserves a font name but the list is empty/u);
-    expect(check(mixed(["Other Mono"]))).toEqual([]);
+    fails(
+      await check(mixed([])),
+      /reserves a font name but the list is empty/u,
+    );
+    expect(await check(mixed(["Other Mono"]))).toEqual([]);
     const unlisted = withNotice(
       "Copyright 2026 Fixture Authors, with no reserved font name.",
     );
-    fails(check(unlisted([])), /reserves a font name but the list is empty/u);
+    fails(
+      await check(unlisted([])),
+      /reserves a font name but the list is empty/u,
+    );
     const tabbed = withNotice(
       "Copyright 2026 Fixture Authors, with\tno Reserved Font Name.",
     );
-    fails(check(tabbed([])), /reserves a font name but the list is empty/u);
+    fails(
+      await check(tabbed([])),
+      /reserves a font name but the list is empty/u,
+    );
   });
 
-  it("A95 declarationHash binds the licence hash to the reserved names", () => {
+  it("A95 declarationHash binds the licence hash to the reserved names", async () => {
     fails(
-      check(repoFixture([{ ...mono(), declarationHash: "0".repeat(64) }])),
+      await check(
+        repoFixture([{ ...mono(), declarationHash: "0".repeat(64) }]),
+      ),
       /declarationHash does not match/u,
     );
     const edited = {
@@ -420,7 +472,10 @@ describe("asset licence metadata", () => {
       reservedFontNames: ["Sample Mono", "Fixture Authors"],
       declarationHash: declared(mono()),
     };
-    fails(check(repoFixture([edited])), /declarationHash does not match/u);
+    fails(
+      await check(repoFixture([edited])),
+      /declarationHash does not match/u,
+    );
     // The list is order-significant, so a reorder is an edit too.
     const pair = { ...mono(), reservedFontNames: ["Sample Mono", "Fixture"] };
     const reordered = {
@@ -428,26 +483,29 @@ describe("asset licence metadata", () => {
       reservedFontNames: ["Fixture", "Sample Mono"],
       declarationHash: declared(pair),
     };
-    expect(check(repoFixture([pair]))).toEqual([]);
-    fails(check(repoFixture([reordered])), /declarationHash does not match/u);
+    expect(await check(repoFixture([pair]))).toEqual([]);
+    fails(
+      await check(repoFixture([reordered])),
+      /declarationHash does not match/u,
+    );
     const relicensed = {
       ...mono(),
       licenceText: { ...mono().licenceText, sha256: hash(sansNotice) },
       declarationHash: declared(mono()),
     };
     fails(
-      check(
+      await check(
         repoFixture([relicensed], { texts: { "sample-mono": sansNotice } }),
       ),
       /declarationHash does not match/u,
     );
     fails(
-      check(repoFixture([{ ...mono(), declarationHash: "ab" }])),
+      await check(repoFixture([{ ...mono(), declarationHash: "ab" }])),
       /declarationHash/u,
     );
   });
 
-  it("A95b declarationHash matches fixed digests of the hex string and UTF-8 names", () => {
+  it("A95b declarationHash matches fixed digests of the hex string and UTF-8 names", async () => {
     const copyright =
       "Copyright 2026 Fixture Authors, with Reserved Font Name Ünïcode Sans.";
     const text = ofl(copyright);
@@ -469,18 +527,18 @@ describe("asset licence metadata", () => {
       );
     const hexString =
       "923b57a9255a661e9282190f47ab18e0e0bc8d270a1aaca3a2b9299c2e8ff800";
-    expect(fixture(hexString)).toEqual([]);
+    expect(await fixture(hexString)).toEqual([]);
     // Digest bytes in place of the hex string give a different, rejected value.
     const digestBytes =
       "e03fac2fb4e90b7ab316ade01ba11179b51f41c36f3f502543abea7bde5ccb96";
-    fails(fixture(digestBytes), /declarationHash does not match/u);
+    fails(await fixture(digestBytes), /declarationHash does not match/u);
     // Names encoded as Latin-1 rather than UTF-8 are rejected too.
     const latin1 =
       "12aeedc7fe5f9e8fe3cc8d95e302a73305c05effe6647be8e1bb9fe7b64b7fe4";
-    fails(fixture(latin1), /declarationHash does not match/u);
+    fails(await fixture(latin1), /declarationHash does not match/u);
   });
 
-  it("A96 the three production records carry the reviewed names and their hashes", () => {
+  it("A96 the three production records carry the reviewed names and their hashes", async () => {
     const real = JSON.parse(
       readFileSync(
         join(web, "assets", "licences", "asset-inventory.json"),
@@ -497,32 +555,32 @@ describe("asset licence metadata", () => {
     });
     for (const asset of real.assets)
       expect(asset.declarationHash).toBe(declared(asset));
-    expect(check({ root: join(web, "..") })).toEqual([]);
+    expect(await check({ root: join(web, "..") })).toEqual([]);
   });
 
-  it("A97 a misreading of a declaration is a review boundary, not a detection claim", () => {
+  it("A97 a misreading of a declaration is a review boundary, not a detection claim", async () => {
     // Each listed name occurs verbatim, so only the reviewer can see the list is wrong.
     const split = withNotice(
       'Copyright 2026 Fixture Authors, with Reserved Font Name "Sample. Mono".',
     );
-    expect(check(split(["Sample"]))).toEqual([]);
+    expect(await check(split(["Sample"]))).toEqual([]);
     const joined = withNotice(
       'Copyright 2026 Fixture Authors, with Reserved Font Names "Sample and Code" and "Other Mono".',
     );
-    expect(check(joined(["Sample", "Code", "Other Mono"]))).toEqual([]);
+    expect(await check(joined(["Sample", "Code", "Other Mono"]))).toEqual([]);
   });
 
-  it("A91 declared output paths are safe and unique without a build", () => {
+  it("A91 declared output paths are safe and unique without a build", async () => {
     const escaping = shipped(mono());
     escaping.distributedFiles[0].distPath = "../font.ttf";
     fails(
-      check(repoFixture([escaping])),
+      await check(repoFixture([escaping])),
       /output path \.\.\/font.ttf has a dot segment/u,
     );
     const licence = shipped(mono());
     licence.licenceText.distributionPath = "../OFL.txt";
     fails(
-      check(repoFixture([licence])),
+      await check(repoFixture([licence])),
       /output path \.\.\/OFL.txt has a dot segment/u,
     );
     for (const other of ["assets/shared.ttf", "Assets/Shared.TTF"]) {
@@ -531,13 +589,13 @@ describe("asset licence metadata", () => {
       const second = shipped(sans());
       second.distributedFiles[0].distPath = other;
       fails(
-        check(repoFixture([first, second])),
+        await check(repoFixture([first, second])),
         /is owned by both asset sample-mono and asset sample-sans/u,
       );
     }
   });
 
-  it("A80 traversal, absolute, backslash and case-colliding paths fail", () => {
+  it("A80 traversal, absolute, backslash and case-colliding paths fail", async () => {
     for (const distPath of [
       "assets/../../escape.woff2",
       "./assets/x.woff2",
@@ -548,7 +606,7 @@ describe("asset licence metadata", () => {
       const record = shipped(mono());
       record.distributedFiles[0].distPath = distPath;
       fails(
-        check(outputFixture([record])),
+        await check(outputFixture([record])),
         /output path .* (has a dot segment|is absolute|uses a backslash)|distPath: should match pattern/u,
       );
     }
@@ -559,32 +617,32 @@ describe("asset licence metadata", () => {
         sourcePath: "web/assets/licences/../../../OFL.txt",
       },
     };
-    fails(check(repoFixture([traversal])), /must be stored at/u);
+    fails(await check(repoFixture([traversal])), /must be stored at/u);
     const caseOnly = repoFixture([mono()]);
     write(join(caseOnly.licences, "Sample-Mono", "x.txt"), "x\n");
-    fails(check(caseOnly), /collides in case|x.txt is not declared/u);
+    fails(await check(caseOnly), /collides in case|x.txt is not declared/u);
   });
 
-  it("A81 links and junctions fail closed in the repository and the output", () => {
+  it("A81 links and junctions fail closed in the repository and the output", async () => {
     const repoLinked = repoFixture([mono()], { texts: {} });
     const elsewhere = join(repoLinked.base, "elsewhere");
     write(join(elsewhere, "OFL.txt"), monoNotice);
     link(elsewhere, join(repoLinked.licences, "sample-mono"));
-    fails(check(repoLinked), /link or junction/u);
+    fails(await check(repoLinked), /link or junction/u);
 
     const out = outputFixture([shipped(mono())]);
     link(elsewhere, join(out.output, "assets", "more"));
-    fails(check(out), /link or junction/u);
+    fails(await check(out), /link or junction/u);
 
     const moved = outputFixture([shipped(mono())]);
     const real = `${moved.output}-real`;
     rmSync(moved.output, { recursive: true });
     mkdirSync(real);
     link(real, moved.output);
-    fails(check(moved), /not a real directory/u);
+    fails(await check(moved), /not a real directory/u);
   });
 
-  it("A82 read failures fail closed", () => {
+  it("A82 read failures fail closed", async () => {
     const fixture = outputFixture([shipped(mono())]);
     const denied = Object.assign(new Error("denied"), { code: "EACCES" });
     const failing = {
@@ -592,54 +650,36 @@ describe("asset licence metadata", () => {
         throw denied;
       },
     };
-    fails(check(fixture, failing), /cannot list .*denied/u);
-    fails(check(fixture, failing), /cannot read the output: denied/u);
+    fails(await check(fixture, failing), /cannot list .*denied/u);
+    fails(await check(fixture, failing), /cannot read the output: denied/u);
     const unreadable = {
       readFile: (path) => {
         if (String(path).endsWith("OFL.txt")) throw denied;
         return readFileSync(path);
       },
     };
-    fails(check(fixture, unreadable), /cannot read licence text: denied/u);
+    fails(
+      await check(fixture, unreadable),
+      /cannot read licence text: denied/u,
+    );
   });
 
-  it("A83 production records stay unshipped until the build guard admits fonts", () => {
-    const real = JSON.parse(
-      readFileSync(join(web, "assets/licences/asset-inventory.json"), "utf8"),
+  it("A83 production records are admitted for the guard with their licence texts", async () => {
+    const admitted = await assetAdmission({ root: join(web, "..") });
+    expect(admitted.problems).toEqual([]);
+    expect(admitted.licenceTexts.map(({ path }) => path).sort()).toEqual([
+      "assets/licences/cascadia-code/OFL.txt",
+      "assets/licences/noto-sans-display/OFL.txt",
+      "assets/licences/noto-sans/OFL.txt",
+    ]);
+    const shippedFiles = admitted.inventory.assets.flatMap((a) =>
+      a.distributedFiles.map((file) => file.distPath),
     );
-    const record = real.assets.find((a) => a.id === "noto-sans");
-    const promoted = {
-      ...real,
-      assets: [
-        {
-          ...record,
-          shipped: true,
-          distributedFamilyName: record.family,
-          licenceText: {
-            ...record.licenceText,
-            distributionPath: "assets/fonts/noto-sans/OFL.txt",
-          },
-          distributedFiles: [
-            {
-              distPath: "assets/fonts/noto-sans/NotoSans.ttf",
-              sha256: record.originalFiles[0].sha256,
-              fromOriginal: record.originalFiles[0].id,
-            },
-          ],
-        },
-        ...real.assets.filter((a) => a !== record),
-      ],
-    };
-    const seams = {
-      readFile: (path) =>
-        String(path).endsWith("asset-inventory.json")
-          ? Buffer.from(JSON.stringify(promoted))
-          : readFileSync(path),
-    };
-    fails(
-      checkAssets({}, seams),
-      /asset noto-sans: no font ships until the build guard admits fonts/u,
-    );
+    expect(shippedFiles.sort()).toEqual([
+      "assets/cascadia-code-regular.woff2",
+      "assets/noto-sans-display.woff2",
+      "assets/noto-sans.woff2",
+    ]);
   });
 }, 30_000);
 
@@ -650,7 +690,7 @@ describe("asset licence output closure", () => {
     return file;
   };
 
-  it("A84 an isolated complete output passes from the command line", () => {
+  it("A84 an isolated complete output passes from the command line", async () => {
     const fixture = outputFixture([shipped(mono()), sans()]);
     const r = run([
       "--root",
@@ -664,7 +704,7 @@ describe("asset licence output closure", () => {
     expect(r.status).toBe(0);
   });
 
-  it("A85 an absent output directory or owned list is a failure", () => {
+  it("A85 an absent output directory or owned list is a failure", async () => {
     const fixture = outputFixture([mono()]);
     const absent = join(fixture.base, "missing");
     const r = run([
@@ -680,10 +720,13 @@ describe("asset licence output closure", () => {
     const alone = run(["--root", fixture.root, "--output", fixture.output]);
     expect(alone.status).toBe(1);
     expect(alone.stdout).toMatch(/go together/u);
-    fails(check({ ...fixture, owned: null }), /needs the build-guard-owned/u);
+    fails(
+      await check({ ...fixture, owned: null }),
+      /needs the build-guard-owned/u,
+    );
   });
 
-  it("A92 a repeated key in the owned list fails instead of being merged", () => {
+  it("A92 a repeated key in the owned list fails instead of being merged", async () => {
     const fixture = outputFixture([]);
     const entry = `"index.html": "${fixture.owned.get("index.html")}"`;
     const rest = `"assets/app.js": "${fixture.owned.get("assets/app.js")}"`;
@@ -706,39 +749,45 @@ describe("asset licence output closure", () => {
     }
   });
 
-  it("A86 extra, missing, mismatched and altered outputs fail", () => {
+  it("A86 extra, missing, mismatched and altered outputs fail", async () => {
     const disguised = outputFixture([shipped(mono())]);
     write(join(disguised.output, "assets", "extra.js"), "x;\n");
-    fails(check(disguised), /unowned file assets\/extra.js/u);
+    fails(await check(disguised), /unowned file assets\/extra.js/u);
 
     const noFont = outputFixture([shipped(mono())]);
     rmSync(join(noFont.output, fontPath("sample-mono")));
-    fails(check(noFont), /missing assets\/fonts\/sample-mono\/Regular.woff2/u);
+    fails(
+      await check(noFont),
+      /missing assets\/fonts\/sample-mono\/Regular.woff2/u,
+    );
 
     const swapped = outputFixture([shipped(mono())]);
     write(join(swapped.output, fontPath("sample-mono")), "other bytes\n");
-    fails(check(swapped), /Regular.woff2 differs from its hash/u);
+    fails(await check(swapped), /Regular.woff2 differs from its hash/u);
 
     const noLicence = outputFixture([shipped(mono())]);
     rmSync(join(noLicence.output, "assets/fonts/sample-mono/OFL.txt"));
-    fails(check(noLicence), /missing assets\/fonts\/sample-mono\/OFL.txt/u);
+    fails(
+      await check(noLicence),
+      /missing assets\/fonts\/sample-mono\/OFL.txt/u,
+    );
 
     const edited = outputFixture([shipped(mono())]);
     write(
       join(edited.output, "assets/fonts/sample-mono/OFL.txt"),
       monoNotice.replace("2026", "2025"),
     );
-    fails(check(edited), /OFL.txt differs from its hash/u);
+    fails(await check(edited), /OFL.txt differs from its hash/u);
 
     const relabelled = shipped(mono());
     relabelled.distributedFiles[0].sha256 = hash("other bytes\n");
     fails(
-      check(outputFixture([relabelled])),
+      await check(outputFixture([relabelled])),
       /is untransformed but differs from its original/u,
     );
   });
 
-  it("A87 a modified font with a reserved name must take a new identity", () => {
+  it("A87 a modified font with a reserved name must take a new identity", async () => {
     const subset = (record, rename) => ({
       ...shipped(record),
       transformation: {
@@ -751,11 +800,11 @@ describe("asset licence output closure", () => {
       ...rename,
     });
     fails(
-      check(repoFixture([subset(mono(), { renamedIdentity: false })])),
+      await check(repoFixture([subset(mono(), { renamedIdentity: false })])),
       /modified font with a reserved name is not renamed/u,
     );
     fails(
-      check(
+      await check(
         repoFixture([
           subset(mono(), {
             renamedIdentity: true,
@@ -765,7 +814,7 @@ describe("asset licence output closure", () => {
       ),
       /distributed family keeps reserved name Sample Mono/u,
     );
-    const renamed = check(
+    const renamed = await check(
       repoFixture([
         subset(mono(), {
           renamedIdentity: true,
@@ -774,7 +823,7 @@ describe("asset licence output closure", () => {
       ]),
     );
     expect(renamed.join("\n")).not.toMatch(/reserved|renamed|copyright/u);
-    fails(renamed, /modified fonts cannot ship until binary naming/u);
+    fails(renamed, /a subset font cannot ship without a pinned subset tool/u);
   });
 }, 30_000);
 
@@ -802,7 +851,7 @@ setExitCode();
     return r;
   };
 
-  it("A88 a failing inventory fails the check run, and a valid one passes", () => {
+  it("A88 a failing inventory fails the check run, and a valid one passes", async () => {
     const bad = runStage(repoFixture([{ ...mono(), licence: "MIT" }]).root);
     expect(bad.status).toBe(1);
     expect(bad.stdout).toMatch(/FAIL asset licence inventory/u);
@@ -811,7 +860,7 @@ setExitCode();
     expect(good.status).toBe(0);
   });
 
-  it("A89 the build guard still rejects a font output", () => {
+  it("A89 the build guard rejects a font output no inventory binds", async () => {
     const bundle = {
       "assets/app.js": { fileName: "assets/app.js", type: "chunk", code: "x" },
       "index.html": { fileName: "index.html", type: "asset", source: "<p>" },
@@ -822,5 +871,17 @@ setExitCode();
       },
     };
     expect(() => snapshot(bundle)).toThrow(/unexpected asset output/u);
+    const orphan = {
+      ...bundle,
+      "assets/orphan.woff2": {
+        fileName: "assets/orphan.woff2",
+        type: "asset",
+        source: new Uint8Array([1]),
+      },
+    };
+    delete orphan[fontPath("sample-mono")];
+    expect(() => snapshot(orphan)).toThrow(
+      /output has an unowned file assets\/orphan\.woff2/u,
+    );
   });
 }, 30_000);
