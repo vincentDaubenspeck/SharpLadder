@@ -728,7 +728,7 @@ function summaryStatus(name, outcome, rows) {
   rmSync(out, { recursive: true, force: true });
   fixtureRun(
     out,
-    Array.from({ length: rows }, () => 0),
+    Array.from({ length: rows }, () => false),
   );
   const lines = [];
   const status = summaryReport({
@@ -752,16 +752,16 @@ const passed = summaryStatus("passed", "success", 6);
 report(
   passed.status === 0 &&
     passed.text.startsWith(
-      "Post-restore: 6/6 cycles completed; 6 exact, 0 failed, 0 incomplete; high-contrast step: success.\n",
+      "Post-restore: 6/6 cycles completed; 6 verified, 0 failed, 0 incomplete; high-contrast step: success.\n",
     ),
-  "the summary passes six exact cycles after a successful step and writes the line to the job summary",
+  "the summary passes six verified cycles after a successful step and writes the line to the job summary",
   passed.lines.join(" | "),
 );
 const stepFailed = summaryStatus("step-failed", "failure", 6);
 report(
   stepFailed.status === 1 &&
     stepFailed.text.startsWith(
-      "Post-restore: 6/6 cycles completed; 6 exact, 0 failed, 0 incomplete; high-contrast step: failure.\n",
+      "Post-restore: 6/6 cycles completed; 6 verified, 0 failed, 0 incomplete; high-contrast step: failure.\n",
     ),
   "the summary still writes the line and fails when the high-contrast step failed",
   stepFailed.lines.join(" | "),

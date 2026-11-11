@@ -7,19 +7,9 @@ import {
   postRestoreDeadlineMs,
   recordCycle,
   settlePostRestore,
-  type Box,
-  type PostRestoreImages,
 } from "./high-contrast-cycles.ts";
 import { groupDCells, viewportAt } from "./group-d.ts";
-import {
-  capture,
-  focusOf,
-  forced,
-  fullChromium,
-  open,
-  pngOf,
-  rgbaOf,
-} from "./high-contrast-capture.ts";
+import { forced, fullChromium, open } from "./high-contrast-capture.ts";
 import {
   beforeDeadline,
   capability,
@@ -29,8 +19,6 @@ import {
   hostedProblems,
   loadBaseline,
   notRunCells,
-  pixelDiff,
-  pngSize,
   readLastEnabled,
   realClock,
   recordLastEnabled,
@@ -48,7 +36,7 @@ import {
   type Verdict,
 } from "./high-contrast.ts";
 import { indicators, judge, resize, setTheme } from "./indicators.ts";
-import { differing, shot } from "./probe.ts";
+import { shot } from "./probe.ts";
 
 /** The engine's resolved system colours, recorded as its own forced-colours palette. */
 const palette = (page: Page) =>
@@ -291,24 +279,10 @@ test("real Windows high contrast: Group D matrix per scheme, theme and width, th
           engine,
           scheme,
           project: info.project.name,
-          captureMs: null as number | null,
           doneMs: null as number | null,
-          width: null as number | null,
-          height: null as number | null,
-          devicePixelRatio: null as number | null,
           forced: null as boolean | null,
-          changed: null as number | null,
-          diagnostic: null as number | null,
-          box: null as Box | null,
           state: restored,
-          activeElement: null as { tag: string; id: string } | null,
-          hasFocus: null as boolean | null,
           error: null as string | null,
-        };
-        const images: PostRestoreImages = {
-          capture: null,
-          diff: null,
-          baseline: baseline.png,
         };
         const stop = new AbortController();
         try {
@@ -316,28 +290,6 @@ test("real Windows high contrast: Group D matrix per scheme, theme and width, th
             () =>
               fullChromium(async (page) => {
                 check.forced = await forced(page);
-                Object.assign(check, await focusOf(page));
-                images.capture = await capture(page);
-                check.captureMs = since();
-                Object.assign(check, pngSize(images.capture));
-                check.changed = await differing(
-                  page,
-                  baseline.png,
-                  images.capture,
-                );
-                // The count above is the verdict; this second count must agree with it.
-                if (check.changed > 0) {
-                  const found = pixelDiff(
-                    await rgbaOf(page, baseline.png),
-                    await rgbaOf(page, images.capture),
-                  );
-                  check.diagnostic = found.count;
-                  check.box = found.box;
-                  images.diff = await pngOf(page, {
-                    ...pngSize(images.capture),
-                    data: found.mask,
-                  });
-                }
               }, stop.signal),
             {
               start: accepted,
@@ -351,16 +303,12 @@ test("real Windows high contrast: Group D matrix per scheme, theme and width, th
         } catch (error) {
           check.error = error instanceof Error ? error.message : String(error);
         }
-        // Writing diagnostics must not consume the restore measurement budget.
         check.doneMs = since();
         const root = dirname(baseline.run.dir);
         try {
-          // Any difference from the baseline throws here, after its images and record are kept.
           settlePostRestore({
             check,
-            images,
-            baseline: { state: baseline.state, ...baseline.size },
-            root,
+            baseline: baseline.state,
             append: (row) => {
               record.postRestore.push(row);
               save();

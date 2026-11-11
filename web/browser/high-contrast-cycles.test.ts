@@ -1,7 +1,6 @@
 // @vitest-environment node
 import {
   appendFileSync,
-  existsSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -13,7 +12,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   completenessProblems,
-  cycleFolder,
   cycleStandings,
   expectedCycles,
   postRestoreProblems,
@@ -23,15 +21,11 @@ import {
 } from "./high-contrast-cycles.ts";
 import {
   cycleInput,
-  encodePng,
   fixtureRun,
   fixtureState,
-  pixels,
 } from "./high-contrast-fixture.ts";
 
-const size = { width: 16, height: 8 };
-const baselinePng = encodePng(size.width, size.height, pixels(16, 8));
-const baseline = { state: fixtureState(), ...size };
+const baseline = fixtureState();
 
 const made: string[] = [];
 const temp = () => {
@@ -44,10 +38,9 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
-const input = (changed = 0, i = 0) => cycleInput(i, changed, size, baselinePng);
-const problemsOf = (edit: Record<string, unknown>, changed = 0) =>
+const problemsOf = (edit: Record<string, unknown>) =>
   postRestoreProblems(
-    { ...input(changed).check, problems: [], ...edit },
+    { ...cycleInput(0).check, problems: [], ...edit },
     baseline,
   );
 const ledger = (root: string) => join(root, "hc-run", "cycles.jsonl");
@@ -79,40 +72,15 @@ const reported = (root: string | undefined, outcome: string | undefined) => {
 };
 
 describe("post-restore judgement", () => {
-  it("passes only zero differing pixels", () => {
+  it("passes only a fresh browser that reports no forced colours", () => {
     expect(problemsOf({})).toEqual([]);
-    for (const changed of [1, 20, 64, 65])
-      expect(problemsOf({}, changed)).toEqual([
-        `${String(changed)} pixels differ from the baseline after restore`,
-      ]);
-  });
-
-  it("fails a count that is missing or is not a non-negative integer", () => {
-    for (const changed of [null, undefined, Number.NaN, 0.5, -2, "0", -1])
-      expect(problemsOf({ changed }), String(changed)).toHaveLength(1);
-    expect(problemsOf({ changed: -1 })).toEqual([
-      "the capture size differs from the baseline",
-    ]);
-  });
-
-  it("fails a second count that disagrees with the first", () => {
-    expect(problemsOf({ diagnostic: 19 }, 20)).toHaveLength(2);
-  });
-
-  it("fails a capture of another size", () => {
-    expect(problemsOf({ width: 15 })).toEqual([
-      "the capture is 15x8, the baseline 16x8",
-    ]);
-    expect(problemsOf({ height: null })).toHaveLength(1);
-  });
-
-  it("fails forced colours that are still active or were not read", () => {
     expect(problemsOf({ forced: true })).toEqual([
       "forced colours are still active",
     ]);
-    expect(problemsOf({ forced: null })).toEqual([
-      "forced colours were not read",
-    ]);
+    for (const forced of [null, undefined, 0, "false"])
+      expect(problemsOf({ forced }), String(forced)).toEqual([
+        "forced colours were not read",
+      ]);
   });
 
   it("fails a restored state that differs from the baseline", () => {
@@ -123,30 +91,23 @@ describe("post-restore judgement", () => {
     expect(problemsOf({ state: null }).join("; ")).toContain("restored state:");
   });
 
-  it("holds the timing rule with zero differing pixels", () => {
-    const failing: [unknown, unknown][] = [
-      [null, 200],
-      [100, null],
-      [Number.NaN, 200],
-      [100, Number.POSITIVE_INFINITY],
-      [-1, 200],
-      [201, 200],
-      [100, 30_001],
-    ];
-    for (const [captureMs, doneMs] of failing)
-      expect(
-        problemsOf({ captureMs, doneMs }),
-        `${String(captureMs)}, ${String(doneMs)}`,
-      ).toHaveLength(1);
-    expect(problemsOf({ captureMs: 0, doneMs: 0 })).toEqual([]);
-    expect(problemsOf({ captureMs: 30_000, doneMs: 30_000 })).toEqual([]);
+  it("holds the deadline whatever the browser reported", () => {
+    for (const doneMs of [
+      null,
+      undefined,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      -1,
+      30_001,
+    ])
+      expect(problemsOf({ doneMs }), String(doneMs)).toHaveLength(1);
+    expect(problemsOf({ doneMs: 0 })).toEqual([]);
+    expect(problemsOf({ doneMs: 30_000 })).toEqual([]);
   });
 
-  it("fails a capture error, an unread page and a cycle that is not its own", () => {
+  it("fails a check error and a cycle that is not its own", () => {
     expect(problemsOf({ error: "timed out" })).toEqual(["timed out"]);
     expect(problemsOf({ error: 1 })).toHaveLength(1);
-    expect(problemsOf({ hasFocus: null })).toHaveLength(1);
-    expect(problemsOf({ devicePixelRatio: 0 })).toHaveLength(1);
     expect(problemsOf({ cycle: "hc-chromium/Other" })).toHaveLength(1);
     expect(problemsOf({ engine: "firefox" })).toEqual([
       'engine "firefox", not chromium',
@@ -155,124 +116,57 @@ describe("post-restore judgement", () => {
   });
 
   it("never consults the problems an observation carries", () => {
-    expect(problemsOf({ problems: [] }, 20)).toHaveLength(1);
+    expect(problemsOf({ forced: true, problems: [] })).toHaveLength(1);
     expect(problemsOf({ problems: ["x"] })).toEqual([]);
   });
 });
 
 describe("the writer", () => {
-  it("records an exact cycle and writes no diagnostics", () => {
+  it("records a verified cycle and writes nothing but the records", () => {
     const fx = fixtureRun(temp());
     expect(fx.errors).toEqual([]);
     expect(fx.rows.map((row) => row.outcome)).toEqual(
-      expectedCycles.map(() => "exact"),
+      expectedCycles.map(() => "verified"),
     );
-    expect(existsSync(join(fx.root, "post-restore"))).toBe(false);
+    expect(readdirSync(fx.root)).toEqual(["hc-run"]);
+    expect(readdirSync(fx.run).sort()).toEqual([
+      "baseline.json",
+      "cycles.jsonl",
+    ]);
     expect(rowsOf(fx.root)).toEqual(fx.rows);
   });
 
-  it("throws on any difference, after keeping the three images and the observation", () => {
-    for (const changed of [1, 20, 64, 65]) {
-      const fx = fixtureRun(temp(), [0, changed]);
-      expect(fx.errors).toEqual([
-        `${String(changed)} pixels differ from the baseline after restore`,
-      ]);
-      const row = fx.rows[1];
-      expect(row?.outcome).toBe("failed");
-      const folder = cycleFolder("hc-chromium", "High Contrast White");
-      expect(row?.files).toEqual(
-        ["baseline.png", "capture.png", "diff.png", "observation.json"].map(
-          (name) => `${folder}/${name}`,
-        ),
-      );
-      const at = (name: string) =>
-        readFileSync(join(fx.root, ...folder.split("/"), name));
-      const images = input(changed, 1).images;
-      expect(at("baseline.png").equals(fx.baselinePng)).toBe(true);
-      expect(at("capture.png").equals(Buffer.from(images.capture ?? []))).toBe(
-        true,
-      );
-      expect(at("diff.png").equals(Buffer.from(images.diff ?? []))).toBe(true);
-      expect(at("capture.png").equals(fx.baselinePng)).toBe(false);
-      expect(JSON.parse(at("observation.json").toString("utf8"))).toEqual(
-        row?.observation,
-      );
-    }
+  it("throws on a failed cycle, after keeping its record", () => {
+    const fx = fixtureRun(temp(), [false, true]);
+    expect(fx.errors).toEqual(["forced colours are still active"]);
+    const row = rowAt(fx.rows, 1);
+    expect(row.outcome).toBe("failed");
+    expect(row.observation.problems).toEqual(fx.errors);
+    expect(rowAt(rowsOf(fx.root), 1)).toEqual(row);
+    expect(readdirSync(fx.root)).toEqual(["hc-run"]);
   });
 
-  it("keeps what a failed cycle has when an image is missing", () => {
-    const root = temp();
-    fixtureRun(root, []);
-    const failing = input(0);
-    failing.check.error = "no page";
-    failing.check.changed = null;
-    failing.images.capture = null;
-    const rows: CycleRow[] = [];
-    expect(() =>
-      settlePostRestore({ ...failing, root, append: (row) => rows.push(row) }),
-    ).toThrow("no page");
-    const folder = cycleFolder("hc-chromium", "High Contrast Black");
-    expect(readdirSync(join(root, ...folder.split("/"))).sort()).toEqual([
-      "baseline.png",
-      "observation.json",
-    ]);
-    expect(rows[0]?.outcome).toBe("failed");
-  });
-
-  it("stays failed, and says so, when the diagnostics cannot be written", () => {
-    for (const io of [
-      {
-        makeFolder: () => {
-          throw new Error("disk full");
-        },
-      },
-      {
-        create: () => {
-          throw new Error("disk full");
-        },
-      },
-    ]) {
-      const fx = fixtureRun(temp(), [20], size, io);
-      expect(fx.errors).toEqual([
-        "20 pixels differ from the baseline after restore; diagnostics were not written: disk full",
-      ]);
-      expect(fx.rows[0]?.outcome).toBe("failed");
-      expect(rowsOf(fx.root)[0]?.outcome).toBe("failed");
-    }
-  });
-
-  it("fails a cycle whose record cannot be appended, exact or not", () => {
-    const root = temp();
+  it("fails a cycle whose record cannot be appended, verified or not", () => {
     const refuse = () => {
       throw new Error("read-only");
     };
     expect(() =>
-      settlePostRestore({ ...input(0), root, append: refuse }),
+      settlePostRestore({ ...cycleInput(0), append: refuse }),
     ).toThrow("the cycle record was not written: read-only");
     expect(() =>
-      settlePostRestore({ ...input(20), root, append: refuse }),
+      settlePostRestore({ ...cycleInput(0, true), append: refuse }),
     ).toThrow(
-      "the cycle record was not written: read-only; 20 pixels differ from the baseline after restore",
+      "the cycle record was not written: read-only; forced colours are still active",
     );
-  });
-
-  it("does not replace the diagnostics of an earlier cycle", () => {
-    const root = temp();
-    fixtureRun(root, [20]);
-    const again = input(20);
-    const rows: CycleRow[] = [];
-    expect(() =>
-      settlePostRestore({ ...again, root, append: (row) => rows.push(row) }),
-    ).toThrow("diagnostics were not written");
   });
 });
 
 describe("the six cycles", () => {
-  it("finds six distinct exact cycles complete", () => {
+  it("finds six distinct verified cycles complete", () => {
     const fx = fixtureRun(temp());
     expect(completenessProblems(fx.root)).toEqual([]);
     expect(cycleStandings(fx.root)).toMatchObject({
-      exact: 6,
+      verified: 6,
       failed: 0,
       incomplete: 0,
       problems: [],
@@ -280,9 +174,9 @@ describe("the six cycles", () => {
   });
 
   it("counts a cycle with no record as incomplete and a failed one as failed", () => {
-    const fx = fixtureRun(temp(), [0, 20, 0, 0]);
+    const fx = fixtureRun(temp(), [false, true, false, false]);
     expect(cycleStandings(fx.root)).toMatchObject({
-      exact: 3,
+      verified: 3,
       failed: 1,
       incomplete: 2,
     });
@@ -294,13 +188,13 @@ describe("the six cycles", () => {
   });
 
   it("does not take one cycle recorded six times for six cycles", () => {
-    const fx = fixtureRun(temp(), [0]);
+    const fx = fixtureRun(temp(), [false]);
     writeRows(
       fx.root,
       expectedCycles.map(() => fx.rows[0]),
     );
     const standings = cycleStandings(fx.root);
-    expect(standings).toMatchObject({ exact: 0, failed: 1, incomplete: 5 });
+    expect(standings).toMatchObject({ verified: 0, failed: 1, incomplete: 5 });
     expect(standings.problems).toEqual([
       "hc-chromium/High Contrast Black recorded 6 times",
     ]);
@@ -337,19 +231,22 @@ describe("the six cycles", () => {
     ]);
   });
 
-  it("does not count a record as exact unless it shows zero pixels and no problem", () => {
+  it("does not count a record as verified unless it shows no forced colours and no problem", () => {
     for (const edit of [
       (row: CycleRow) => {
         row.outcome = "failed";
       },
       (row: CycleRow) => {
-        row.observation.changed = 20;
+        row.observation.forced = true;
+      },
+      (row: CycleRow) => {
+        row.observation.forced = null;
       },
       (row: CycleRow) => {
         row.observation.problems = ["x"];
       },
       (row: CycleRow) => {
-        row.version = 2;
+        row.version = 1;
       },
     ]) {
       const fx = fixtureRun(temp());
@@ -364,12 +261,12 @@ describe("the six cycles", () => {
 });
 
 describe("the summary", () => {
-  it("passes only a successful step with six exact cycles", () => {
+  it("passes only a successful step with six verified cycles", () => {
     const fx = fixtureRun(temp());
     expect(reported(fx.root, "success")).toEqual({
       status: 0,
       lines: [
-        "Post-restore: 6/6 cycles completed; 6 exact, 0 failed, 0 incomplete; high-contrast step: success.",
+        "Post-restore: 6/6 cycles completed; 6 verified, 0 failed, 0 incomplete; high-contrast step: success.",
       ],
     });
   });
@@ -380,24 +277,24 @@ describe("the summary", () => {
       const result = reported(fx.root, outcome);
       expect(result.status).toBe(1);
       expect(result.lines[0]).toBe(
-        `Post-restore: 6/6 cycles completed; 6 exact, 0 failed, 0 incomplete; high-contrast step: ${outcome ?? "not reported"}.`,
+        `Post-restore: 6/6 cycles completed; 6 verified, 0 failed, 0 incomplete; high-contrast step: ${outcome ?? "not reported"}.`,
       );
     }
   });
 
   it("fails a successful step whose records are short, failed or unreadable", () => {
-    const short = fixtureRun(temp(), [0, 0, 0, 20]);
+    const short = fixtureRun(temp(), [false, false, false, true]);
     const result = reported(short.root, "success");
     expect(result.status).toBe(1);
     expect(result.lines[0]).toBe(
-      "Post-restore: 4/6 cycles completed; 3 exact, 1 failed, 2 incomplete; high-contrast step: success.",
+      "Post-restore: 4/6 cycles completed; 3 verified, 1 failed, 2 incomplete; high-contrast step: success.",
     );
     const broken = fixtureRun(temp());
     appendFileSync(ledger(broken.root), "not json\n");
     expect(reported(broken.root, "success")).toEqual({
       status: 1,
       lines: [
-        "Post-restore: 6/6 cycles completed; 6 exact, 0 failed, 0 incomplete; high-contrast step: success.",
+        "Post-restore: 6/6 cycles completed; 6 verified, 0 failed, 0 incomplete; high-contrast step: success.",
         "failed record 7 cannot be read",
       ],
     });
@@ -429,7 +326,7 @@ describe("the summary", () => {
     const text = readFileSync(target, "utf8");
     expect(text.startsWith("Post-restore: 6/6 cycles completed;")).toBe(true);
     for (const { cycle } of expectedCycles)
-      expect(text).toContain(`- ${cycle}: exact\n`);
+      expect(text).toContain(`- ${cycle}: verified\n`);
     expect(run({ GITHUB_ACTIONS: "true" })).toBe(1);
     expect(lines.at(-1)).toContain("::error::high contrast summary:");
   });

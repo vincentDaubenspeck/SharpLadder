@@ -12,7 +12,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { groupDCells, themes, viewportAt } from "./group-d.ts";
 import { postRestoreDeadlineMs } from "./high-contrast-cycles.ts";
-import { encodePng, pixels } from "./high-contrast-fixture.ts";
 import {
   baselineProblems,
   beforeDeadline,
@@ -28,8 +27,6 @@ import {
   loadBaseline,
   nameKeys,
   notRunCells,
-  pixelDiff,
-  pngSize,
   readLastEnabled,
   recordLastEnabled,
   recorder,
@@ -85,12 +82,11 @@ const temp = () => {
 };
 afterEach(() => {
   for (const dir of temps.splice(0)) {
-    for (const name of ["baseline.json", "baseline.png"])
-      try {
-        chmodSync(join(dir, name), 0o666);
-      } catch {
-        // Absent in tests that never wrote a baseline.
-      }
+    try {
+      chmodSync(join(dir, "baseline.json"), 0o666);
+    } catch {
+      // Absent in tests that never wrote a baseline.
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -1077,19 +1073,15 @@ describe(
 );
 
 describe("run-global baseline and last enabled scheme", () => {
-  const png = new Uint8Array(encodePng(2, 1, pixels(2, 1)));
-
-  it("captures once; a later capture into the same run fails and leaves both files as they were", () => {
+  it("captures once; a later capture into the same run fails and leaves the file as it was", () => {
     const dir = temp();
-    const run = writeBaseline(dir, base(), png);
+    const run = writeBaseline(dir, base());
     const before = readFileSync(join(dir, "baseline.json"), "utf8");
     expect(() =>
-      writeBaseline(dir, { ...base(), scheme: "High Contrast Black" }, png),
+      writeBaseline(dir, { ...base(), scheme: "High Contrast Black" }),
     ).toThrow(/EEXIST/u);
     expect(readFileSync(join(dir, "baseline.json"), "utf8")).toBe(before);
-    const loaded = loadBaseline(encodeRun(run));
-    expect(loaded.state).toEqual(base());
-    expect([...loaded.png]).toEqual([...png]);
+    expect(loadBaseline(encodeRun(run)).state).toEqual(base());
   });
 
   it("refuses a baseline that is on, unavailable or malformed", () => {
@@ -1100,16 +1092,19 @@ describe("run-global baseline and last enabled scheme", () => {
       "high contrast is not available",
     ]);
     expect(baselineProblems({})).toContain("malformed baseline: flags missing");
-    expect(() => writeBaseline(temp(), { ...base(), on: true }, png)).toThrow(
+    expect(() => writeBaseline(temp(), { ...base(), on: true })).toThrow(
       /on before the run/u,
     );
   });
 
   it("refuses a baseline changed after capture, or one never captured", () => {
     const dir = temp();
-    const run = writeBaseline(dir, base(), png);
-    chmodSync(join(dir, "baseline.png"), 0o666);
-    writeFileSync(join(dir, "baseline.png"), new Uint8Array([9]));
+    const run = writeBaseline(dir, base());
+    chmodSync(join(dir, "baseline.json"), 0o666);
+    writeFileSync(
+      join(dir, "baseline.json"),
+      `${JSON.stringify({ ...base(), flags: 127 }, null, 2)}\n`,
+    );
     expect(() => loadBaseline(encodeRun(run))).toThrow(
       /changed after it was captured/u,
     );
@@ -1120,7 +1115,7 @@ describe("run-global baseline and last enabled scheme", () => {
 
   it("carries the last enabled scheme across projects without touching the baseline", () => {
     const dir = temp();
-    const run = writeBaseline(dir, base(), png);
+    const run = writeBaseline(dir, base());
     expect(readLastEnabled(dir)).toBeNull();
     // The first project turned on White last; the next project starts from what it left.
     recordLastEnabled(dir, "High Contrast Black");
@@ -1224,10 +1219,10 @@ describe("restore after every scheme and evidence on failure", () => {
     const bad = steps2(
       () => undefined,
       () => {
-        throw new Error("1 pixels differ");
+        throw new Error("forced colours are still active");
       },
     );
-    await expect(bad.done).rejects.toThrow("1 pixels differ");
+    await expect(bad.done).rejects.toThrow("forced colours are still active");
     const good = steps2(
       () => undefined,
       () => undefined,
@@ -1435,23 +1430,20 @@ describe("high-contrast spec, setup and config", () => {
   it("reads the baseline the setup wrote and never writes one", () => {
     expect(specText).toContain("loadBaseline(process.env[runVariable])");
     expect(specText).not.toMatch(/writeBaseline|writeOnce/u);
-    expect(setupText).toContain("writeBaseline(dir, state, png)");
+    expect(setupText).toContain("writeBaseline(dir, state)");
     expect(
       setupText.indexOf("hostedProblems(process.env, process.platform)"),
     ).toBeLessThan(setupText.indexOf('spi("read")'));
   });
 
-  it("captures the same way before and after, in a fresh headless full Chromium", () => {
+  it("reads forced colours before the run and after each restore in a fresh full Chromium, and compares no picture", () => {
     expect(setupText).toContain("fullChromium(");
-    expect(setupText).toContain("capture(page)");
-    expect(specText).toContain("images.capture = await capture(page);");
-    expect(specText).toMatch(
-      /check\.changed = await differing\(\s*page,\s*baseline\.png,\s*images\.capture,\s*\);/u,
-    );
-    // One capture, no polling: the spec captures once per restore, inside the deadline.
-    expect(specText.match(/await capture\(page\)/gu)).toHaveLength(1);
+    expect(setupText).toContain("if (await forced(page))");
+    expect(specText).toContain("check.forced = await forced(page);");
     expect(specText).toContain("ms: postRestoreDeadlineMs,");
     expect(specText).toContain("}, stop.signal),");
+    for (const text of [setupText, specText])
+      expect(text).not.toMatch(/capture\(|differing|pixelDiff|baseline\.png/u);
   });
 
   it("is selected only in the opted-in run, alone, on one worker, without retries", () => {
@@ -1489,9 +1481,6 @@ describe("high-contrast spec, setup and config", () => {
     expect(captureText).toMatch(
       /chromium\.launch\(\{\s*channel: "chromium",\s*headless: true,\s*\}\)/u,
     );
-    // shot() hides the caret and disables animations for every capture.
-    expect(captureText).toContain("shot(page, { x: 0, y: 0, ...client })");
-    expect(captureText).toContain("scrollbar-width: none;");
     expect(captureText).toMatch(
       /\} finally \{\s*signal\?\.removeEventListener\("abort", close\);\s*await browser\.close\(\);/u,
     );
@@ -1574,80 +1563,7 @@ describe("Group D matrix under real high contrast", () => {
   });
 });
 
-describe("post-restore diagnostics", () => {
-  const image = (width: number, height: number, fill = 10) => ({
-    width,
-    height,
-    data: new Uint8Array(width * height * 4).fill(fill),
-  });
-  const poke = (
-    img: { width: number; data: Uint8Array },
-    x: number,
-    y: number,
-    channel = 0,
-  ) => {
-    const at = (y * img.width + x) * 4 + channel;
-    img.data[at] = (img.data[at] ?? 0) ^ 1;
-  };
-  const red = (mask: Uint8Array, pixel: number) =>
-    [...mask.subarray(pixel * 4, pixel * 4 + 4)].join(",") === "255,0,0,255";
-
-  it("gives no box and no marked pixel when nothing differs", () => {
-    const found = pixelDiff(image(5, 4), image(5, 4));
-    expect(found.count).toBe(0);
-    expect(found.box).toBeNull();
-    for (let p = 0; p < 20; p += 1) expect(red(found.mask, p)).toBe(false);
-  });
-
-  it("bounds exactly the differing pixels, any channel, alpha included", () => {
-    const after = image(7, 6);
-    poke(after, 2, 1, 3);
-    poke(after, 5, 4, 1);
-    const found = pixelDiff(image(7, 6), after);
-    expect(found.count).toBe(2);
-    expect(found.box).toEqual({ x: 2, y: 1, width: 4, height: 4 });
-    const single = image(7, 6);
-    poke(single, 6, 5);
-    expect(pixelDiff(image(7, 6), single).box).toEqual({
-      x: 6,
-      y: 5,
-      width: 1,
-      height: 1,
-    });
-  });
-
-  it("marks exactly the differing pixels in the diff image", () => {
-    const before = image(9, 3, 0);
-    before.data.fill(255);
-    const after = image(9, 3, 0);
-    after.data.set(before.data);
-    const changed = new Set([0, 13, 26]);
-    for (const p of changed) poke(after, p % 9, Math.floor(p / 9), 2);
-    const found = pixelDiff(before, after);
-    expect(found.count).toBe(changed.size);
-    for (let p = 0; p < 27; p += 1)
-      expect(red(found.mask, p), `pixel ${String(p)}`).toBe(changed.has(p));
-  });
-
-  it("fails on a dimension mismatch, never comparing part of an image", () => {
-    expect(() => pixelDiff(image(4, 4), image(4, 5))).toThrow("4x5 is not 4x4");
-    expect(() =>
-      pixelDiff(image(4, 4), { ...image(4, 4), data: new Uint8Array(4) }),
-    ).toThrow("does not match its size");
-  });
-
-  it("reads the size from the PNG header and refuses anything else", () => {
-    const png = new Uint8Array(24);
-    png.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
-    new DataView(png.buffer).setUint32(16, 1920);
-    new DataView(png.buffer).setUint32(20, 1080);
-    expect(pngSize(png)).toEqual({ width: 1920, height: 1080 });
-    expect(() => pngSize(png.subarray(0, 20))).toThrow("not a PNG");
-    const other = png.slice();
-    other[0] = 0;
-    expect(() => pngSize(other)).toThrow("not a PNG");
-  });
-
+describe("post-restore deadline", () => {
   const fakeClock = () => {
     let time = 1_000;
     const timers: { at: number; fire: () => void }[] = [];

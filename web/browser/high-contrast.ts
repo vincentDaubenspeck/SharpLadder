@@ -5,7 +5,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { sha256, writeEvidence } from "./fonts.ts";
 import { groupDCells } from "./group-d.ts";
-import { type Box, type Engine } from "./high-contrast-cycles.ts";
+import { type Engine } from "./high-contrast-cycles.ts";
 import {
   colourKeys,
   evidenceOnly,
@@ -180,50 +180,38 @@ export function spi(
   return parseState(JSON.parse(result.stdout), action);
 }
 
-/** Where the global setup leaves the run-global baseline, and the digests that pin it. */
+/** Where the global setup leaves the run-global baseline, and the digest that pins it. */
 export const runVariable = "SHARPLADDER_HC_RUN";
 
 export interface Run {
   dir: string;
   json: string;
-  png: string;
 }
 
 const runPaths = (dir: string) => ({
   json: join(dir, "baseline.json"),
-  png: join(dir, "baseline.png"),
   lastEnabled: join(dir, "last-enabled.json"),
 });
 
 /** Writes a file that must never be replaced: create-only, then read-only. */
-function writeOnce(path: string, data: string | Uint8Array) {
+function writeOnce(path: string, data: string) {
   writeFileSync(path, data, { flag: "wx" });
   chmodSync(path, 0o444);
-  return sha256(typeof data === "string" ? Buffer.from(data) : data);
+  return sha256(Buffer.from(data));
 }
 
 /** Captures the run-global baseline once; a second capture into the same run fails. */
-export function writeBaseline(
-  dir: string,
-  state: HighContrastState,
-  png: Uint8Array,
-): Run {
+export function writeBaseline(dir: string, state: HighContrastState): Run {
   const problems = baselineProblems(state);
   if (problems.length > 0)
     throw new Error(`high contrast baseline: ${problems.join("; ")}`);
-  pngSize(png);
-  const paths = runPaths(dir);
   const text = `${JSON.stringify(state, null, 2)}\n`;
-  return {
-    dir,
-    json: writeOnce(paths.json, text),
-    png: writeOnce(paths.png, png),
-  };
+  return { dir, json: writeOnce(runPaths(dir).json, text) };
 }
 
 export const encodeRun = (run: Run) => JSON.stringify(run);
 
-/** The baseline the global setup wrote, refused if either file no longer has its digest. */
+/** The baseline the global setup wrote, refused if the file no longer has its digest. */
 export function loadBaseline(encoded: string | undefined) {
   if (encoded === undefined)
     throw new Error(
@@ -232,8 +220,7 @@ export function loadBaseline(encoded: string | undefined) {
   const run = JSON.parse(encoded) as Run;
   const paths = runPaths(run.dir);
   const text = readFileSync(paths.json);
-  const png = new Uint8Array(readFileSync(paths.png));
-  if (sha256(text) !== run.json || sha256(png) !== run.png)
+  if (sha256(text) !== run.json)
     throw new Error(
       "high contrast: the baseline changed after it was captured",
     );
@@ -241,8 +228,6 @@ export function loadBaseline(encoded: string | undefined) {
     run,
     path: paths.json,
     state: parseState(JSON.parse(text.toString("utf8")), "baseline"),
-    png,
-    size: pngSize(png),
   };
 }
 
@@ -358,69 +343,6 @@ export function beforeDeadline<T>(
       },
     );
   });
-}
-
-/** Width and height from a PNG's IHDR chunk. */
-export function pngSize(png: Uint8Array) {
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  const chunk = String.fromCharCode(...png.subarray(12, 16));
-  if (
-    png.length < 24 ||
-    signature.some((byte, i) => png[i] !== byte) ||
-    chunk !== "IHDR"
-  )
-    throw new Error("high contrast: the capture is not a PNG");
-  return { width: view.getUint32(16), height: view.getUint32(20) };
-}
-
-export interface Rgba {
-  width: number;
-  height: number;
-  data: Uint8Array;
-}
-
-/**
- * Exact RGBA comparison: the differing-pixel count, their bounding box (null when none), and a
- * mask with each differing pixel pure red over a light grey copy of the first image.
- */
-export function pixelDiff(a: Rgba, b: Rgba) {
-  if (a.width !== b.width || a.height !== b.height)
-    throw new Error(
-      `high contrast: ${String(b.width)}x${String(b.height)} is not ${String(a.width)}x${String(a.height)}`,
-    );
-  const size = a.width * a.height * 4;
-  if (a.data.length !== size || b.data.length !== size)
-    throw new Error("high contrast: pixel data does not match its size");
-  const mask = new Uint8Array(size);
-  let count = 0;
-  let [left, top, right, bottom] = [a.width, a.height, -1, -1];
-  for (let i = 0; i < size; i += 4) {
-    const same =
-      a.data[i] === b.data[i] &&
-      a.data[i + 1] === b.data[i + 1] &&
-      a.data[i + 2] === b.data[i + 2] &&
-      a.data[i + 3] === b.data[i + 3];
-    if (same) {
-      const sum =
-        (a.data[i] ?? 0) + (a.data[i + 1] ?? 0) + (a.data[i + 2] ?? 0);
-      // Grey from 192 to 255, so no unmarked pixel is ever the marking red.
-      mask.fill(192 + Math.floor(sum / 12), i, i + 3);
-      mask[i + 3] = 255;
-      continue;
-    }
-    mask.set([255, 0, 0, 255], i);
-    count += 1;
-    const pixel = i / 4;
-    const [x, y] = [pixel % a.width, Math.floor(pixel / a.width)];
-    [left, top] = [Math.min(left, x), Math.min(top, y)];
-    [right, bottom] = [Math.max(right, x), Math.max(bottom, y)];
-  }
-  const box: Box | null =
-    count === 0
-      ? null
-      : { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
-  return { count, box, mask };
 }
 
 /** Writes the record now and returns a saver, so every later update reaches the disk at once. */

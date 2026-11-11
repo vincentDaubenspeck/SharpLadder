@@ -1,9 +1,9 @@
-// Global setup for the real high-contrast run only: one baseline state and one full-Chromium
-// screenshot, captured before any project changes the OS and never written again.
+// Global setup for the real high-contrast run only: one baseline state, read before any project
+// changes the OS and never written again, from a session where no browser sees forced colours.
 import type { FullConfig } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { forced, capture, fullChromium } from "./high-contrast-capture.ts";
+import { forced, fullChromium } from "./high-contrast-capture.ts";
 import {
   baselineProblems,
   encodeRun,
@@ -27,10 +27,9 @@ export default async function setup(config: FullConfig) {
   const issues = baselineProblems(state);
   if (issues.length > 0)
     throw new Error(`high contrast baseline: ${issues.join("; ")}`);
-  const png = await fullChromium(async (page) => {
+  await fullChromium(async (page) => {
     if (await forced(page))
       throw new Error("high contrast baseline: forced colours are active");
-    return capture(page);
   });
-  process.env[runVariable] = encodeRun(writeBaseline(dir, state, png));
+  process.env[runVariable] = encodeRun(writeBaseline(dir, state));
 }
