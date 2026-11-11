@@ -110,9 +110,9 @@ internal static class FenceReader
         {
             yield return "code fence needs a spoken gloss (spoken=\"...\")";
         }
-        else if (spoken.Length > ContentIds.MaxSpokenLength)
+        else if (ContentIds.SpokenLength(spoken) > ContentIds.MaxSpokenLength)
         {
-            yield return $"spoken gloss is {spoken.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)} characters; at most 200 are allowed";
+            yield return $"spoken gloss is {ContentIds.SpokenLength(spoken).ToString(System.Globalization.CultureInfo.InvariantCulture)} characters; at most 200 are allowed";
         }
 
         if (Outcomes.Count(values.ContainsKey) > 1)

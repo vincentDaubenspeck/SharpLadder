@@ -9,12 +9,14 @@ blockid
 bsdtar
 bsln
 cacache
+cacheinfo
 cact
 cascadia
 cbdt
 cblc
 cbtn
 ccent
+CDAT
 cdetail
 cgrep
 cmap
@@ -45,6 +47,7 @@ EXDEV
 extensionless
 extractall
 fdsc
+FEFF
 fmtx
 fonteditor
 fontkit
@@ -59,6 +62,7 @@ globalconfig
 gloc
 glyf
 gnueabihf
+gpgsign
 gpos
 Grüße
 gsub
@@ -114,6 +118,7 @@ msvc
 Newtonsoft
 nologo
 NONBLOCK
+noncharacter
 noninteractive
 NOPASSWD
 norc
@@ -125,6 +130,8 @@ notosansdisplay
 ntdll
 ntwo
 nvmrc
+OIDF
+OIDL
 oklab
 oklch
 olor
@@ -187,6 +194,7 @@ termwrap
 themeui
 threedface
 toplevel
+topo
 trak
 ttcf
 UAPI

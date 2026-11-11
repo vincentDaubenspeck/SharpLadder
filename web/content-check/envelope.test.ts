@@ -43,9 +43,13 @@ const utf8 = (text: string) => new TextEncoder().encode(text);
 const join = (...parts: Uint8Array[]) =>
   Uint8Array.from(parts.flatMap((p) => [...p]));
 
-const record = (path: string, text = "{}") => ({ path, text });
+const record = (path: string, text = "{}", kind: unknown = "chapter") => ({
+  path,
+  kind,
+  text,
+});
 const envelope = (records: unknown[], extra: object = {}) =>
-  JSON.stringify({ version: 1, records, ...extra });
+  JSON.stringify({ version: 2, records, ...extra });
 const valid = envelope([
   record("compiled/chapters/a/chapter.json"),
   record("compiled/chapters/a/syntax.json"),
@@ -77,13 +81,15 @@ describe("the test-records transport", () => {
       acceptEnvelope(run.stdout, run.exit, [
         "compiled/chapters/a/chapter.json",
       ]),
-    ).toEqual([{ path: "compiled/chapters/a/chapter.json", text }]);
+    ).toEqual([
+      { path: "compiled/chapters/a/chapter.json", kind: "chapter", text },
+    ]);
   });
 
   it("accepts escaped non-ASCII text as the same decoded value", () => {
     const run = redirected(
       utf8(
-        '{"version":1,"records":[{"path":"compiled/a.json","text":"caf\\u00E9"}]}',
+        '{"version":2,"records":[{"path":"compiled/a.json","kind":"part","text":"caf\\u00E9"}]}',
       ),
     );
     expect(
@@ -165,11 +171,11 @@ describe("the test-records transport", () => {
     ],
     ["no records", utf8(envelope([])), /non-empty array/u],
     [
-      "version 2",
+      "version 1",
       utf8(
-        JSON.stringify({ version: 2, records: [record("compiled/a.json")] }),
+        JSON.stringify({ version: 1, records: [record("compiled/a.json")] }),
       ),
-      /version must be 1/u,
+      /version must be 2/u,
     ],
     [
       "an extra envelope key",
@@ -179,24 +185,54 @@ describe("the test-records transport", () => {
     [
       "an extra record key",
       utf8(envelope([{ ...record("compiled/a.json"), sha256: "x" }])),
-      /exactly path and text/u,
+      /exactly path, kind and text/u,
+    ],
+    [
+      "a record without a kind",
+      utf8(envelope([{ path: "compiled/a.json", text: "{}" }])),
+      /exactly path, kind and text/u,
+    ],
+    [
+      "a record with its kind last",
+      utf8(envelope([{ path: "compiled/a.json", text: "{}", kind: "part" }])),
+      /exactly path, kind and text/u,
+    ],
+    [
+      "an unknown kind",
+      utf8(envelope([record("compiled/a.json", "{}", "registry")])),
+      /record kind "registry" is not a known kind/u,
+    ],
+    [
+      "a kind in capitals",
+      utf8(envelope([record("compiled/a.json", "{}", "Chapter")])),
+      /is not a known kind/u,
+    ],
+    [
+      "a kind that is not text",
+      utf8(envelope([record("compiled/a.json", "{}", ["chapter"])])),
+      /is not a known kind/u,
+    ],
+    [
+      "a kind named like an object member",
+      utf8(envelope([record("compiled/a.json", "{}", "constructor")])),
+      /is not a known kind/u,
     ],
     [
       "a record text that is not a string",
-      utf8(envelope([{ path: "compiled/a.json", text: 1 }])),
+      utf8(envelope([{ path: "compiled/a.json", kind: "part", text: 1 }])),
       /must be strings/u,
     ],
     [
       "a repeated envelope key",
       utf8(
-        `{"version":1,"records":[],"records":${JSON.stringify([record("compiled/a.json")])}}`,
+        `{"version":2,"records":[],"records":${JSON.stringify([record("compiled/a.json")])}}`,
       ),
       /key records is repeated/u,
     ],
     [
       "an escaped repeated record key",
       utf8(
-        '{"version":1,"records":[{"path":"compiled/a.json","text":"x","\\u0074ext":"y"}]}',
+        '{"version":2,"records":[{"path":"compiled/a.json","kind":"part","text":"x","\\u0074ext":"y"}]}',
       ),
       /key text is repeated/u,
     ],
@@ -342,7 +378,7 @@ describe("the compiled inventory", () => {
   });
 });
 
-type Records = { path: string; text: string }[];
+type Records = { path: string; kind: string; text: string }[];
 
 // The global setup's own path, given an envelope the compiler did not write.
 function altered(change: (records: Records) => void) {
@@ -365,13 +401,13 @@ const recordChanges: [string, (records: Records) => void][] = [
   [
     "an extra record",
     (r) => {
-      r.push({ path: "compiled/zz.json", text: "{}" });
+      r.push({ path: "compiled/zz.json", kind: "part", text: "{}" });
     },
   ],
   [
     "a same-count wrong path",
     (r) => {
-      r.splice(-1, 1, { path: "compiled/zz.json", text: "{}" });
+      r.splice(-1, 1, { path: "compiled/zz.json", kind: "part", text: "{}" });
     },
   ],
 ];

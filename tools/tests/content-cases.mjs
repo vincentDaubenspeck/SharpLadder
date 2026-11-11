@@ -2,12 +2,18 @@
 // fixture against the golden digest, reports compile errors by file and line, rejects an empty
 // input and a malformed golden file, and fails when no SDK is found; the compiler refuses a
 // relative argument, rejects output inside the content root, writes no partial output, and
-// reports a malformed schema with exit 2.
+// reports a malformed schema with exit 2; alias retention passes kept and honestly moved
+// names and fails a name removed or redirected anywhere in the history, a commit without the
+// record other than the named first one, a first commit that is absent or not an ancestor, a
+// shallow clone, a grafts file, a record that is not a plain file, a replaced commit, a forged
+// commit-graph cache and a tree without history.
 // Usage: node tools/tests/content-cases.mjs <empty work directory>
 // Needs the pinned .NET SDK and nuget.org.
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { compilerDll, contentProblems, fixture } from "../checks/content.mjs";
+import { pathToFileURL } from "node:url";
+import { aliasRecord, compilerDll, contentProblems, fixture, retentionProblems } from "../checks/content.mjs";
 import { dotnet, env, exec } from "../checks/lib.mjs";
 
 const src = join(import.meta.dirname, "..", "..");
@@ -147,6 +153,337 @@ check(
   "no SDK: content fails",
   noSdk.code !== 0 && out.includes("FAIL .NET config") && at > 0 && out[at - 1] === "  needs .NET config (see above)",
   noSdk.out,
+);
+
+// Alias retention, on small repositories that hold nothing but the compiled alias record.
+const gitIn = (dir, ...args) => {
+  const identity = ["-c", "user.name=case", "-c", "user.email=case@example.invalid", "-c", "commit.gpgsign=false"];
+  const r = exec("git", [...identity, "-c", "core.autocrlf=false", ...args], { cwd: dir });
+  if (r.code !== 0) throw new Error(`git ${args.join(" ")}: ${r.out}`);
+  return r.out.trim();
+};
+const record = (slugs, ids) => `${JSON.stringify({ slugs, ids })}\n`;
+const place = (dir, text) => {
+  mkdirSync(join(dir, "web", "compiled"), { recursive: true });
+  writeFileSync(join(dir, aliasRecord), text);
+};
+// One commit per entry: a record's text, or null for a commit without the record.
+function history(name, ...records) {
+  const dir = join(work, name);
+  mkdirSync(dir);
+  gitIn(dir, "init", "-q", "-b", "main");
+  const commits = records.map((text, i) => {
+    if (text === null) gitIn(dir, "rm", "-q", "--ignore-unmatch", aliasRecord);
+    else {
+      place(dir, text);
+      gitIn(dir, "add", aliasRecord);
+    }
+    gitIn(dir, "commit", "-q", "--allow-empty", "-m", `commit ${String(i + 1)}`);
+    return gitIn(dir, "rev-parse", "HEAD");
+  });
+  return { dir, commits };
+}
+const retained = ({ dir, commits }, first = commits[0]) => retentionProblems(src, { tree: dir, first });
+const begin = record({ old: "test" }, { begin: "start" });
+const noNames = record({}, {});
+
+const kept = history("kept", begin, record({ old: "test", older: "test" }, { begin: "start" }));
+check("retention passes an added name", retained(kept).length === 0, retained(kept).join("\n"));
+
+// The first record: uncommitted on the named first commit, whose own parents also lack it, then
+// committed as its child.
+const opening = history("opening", null, null);
+place(opening.dir, begin);
+const uncommitted = retained(opening, opening.commits[1]);
+check("retention passes the first record while it is uncommitted on the first commit", uncommitted.length === 0, uncommitted.join("\n"));
+const earlier = retained(opening, opening.commits[0]);
+check(
+  "retention fails the same tree when HEAD is not the named first commit",
+  earlier.length === 1 && earlier[0].startsWith(`commit ${opening.commits[1]} holds no `),
+  earlier.join("\n"),
+);
+gitIn(opening.dir, "add", aliasRecord);
+gitIn(opening.dir, "commit", "-q", "-m", "first record");
+const committed = retained(opening, opening.commits[1]);
+check("retention passes the first record committed on the first commit", committed.length === 0, committed.join("\n"));
+
+const moved = history("moved", begin, record({ old: "exam", test: "exam" }, { begin: "opening", start: "opening" }));
+check("retention passes a name whose old end was retired to its new end", retained(moved).length === 0, retained(moved).join("\n"));
+
+// Retired twice, one commit at a time: the last record is judged against both earlier ones.
+const twice = history("twice", record({}, { a: "t" }), record({}, { a: "v", t: "v" }));
+const stepOne = retained(twice);
+place(twice.dir, record({}, { a: "u", t: "u", v: "u" }));
+gitIn(twice.dir, "add", aliasRecord);
+gitIn(twice.dir, "commit", "-q", "-m", "second retirement");
+const stepTwo = retained(twice);
+check("retention passes a name retired twice across two commits", stepOne.length === 0 && stepTwo.length === 0, [...stepOne, ...stepTwo].join("\n"));
+
+const dropped = history("dropped", begin, noNames);
+const droppedProblems = retained(dropped);
+check(
+  "retention fails a committed removal, naming the commit that held the name",
+  droppedProblems[0] === `against commit ${dropped.commits[0]}:` &&
+    droppedProblems.includes('slugs: the retired name "old" was removed; a retired name is kept for good') &&
+    droppedProblems.includes('ids: the retired name "begin" was removed; a retired name is kept for good'),
+  droppedProblems.join("\n"),
+);
+
+const working = history("working", begin, begin);
+place(working.dir, noNames);
+const workingProblems = retained(working);
+check(
+  "retention fails an uncommitted removal once, under the newest commit with that record",
+  workingProblems[0] === `against commit ${working.commits[1]}:` &&
+    workingProblems.filter((p) => p.startsWith("against commit ")).length === 1,
+  workingProblems.join("\n"),
+);
+
+// A removal hidden behind a later commit that changes nothing: the last step alone looks clean.
+const hidden = history("hidden", begin, noNames, noNames);
+const hiddenProblems = retained(hidden);
+check(
+  "retention fails a removal made earlier in a range of commits",
+  hiddenProblems[0] === `against commit ${hidden.commits[0]}:` &&
+    hiddenProblems.includes('slugs: the retired name "old" was removed; a retired name is kept for good'),
+  hiddenProblems.join("\n"),
+);
+
+const back = history("back", begin, noNames, record({ old: "exam" }, { begin: "start" }));
+const backProblems = retained(back);
+check(
+  "retention fails a name removed and brought back with another end",
+  backProblems[0] === `against commit ${back.commits[0]}:` &&
+    backProblems.includes('slugs: "old" ended at "test" and now ends at "exam", where "test" does not lead'),
+  backProblems.join("\n"),
+);
+
+// A name added in one commit and taken out in the next was published in between.
+const brief = history("brief", begin, record({ old: "test", slip: "test" }, { begin: "start" }), begin);
+const briefProblems = retained(brief);
+check(
+  "retention keeps a name that only an intermediate commit held",
+  briefProblems[0] === `against commit ${brief.commits[1]}:` &&
+    briefProblems.includes('slugs: the retired name "slip" was removed; a retired name is kept for good'),
+  briefProblems.join("\n"),
+);
+
+// A merge that keeps one side's record drops what the other side retired.
+const merged = history("merged", begin);
+gitIn(merged.dir, "checkout", "-q", "-b", "side");
+place(merged.dir, record({ old: "test", extra: "test" }, { begin: "start" }));
+gitIn(merged.dir, "add", aliasRecord);
+gitIn(merged.dir, "commit", "-q", "-m", "side");
+const side = gitIn(merged.dir, "rev-parse", "HEAD");
+gitIn(merged.dir, "checkout", "-q", "main");
+place(merged.dir, record({ old: "test", other: "test" }, { begin: "start" }));
+gitIn(merged.dir, "add", aliasRecord);
+gitIn(merged.dir, "commit", "-q", "-m", "main");
+gitIn(merged.dir, "merge", "-q", "--no-ff", "-s", "ours", "-m", "merge", "side");
+const mergedProblems = retained(merged);
+check(
+  "retention fails a merge that drops a name retired on the merged branch",
+  mergedProblems[0] === `against commit ${side}:` &&
+    mergedProblems.filter((p) => p.startsWith("against commit ")).length === 1 &&
+    mergedProblems.includes('slugs: the retired name "extra" was removed; a retired name is kept for good'),
+  mergedProblems.join("\n"),
+);
+place(merged.dir, record({ extra: "test", old: "test", other: "test" }, { begin: "start" }));
+check("retention passes a merge that keeps the names of both sides", retained(merged).length === 0, retained(merged).join("\n"));
+
+// A first commit on a branch HEAD never included.
+gitIn(kept.dir, "checkout", "-q", "-b", "apart", kept.commits[0]);
+gitIn(kept.dir, "commit", "-q", "--allow-empty", "-m", "apart");
+const apart = gitIn(kept.dir, "rev-parse", "HEAD");
+gitIn(kept.dir, "checkout", "-q", "main");
+const apartProblems = retained(kept, apart);
+check(
+  "retention fails a first commit that is not an ancestor of HEAD",
+  apartProblems.length === 1 && apartProblems[0] === `commit ${apart} is not an ancestor of HEAD; alias retention starts from it`,
+  apartProblems.join("\n"),
+);
+
+const turned = history("turned", begin, record({ old: "test" }, { begin: "other" }));
+const turnedProblems = retained(turned);
+check(
+  "retention fails a name pointed somewhere its old end does not lead",
+  turnedProblems.includes('ids: "begin" ended at "start" and now ends at "other", where "start" does not lead'),
+  turnedProblems.join("\n"),
+);
+
+const late = history("late", begin, null, begin);
+const lateProblems = retained(late);
+check(
+  "retention fails a commit without the record that is not the named first commit",
+  lateProblems.length === 1 && lateProblems[0].startsWith(`commit ${late.commits[1]} holds no ${aliasRecord}; only `),
+  lateProblems.join("\n"),
+);
+const start = history("start", null, begin);
+const wrongFirst = retained(start, "0".repeat(40));
+check(
+  "retention fails a first commit the repository does not hold",
+  wrongFirst.length === 1 && wrongFirst[0] === `commit ${"0".repeat(40)} is not in this repository`,
+  wrongFirst.join("\n"),
+);
+// History before the first commit is not read, so only what follows it must hold the record.
+const after = history("after", null, null, begin, begin);
+check("retention reads nothing before the first commit", retained(after, after.commits[1]).length === 0, retained(after, after.commits[1]).join("\n"));
+const afterProblems = retained(after, after.commits[0]);
+check(
+  "retention fails a commit after the first one that lacks the record",
+  afterProblems.length === 1 && afterProblems[0].startsWith(`commit ${after.commits[1]} holds no ${aliasRecord}; only `),
+  afterProblems.join("\n"),
+);
+const short = retained(start, start.commits[0].slice(0, 12));
+check(
+  "retention does not accept a shortened first commit",
+  short.length === 1 && short[0].endsWith(" is not a full commit name"),
+  short.join("\n"),
+);
+
+const garbled = history("garbled", "{}\n", noNames);
+const garbledProblems = retained(garbled);
+check(
+  "retention fails an earlier record that is not an alias record",
+  garbledProblems[0] === `against commit ${garbled.commits[0]}:` && garbledProblems.some((p) => p.startsWith("standard input: schema: ")),
+  garbledProblems.join("\n"),
+);
+
+const shallow = join(work, "shallow");
+gitIn(work, "clone", "-q", "--depth", "1", pathToFileURL(dropped.dir).href, shallow);
+const shallowProblems = retentionProblems(src, { tree: shallow, first: dropped.commits[0] });
+check(
+  "retention fails a shallow clone, whose history ends early",
+  shallowProblems.length === 1 && shallowProblems[0].startsWith("the repository is shallow; "),
+  shallowProblems.join("\n"),
+);
+// Even when the clone's only commit is the named first one, nothing shows it is complete.
+const shallowHead = gitIn(shallow, "rev-parse", "HEAD");
+const shallowFirst = retentionProblems(src, { tree: shallow, first: shallowHead });
+check(
+  "retention fails a shallow clone whatever commit is named first",
+  shallowFirst.length === 1 && shallowFirst[0].startsWith("the repository is shallow; "),
+  shallowFirst.join("\n"),
+);
+
+// A replacement object that shows the parent as a commit which never held the dropped names.
+const swapped = history("swapped", begin, noNames);
+gitIn(swapped.dir, "replace", swapped.commits[0], swapped.commits[1]);
+const swappedProblems = retained(swapped);
+check(
+  "retention reads the real parent behind a replacement object",
+  swappedProblems.includes('slugs: the retired name "old" was removed; a retired name is kept for good'),
+  swappedProblems.join("\n"),
+);
+
+// A commit-graph cache forged to give the commit that dropped the names the first commit as
+// its parent, which hides the commit that held them from any walk that trusts the cache.
+const cached = history("cached", noNames, begin, noNames, noNames);
+gitIn(cached.dir, "commit-graph", "write", "--reachable");
+const graph = join(cached.dir, ".git", "objects", "info", "commit-graph");
+const cache = readFileSync(graph);
+const chunk = (id) => {
+  for (let at = 8; at < 8 + 12 * cache[6]; at += 12)
+    if (cache.toString("latin1", at, at + 4) === id) return Number(cache.readBigUInt64BE(at + 4));
+  throw new Error(`the commit-graph has no ${id} chunk`);
+};
+const rows = cache.readUInt32BE(chunk("OIDF") + 255 * 4);
+const row = (commit) => cache.subarray(chunk("OIDL"), chunk("OIDL") + 20 * rows).toString("hex").indexOf(commit) / 40;
+// Each commit's row holds its tree name, then the rows of its parents.
+cache.writeUInt32BE(row(cached.commits[0]), chunk("CDAT") + 36 * row(cached.commits[2]) + 20);
+createHash("sha1").update(cache.subarray(0, -20)).digest().copy(cache, cache.length - 20);
+chmodSync(graph, 0o666);
+writeFileSync(graph, cache);
+check(
+  "the forged commit-graph hides a commit from a walk that trusts it",
+  gitIn(cached.dir, "rev-list", "--count", `${cached.commits[0]}..HEAD`) === "2",
+);
+const cachedProblems = retained(cached);
+check(
+  "retention reads the real parents behind a forged commit-graph",
+  cachedProblems.includes('slugs: the retired name "old" was removed; a retired name is kept for good'),
+  cachedProblems.join("\n"),
+);
+
+// A grafts file that cuts the newest commit off from the parent that held the dropped names.
+const grafted = history("grafted", begin, noNames);
+mkdirSync(join(grafted.dir, ".git", "info"), { recursive: true });
+writeFileSync(join(grafted.dir, ".git", "info", "grafts"), `${gitIn(grafted.dir, "rev-parse", "HEAD")}\n`);
+const graftedProblems = retained(grafted);
+check(
+  "retention fails a repository whose grafts file could hide a parent",
+  graftedProblems.length === 1 && graftedProblems[0].startsWith("the repository has a grafts file; "),
+  graftedProblems.join("\n"),
+);
+
+// The record stored as a link in the earlier commit, whatever the link names.
+const linked = history("linked", null);
+writeFileSync(join(work, "target.txt"), "elsewhere");
+const blob = gitIn(linked.dir, "hash-object", "-w", join(work, "target.txt"));
+gitIn(linked.dir, "update-index", "--add", "--cacheinfo", `120000,${blob},${aliasRecord}`);
+gitIn(linked.dir, "commit", "-q", "-m", "link");
+const linkCommit = gitIn(linked.dir, "rev-parse", "HEAD");
+place(linked.dir, noNames);
+const linkedProblems = retentionProblems(src, { tree: linked.dir, first: linked.commits[0] });
+check(
+  "retention fails a record stored as anything but one plain file",
+  linkedProblems.includes(`commit ${linkCommit} holds ${aliasRecord} as something other than one plain file`),
+  linkedProblems.join("\n"),
+);
+
+// Variables left by a hook or a caller that name another repository, one where nothing was
+// dropped, must not decide which history is read.
+const routed = { GIT_DIR: join(kept.dir, ".git"), GIT_WORK_TREE: kept.dir, GIT_COMMON_DIR: join(kept.dir, ".git") };
+const saved = Object.fromEntries(Object.keys(routed).map((k) => [k, env[k]]));
+Object.assign(env, routed);
+let routedProblems;
+try {
+  routedProblems = retained(dropped);
+} finally {
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete env[k];
+    else env[k] = v;
+  }
+}
+check(
+  "retention reads the tree's own history whatever repository the environment names",
+  routedProblems[0] === `against commit ${dropped.commits[0]}:` &&
+    routedProblems.includes('slugs: the retired name "old" was removed; a retired name is kept for good'),
+  routedProblems.join("\n"),
+);
+
+const inner = join(dropped.dir, "web");
+const innerProblems = retentionProblems(src, { tree: inner, first: dropped.commits[0] });
+check(
+  "retention fails a folder that is not the top of its working tree",
+  innerProblems.length === 1 && innerProblems[0].includes("is not the top of a git working tree"),
+  innerProblems.join("\n"),
+);
+
+const unborn = join(work, "unborn");
+mkdirSync(unborn);
+gitIn(unborn, "init", "-q", "-b", "main");
+place(unborn, noNames);
+const unbornProblems = retentionProblems(src, { tree: unborn });
+const outside = retentionProblems(src, { tree: join(work, "empty") });
+check(
+  "retention fails a folder outside any repository",
+  outside.length === 1 && outside[0].includes("is not the top of a git working tree"),
+  outside.join("\n"),
+);
+check(
+  "retention fails a repository without a commit",
+  unbornProblems.length === 1 && unbornProblems[0].startsWith("no commit to compare with"),
+  unbornProblems.join("\n"),
+);
+
+const absent = history("absent", begin, begin);
+rmSync(join(absent.dir, aliasRecord));
+const absentProblems = retained(absent);
+check(
+  "retention fails a working tree that lost the record",
+  absentProblems.some((p) => p.endsWith("the compiled folder holds no such file")),
+  absentProblems.join("\n"),
 );
 
 process.exitCode = failed > 0 ? 1 : 0;

@@ -68,6 +68,32 @@ public sealed class SchemaSetTests
             StringComparer.Ordinal);
     }
 
+    // The loader has its own path to the files, apart from the content root.
+    [Theory]
+    [InlineData("body.schema.json", "\r\n")]
+    [InlineData("body.schema.json", "\r")]
+    [InlineData("content.schema.json", "\r\n")]
+    public void CarriageReturnInASchemaFileIsRefused(string file, string ending)
+    {
+        using var folder = CopyOfSchema();
+        var path = Path.Combine(folder.Path, file);
+        File.WriteAllText(path, File.ReadAllText(path).Replace("\n", ending, StringComparison.Ordinal));
+
+        var (set, problems) = SchemaSet.Load(folder.Path);
+
+        Assert.Null(set);
+        Assert.Contains($"{file}: file holds a carriage return (CR); save it with LF line endings", problems, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void OneLoneCarriageReturnIsRefused()
+    {
+        using var folder = CopyOfSchema();
+        Replace(folder, "body.schema.json", "\"definitions\": {", "\"definitions\": {\r");
+
+        Assert.Null(SchemaSet.Load(folder.Path).Set);
+    }
+
     [Fact]
     public void MalformedKeywordValueIsASetupProblem()
     {

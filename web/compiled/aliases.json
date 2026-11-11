@@ -1,0 +1,14 @@
+{
+  "slugs": {
+    "10": "fixture-basics",
+    "2": "fixture-basics",
+    "fixture-old": "fixture-basics",
+    "fixture-older": "fixture-basics"
+  },
+  "ids": {
+    "constructor": "lib-fix-one",
+    "fix-link-notes": "fix-links",
+    "fix-linking": "fix-links",
+    "lib-fix-first": "lib-fix-one"
+  }
+}

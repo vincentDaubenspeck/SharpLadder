@@ -18,7 +18,20 @@ internal static class Repository
 
     public static IContentSchema Schema => LoadedSchema.Value;
 
-    public static CompileResult Compile(string contentRoot) => ContentCompiler.Compile(contentRoot, Schema, contentRoot);
+    // A tree written by a test holds only what the test is about, so an empty registry is added
+    // for each one it leaves out. CompileAsWritten compiles the tree exactly as it stands.
+    public static CompileResult Compile(string contentRoot)
+    {
+        if (Directory.Exists(contentRoot))
+        {
+            AddMissing(contentRoot, "aliases.yml", "slugs: {}\nids: {}\n");
+            AddMissing(contentRoot, "patterns.yml", "patterns: []\n");
+        }
+
+        return CompileAsWritten(contentRoot);
+    }
+
+    public static CompileResult CompileAsWritten(string contentRoot) => ContentCompiler.Compile(contentRoot, Schema, contentRoot);
 
     public static void CopyTree(string from, string to, string newline)
     {
@@ -28,6 +41,15 @@ internal static class Repository
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             var text = File.ReadAllText(file).Replace("\r\n", "\n", StringComparison.Ordinal);
             File.WriteAllText(target, text.Replace("\n", newline, StringComparison.Ordinal));
+        }
+    }
+
+    private static void AddMissing(string root, string name, string text)
+    {
+        var path = Path.Combine(root, name);
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            File.WriteAllText(path, text);
         }
     }
 

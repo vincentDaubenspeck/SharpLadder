@@ -1,7 +1,15 @@
 import ts from "typescript";
 
+/** Every kind a compiled record can be, as the compiler's manifest names it. */
+export const recordKinds = ["chapter", "part", "aliases", "patterns"] as const;
+export type RecordKind = (typeof recordKinds)[number];
+
+const isKind = (value: unknown): value is RecordKind =>
+  recordKinds.some((kind) => kind === value);
+
 export interface ContentRecord {
   readonly path: string;
+  readonly kind: RecordKind;
   readonly text: string;
 }
 
@@ -84,16 +92,18 @@ export function acceptEnvelope(
   if (!isObject(parsed) || !hasExactKeys(parsed, ["version", "records"]))
     return fail("the envelope must hold exactly version and records");
   const { version, records } = parsed;
-  if (version !== 1) fail("the envelope version must be 1");
+  if (version !== 2) fail("the envelope version must be 2");
   if (!Array.isArray(records) || records.length === 0)
     return fail("records must be a non-empty array");
   const accepted: ContentRecord[] = [];
   for (const record of records) {
-    if (!isObject(record) || !hasExactKeys(record, ["path", "text"]))
-      return fail("each record must hold exactly path and text");
-    const { path, text: payload } = record;
+    if (!isObject(record) || !hasExactKeys(record, ["path", "kind", "text"]))
+      return fail("each record must hold exactly path, kind and text");
+    const { path, kind, text: payload } = record;
     if (typeof path !== "string" || typeof payload !== "string")
       return fail("path and text must be strings");
+    if (!isKind(kind))
+      return fail(`record kind ${JSON.stringify(kind)} is not a known kind`);
     if (path === manifestPath) fail("the manifest is not a record");
     if (!recordPath.test(path) || path.split("/").some((s) => /^\.+$/u.test(s)))
       fail(
@@ -107,7 +117,7 @@ export function acceptEnvelope(
           ? `record path ${path} is repeated`
           : `record path ${path} is out of ordinal order`,
       );
-    accepted.push({ path, text: payload });
+    accepted.push({ path, kind, text: payload });
   }
   const wanted = [...expected].sort();
   if (

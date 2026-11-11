@@ -3,6 +3,7 @@ declare module "vitest" {
   export interface ProvidedContext {
     contentRecords: readonly {
       readonly path: string;
+      readonly kind: string;
       readonly text: string;
     }[];
   }

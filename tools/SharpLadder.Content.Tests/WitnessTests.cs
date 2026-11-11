@@ -63,7 +63,10 @@ public sealed partial class WitnessTests
         Assert.Empty(result.Diagnostics);
         Assert.NotEmpty(result.Files);
 
-        foreach (var file in result.Files)
+        // A registry record has no witness: no browser code reads one yet.
+        var content = result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part).ToList();
+        Assert.Equal(result.Files.Count - 2, content.Count);
+        foreach (var file in content)
         {
             var (text, problems) = WitnessEmitter.Emit(file.RelativePath, file.Bytes);
 
@@ -104,14 +107,11 @@ public sealed partial class WitnessTests
     public void EmissionIsDeterministic()
     {
         var bytes = File.ReadAllBytes(Path.Combine(Folder, "stress.json"));
-        var crlf = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes).Replace("\n", "\r\n", StringComparison.Ordinal));
 
         var (first, _) = Emit(bytes);
         var (second, _) = Emit(bytes);
-        var (third, _) = Emit(crlf);
 
         Assert.Equal(first, second);
-        Assert.Equal(first, third);
         Assert.DoesNotContain('\r', first!);
         Assert.EndsWith(";\n", first, StringComparison.Ordinal);
         Assert.Single(ExportPattern().Matches(first!));
@@ -190,6 +190,17 @@ public sealed partial class WitnessTests
     [InlineData("", "#: not UTF-8 JSON without duplicate names")]
     public void DocumentsOutsideTheGrammarAreRefused(string json, string expected) =>
         AssertRefused(json, expected);
+
+    [Theory]
+    [InlineData("{\"type\":\"part\"}\r\n")]
+    [InlineData("{\r\"type\":\"part\"}")]
+    public void CarriageReturnIsRefused(string json)
+    {
+        var (text, problems) = Emit(Encoding.UTF8.GetBytes(json));
+
+        Assert.Null(text);
+        Assert.Equal($"{Part}#: holds a carriage return (CR)", Assert.Single(problems));
+    }
 
     [Fact]
     public void ByteOrderMarkIsRefused()

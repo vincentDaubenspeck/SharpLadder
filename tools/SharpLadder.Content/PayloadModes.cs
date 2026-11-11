@@ -13,7 +13,7 @@ internal static class PayloadModes
     {
         using var schemaFolder = Folder.OpenRoot(paths[0], paths[0]);
         using var contentFolder = Folder.OpenRoot(paths[1], paths[1]);
-        List<(InputTree Tree, string Role)> inputs = [(InputTree.Read(schemaFolder), "schema folder"), (InputTree.Read(contentFolder), "content root")];
+        List<(InputTree Tree, string Role)> inputs = [(InputTree.Read(schemaFolder), "schema folder"), (InputTree.ReadContent(contentFolder), "content root")];
         CheckTreesApart(inputs);
         if (string.Equals(mode, "update", StringComparison.Ordinal))
         {

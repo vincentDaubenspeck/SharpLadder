@@ -17,6 +17,14 @@ internal static partial class ContentIds
 
     public static bool IsValid(string id) => IdPattern().IsMatch(id);
 
+    public static bool IsSlug(string slug) => SlugPattern().IsMatch(slug);
+
+    // Length as the schema counts it: code points, so a character outside the BMP is one.
+    public static int SpokenLength(string text) => text.Length - text.Count(char.IsLowSurrogate);
+
     [GeneratedRegex(@"^[a-z][a-z0-9-]{0,47}\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex IdPattern();
+
+    [GeneratedRegex(@"^(?=.{1,48}\z)[a-z0-9]+(?:-[a-z0-9]+)*\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex SlugPattern();
 }

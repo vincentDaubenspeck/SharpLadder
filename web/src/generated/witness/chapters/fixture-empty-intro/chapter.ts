@@ -34,6 +34,19 @@ export const witness = {
           ],
         },
       ],
+      spoken: {
+        segments: [
+          {
+            target: {
+              type: "block",
+              blockId: "empty-intro-only/b1",
+            },
+            text: "This chapter has no intro blocks before its first section.",
+          },
+        ],
+        audio:
+          "sha256:01e54794c443917a7b63bba70acc47dad7cb273ff6fc4e5b60354d0f43b130d4",
+      },
     },
   ],
 } satisfies ContentDoc;

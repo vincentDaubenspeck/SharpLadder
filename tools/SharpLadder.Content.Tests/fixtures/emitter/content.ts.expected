@@ -1,6 +1,6 @@
 // SharpLadder.Content type emitter output, grammar 1. Do not edit.
 
-import type { Body, Id, SectionId, Spans } from "./body.ts";
+import type { Body, Id, SectionId, Spans, Speech } from "./body.ts";
 
 export type ChapterId = Id;
 
@@ -32,6 +32,7 @@ export type ChapterSection = {
   id: SectionId;
   title: Spans;
   body: Body;
+  spoken: Speech;
 };
 
 export type PartSection = {
@@ -39,6 +40,7 @@ export type PartSection = {
   number: string;
   title: Spans;
   body: Body;
+  spoken: Speech;
 };
 
 export type ContentDoc = ChapterFile | PartFile;

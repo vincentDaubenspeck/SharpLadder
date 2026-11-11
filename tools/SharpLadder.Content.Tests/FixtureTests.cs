@@ -15,7 +15,7 @@ public sealed class FixtureTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Equal(
-            ["chapters/fixture-basics/build.json", "chapters/fixture-basics/chapter.json", "chapters/fixture-basics/gotchas.json", "chapters/fixture-basics/idioms.json", "chapters/fixture-basics/library.json", "chapters/fixture-basics/syntax.json", "chapters/fixture-empty-intro/chapter.json", "chapters/fixture-no-sections/chapter.json", "chapters/fixture-second/chapter.json"],
+            ["chapters/fixture-basics/build.json", "chapters/fixture-basics/chapter.json", "chapters/fixture-basics/gotchas.json", "chapters/fixture-basics/idioms.json", "chapters/fixture-basics/library.json", "chapters/fixture-basics/syntax.json", "chapters/fixture-empty-intro/chapter.json", "chapters/fixture-no-sections/chapter.json", "chapters/fixture-second/chapter.json", "aliases.json", "patterns.json"],
             result.Files.Select(f => f.RelativePath),
             StringComparer.Ordinal);
     }
@@ -54,21 +54,17 @@ public sealed class FixtureTests
     }
 
     [Fact]
-    public void OutputIsByteIdenticalForCrlfAndLfSources()
+    public void CrlfSourcesAreRefusedWithNoOutput()
     {
-        using var lf = new TempFolder();
         using var crlf = new TempFolder();
-        Repository.CopyTree(Repository.Fixture, lf.Path, "\n");
         Repository.CopyTree(Repository.Fixture, crlf.Path, "\r\n");
         Assert.Contains("\r\n", File.ReadAllText(Path.Combine(crlf.Path, "chapters", "fixture-basics", "chapter.md")), StringComparison.Ordinal);
 
-        var fromLf = Repository.Compile(lf.Path);
-        var fromCrlf = Repository.Compile(crlf.Path);
+        var result = Repository.Compile(crlf.Path);
 
-        Assert.Empty(fromCrlf.Diagnostics);
-        Assert.Equal(fromLf.Files.Select(f => f.RelativePath), fromCrlf.Files.Select(f => f.RelativePath), StringComparer.Ordinal);
-        Assert.All(fromLf.Files.Zip(fromCrlf.Files), pair => Assert.Equal(pair.First.Bytes, pair.Second.Bytes));
-        Assert.DoesNotContain((byte)'\r', fromCrlf.Files.SelectMany(f => f.Bytes));
+        Assert.Empty(result.Files);
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, d => Assert.Contains("carriage return", d.Message, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -93,11 +89,15 @@ public sealed class FixtureTests
         foreach (var property in models.SelectMany(t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)))
         {
             Assert.True(property.GetCustomAttribute<JsonPropertyOrderAttribute>() is not null, $"{property.DeclaringType!.Name}.{property.Name} has no JsonPropertyOrder");
-            Assert.False(IsDictionary(property.PropertyType), $"{property.DeclaringType!.Name}.{property.Name} is a dictionary");
+            Assert.False(IsUnorderedDictionary(property.PropertyType), $"{property.DeclaringType!.Name}.{property.Name} is a dictionary");
         }
     }
 
-    // A dictionary would need ordinal key sorting to serialise deterministically.
+    // A dictionary would need ordinal key sorting to serialise deterministically. The alias maps
+    // are the one sorted kind admitted; the registry tests prove their order is ordinal.
+    private static bool IsUnorderedDictionary(Type type) =>
+        type != typeof(SortedDictionary<string, string>) && IsDictionary(type);
+
     private static bool IsDictionary(Type type) =>
         typeof(IDictionary).IsAssignableFrom(type)
         || type.GetInterfaces().Append(type).Any(i => i.IsGenericType

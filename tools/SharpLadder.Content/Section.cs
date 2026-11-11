@@ -16,4 +16,12 @@ internal sealed class Section
 
     [JsonPropertyOrder(3)]
     public required IReadOnlyList<BodyBlock> Body { get; init; }
+
+    // Set once the whole section has been read; the schema refuses a section without it.
+    [JsonPropertyOrder(4)]
+    public SectionSpeech? Spoken { get; set; }
+
+    // The heading's speech=skip summary, spoken in place of the body.
+    [JsonIgnore]
+    internal string? Summary { get; init; }
 }

@@ -66,17 +66,18 @@
     "chapterSection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "body"],
+      "required": ["id", "title", "body", "spoken"],
       "properties": {
         "id": { "$ref": "body.schema.json#/definitions/sectionId" },
         "title": { "$ref": "body.schema.json#/definitions/spans" },
-        "body": { "$ref": "body.schema.json#/definitions/body" }
+        "body": { "$ref": "body.schema.json#/definitions/body" },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
       }
     },
     "partSection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "number", "title", "body"],
+      "required": ["id", "number", "title", "body", "spoken"],
       "properties": {
         "id": { "$ref": "body.schema.json#/definitions/sectionId" },
         "number": {
@@ -84,7 +85,8 @@
           "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*(?![\\s\\S])"
         },
         "title": { "$ref": "body.schema.json#/definitions/spans" },
-        "body": { "$ref": "body.schema.json#/definitions/body" }
+        "body": { "$ref": "body.schema.json#/definitions/body" },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
       }
     }
   }

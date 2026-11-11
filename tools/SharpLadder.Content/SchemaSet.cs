@@ -18,13 +18,26 @@ internal sealed class SchemaSet : IContentSchema
 {
     public const string BaseUri = "https://sharpladder.com/schema/";
     public const string RootFile = "content.schema.json";
+    public const string AliasesFile = "aliases.schema.json";
+    public const string PatternsFile = "patterns.schema.json";
+
+    // The registry schemas describe records no browser code reads yet, so no types come from them.
+    public static readonly IReadOnlyList<string> RegistryFiles = [AliasesFile, PatternsFile];
+
     private const string Draft07 = "http://json-schema.org/draft-07/schema#";
 
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     private readonly JsonValidator _validator;
+    private readonly JsonValidator _aliases;
+    private readonly JsonValidator _patterns;
 
-    private SchemaSet(JsonValidator validator) => _validator = validator;
+    private SchemaSet(JsonValidator validator, JsonValidator aliases, JsonValidator patterns)
+    {
+        _validator = validator;
+        _aliases = aliases;
+        _patterns = patterns;
+    }
 
     // A boundary refusal, a link in the folder included, throws BoundaryException.
     public static (SchemaSet? Set, IReadOnlyList<string> Problems) Load(string folder)
@@ -49,9 +62,9 @@ internal sealed class SchemaSet : IContentSchema
             Read(entry.Name, entry.Bytes!, texts, nodes, problems);
         }
 
-        if (!texts.ContainsKey(BaseUri + RootFile))
+        foreach (var required in RegistryFiles.Prepend(RootFile).Where(f => !texts.ContainsKey(BaseUri + f)))
         {
-            problems.Add($"{RootFile} not found in the schema folder");
+            problems.Add($"{required} not found in the schema folder");
         }
 
         var positions = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
@@ -74,7 +87,7 @@ internal sealed class SchemaSet : IContentSchema
         // The validator library reports a malformed keyword value with assorted exception types.
         try
         {
-            return (new SchemaSet(Build(texts)), []);
+            return (new SchemaSet(Build(texts, RootFile), Build(texts, AliasesFile), Build(texts, PatternsFile)), []);
         }
         catch (Exception e)
         {
@@ -82,18 +95,36 @@ internal sealed class SchemaSet : IContentSchema
         }
     }
 
-    public string? Validate(string json)
+    public string? Validate(string json) => Validate(json, _validator, null);
+
+    public string? Validate(string json, RecordKind kind) => kind switch
     {
+        RecordKind.Chapter => Validate(json, _validator, "chapter"),
+        RecordKind.Part => Validate(json, _validator, "part"),
+        RecordKind.Aliases => Validate(json, _aliases, null),
+        RecordKind.Patterns => Validate(json, _patterns, null),
+        _ => "unknown record kind",
+    };
+
+    // type is the value the record's own type property must hold, when the kind fixes one.
+    private static string? Validate(string json, JsonValidator validator, string? type)
+    {
+        JsonNode? node;
         try
         {
-            _ = StrictJson.Parse(json);
+            node = StrictJson.Parse(json);
         }
         catch (JsonException e)
         {
             return "not JSON without duplicate names: " + e.Message;
         }
 
-        var result = _validator.Validate(json);
+        if (type is not null && !(node is JsonObject record && record["type"] is JsonValue value && value.TryGetValue<string>(out var found) && string.Equals(found, type, StringComparison.Ordinal)))
+        {
+            return $"the record is not of type \"{type}\"";
+        }
+
+        var result = validator.Validate(json);
         if (result.IsValid)
         {
             return null;
@@ -103,16 +134,16 @@ internal sealed class SchemaSet : IContentSchema
         return error is null ? "invalid" : $"{error.InstanceLocation}: {error.ErrorMessage} ({error.Keyword})";
     }
 
-    private static JsonValidator Build(SortedDictionary<string, string> texts)
+    private static JsonValidator Build(SortedDictionary<string, string> texts, string rootFile)
     {
         var options = new JsonValidatorOptions { DefaultDialect = DialectKind.Draft7 };
-        var validator = new JsonValidator(texts[BaseUri + RootFile], options)
+        var validator = new JsonValidator(texts[BaseUri + rootFile], options)
         {
             ExternalSchemaDocumentPopulator = new RefusingPopulator(),
         };
         foreach (var (uri, text) in texts)
         {
-            if (!string.Equals(uri, BaseUri + RootFile, StringComparison.Ordinal))
+            if (!string.Equals(uri, BaseUri + rootFile, StringComparison.Ordinal))
             {
                 validator.AddExternalDocument(text, options);
             }
@@ -123,6 +154,12 @@ internal sealed class SchemaSet : IContentSchema
 
     private static void Read(string name, byte[] bytes, SortedDictionary<string, string> texts, SortedDictionary<string, JsonNode> nodes, List<string> problems)
     {
+        if (TextAdmission.HoldsCarriageReturn(bytes))
+        {
+            problems.Add($"{name}: file holds a carriage return (CR); save it with LF line endings");
+            return;
+        }
+
         string text;
         JsonNode? node;
         try

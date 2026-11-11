@@ -71,14 +71,12 @@ public sealed class EmitterTests
     }
 
     [Fact]
-    public void OutputIsDeterministicAndIgnoresLineEndings()
+    public void OutputIsDeterministic()
     {
         var first = Accepted(Real(TypeEmitter.BodyFile), Real(TypeEmitter.ContentFile));
         var second = Accepted(Real(TypeEmitter.BodyFile), Real(TypeEmitter.ContentFile));
-        var crlf = Accepted(Real(TypeEmitter.BodyFile).Replace("\n", "\r\n", StringComparison.Ordinal), Real(TypeEmitter.ContentFile).Replace("\n", "\r\n", StringComparison.Ordinal));
 
         Assert.Equal(first, second);
-        Assert.Equal(first, crlf);
     }
 
     [Fact]
@@ -94,7 +92,7 @@ public sealed class EmitterTests
             Assert.EndsWith(";\n", text, StringComparison.Ordinal);
         }
 
-        Assert.Contains("import type { Body, Id, SectionId, Spans } from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
+        Assert.Contains("import type { Body, Id, SectionId, Spans, Speech } from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
         Assert.DoesNotContain("import", modules["body.ts"], StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(modules["content.ts"], "export type ContentDoc ="));
     }
@@ -503,6 +501,16 @@ public sealed class EmitterTests
         Assert.Null(notUtf8.Modules);
         Assert.Contains("not UTF-8 JSON", Assert.Single(notUtf8.Problems), StringComparison.Ordinal);
         Refused("[]", ContentDocument(), "the document must be a JSON object");
+    }
+
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\r")]
+    public void CarriageReturnInASchemaFileIsRefused(string ending)
+    {
+        var body = Entry(TypeEmitter.BodyFile, Real(TypeEmitter.BodyFile).Replace("\n", ending, StringComparison.Ordinal));
+
+        AssertProblem(TypeEmitter.Emit([body, Entry(TypeEmitter.ContentFile, Real(TypeEmitter.ContentFile))]), "body.schema.json: holds a carriage return (CR)");
     }
 
     [Fact]

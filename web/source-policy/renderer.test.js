@@ -75,10 +75,10 @@ const expectAll = (found, expected) => {
 };
 const anchor = "href={internalHref(link, slugs)}";
 const listCall = "return <ListNode block={block} slugs={slugs} />;";
-const para = "<p>\n          <Spans";
+const para = "<p data-block-id={block.blockId}>\n          <Spans";
 const labelSpan = "<span id={labelId}>";
 const labelPre = "<pre aria-labelledby={labelId}>";
-const divId = "<div id={block.id}>";
+const divId = "<div id={block.id} data-block-id={block.blockId}>";
 const hrefImport = 'import { internalHref, type SlugMap } from "./href.ts";';
 
 const assigned = "an assignment is not admitted in the renderer";
@@ -546,7 +546,7 @@ const refused = [
     mutate(blocks, listCall, "return <script>{block.type}</script>;"),
     "element <script> is not admitted",
   ],
-  ...["iframe", "svg", "section", "article", "img", "form", "h1", "button"].map(
+  ...["iframe", "svg", "aside", "article", "img", "form", "h1", "button"].map(
     (tag) => [
       `an unlisted ${tag} element`,
       blocks,
@@ -637,6 +637,98 @@ const refused = [
     "id on <div> is not from",
   ],
   [
+    "a block hook from the anchor id",
+    blocks,
+    mutate(blocks, divId, "<div id={block.id} data-block-id={block.id}>"),
+    "data-block-id on <div> is not from",
+  ],
+  [
+    "a literal block hook",
+    blocks,
+    mutate(blocks, para, '<p data-block-id="intro/b1">\n          <Spans'),
+    "data-block-id on <p> is not from",
+  ],
+  [
+    "a block hook built from the block id",
+    blocks,
+    mutate(
+      blocks,
+      para,
+      "<p data-block-id={String(block.blockId)}>\n          <Spans",
+    ),
+    "data-block-id on <p> is not from",
+  ],
+  [
+    "an item hook from the list",
+    blocks,
+    mutate(
+      blocks,
+      "<li key={item.blockId} data-block-id={item.blockId}>",
+      "<li key={item.blockId} data-block-id={block.blockId}>",
+    ),
+    "data-block-id on <li> is not from",
+  ],
+  [
+    "an item hook from the item content",
+    blocks,
+    mutate(
+      blocks,
+      "<li key={item.blockId} data-block-id={item.blockId}>",
+      "<li key={item.blockId} data-block-id={item.content}>",
+    ),
+    "data-block-id on <li> is not from",
+  ],
+  [
+    "a block hook on a label",
+    blocks,
+    mutate(
+      blocks,
+      labelSpan,
+      "<span id={labelId} data-block-id={block.blockId}>",
+    ),
+    "attribute data-block-id is not admitted on <span>",
+  ],
+  [
+    "a section hook on a block",
+    blocks,
+    mutate(
+      blocks,
+      para,
+      "<p data-section-id={block.blockId}>\n          <Spans",
+    ),
+    "attribute data-section-id is not admitted on <p>",
+  ],
+  [
+    "a section hook from the title",
+    view,
+    mutate(
+      view,
+      "<section data-section-id={section.id}>\n      <h2",
+      "<section data-section-id={section.title}>\n      <h2",
+    ),
+    "data-section-id on <section> is not from",
+  ],
+  [
+    "a block hook on a section",
+    view,
+    mutate(
+      view,
+      "<section data-section-id={section.id}>\n      <h2",
+      "<section data-block-id={section.id}>\n      <h2",
+    ),
+    "attribute data-block-id is not admitted on <section>",
+  ],
+  [
+    "another data attribute beside the hook",
+    blocks,
+    mutate(
+      blocks,
+      para,
+      "<p data-block-id={block.blockId} data-kind={block.type}>\n          <Spans",
+    ),
+    "attribute data-kind is not admitted on <p>",
+  ],
+  [
     "a heading id from the title",
     view,
     mutate(view, "<h2 id={section.id}>", "<h2 id={section.title}>"),
@@ -685,7 +777,11 @@ const refused = [
   [
     "an arbitrary list start",
     blocks,
-    mutate(blocks, "<ol start={block.start}>", "<ol start={2}>"),
+    mutate(
+      blocks,
+      "<ol start={block.start} data-block-id={block.blockId}>",
+      "<ol start={2}>",
+    ),
     "start on <ol> is not from",
   ],
   [
@@ -693,7 +789,7 @@ const refused = [
     blocks,
     mutate(
       blocks,
-      "<ol start={block.start}>",
+      "<ol start={block.start} data-block-id={block.blockId}>",
       "<ol start={block.items.length}>",
     ),
     "start on <ol> is not from",
@@ -836,7 +932,7 @@ const refused = [
     blocks,
     mutate(
       blocks,
-      "<li key={item.blockId}>",
+      "<li key={item.blockId} data-block-id={item.blockId}>",
       "<li key={String(item.blockId)}>",
     ),
     badCall,
@@ -846,8 +942,8 @@ const refused = [
     view,
     mutate(
       view,
-      "  return (\n    <>\n      <h2 id={section.id}>",
-      '  section.id = "x";\n  return (\n    <>\n      <h2 id={section.id}>',
+      "  return (\n    <section data-section-id={section.id}>\n      <h2 id={section.id}>",
+      '  section.id = "x";\n  return (\n    <section data-section-id={section.id}>\n      <h2 id={section.id}>',
     ),
     assigned,
   ],
@@ -1154,7 +1250,11 @@ const allowed = [
   [
     "a literal key",
     blocks,
-    mutate(blocks, "<li key={item.blockId}>", '<li key="fixed">'),
+    mutate(
+      blocks,
+      "<li key={item.blockId} data-block-id={item.blockId}>",
+      '<li key="fixed">',
+    ),
   ],
   ["every admitted call form", blocks, callForms],
 ];

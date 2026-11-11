@@ -32,6 +32,11 @@ export const p1 = {
           source: "int x = 1;",
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -60,6 +65,11 @@ export const p2b = {
       number: "1.1",
       title: [{ type: "text", text: "One" }],
       body: [],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -86,6 +96,11 @@ export const p3 = {
           source: "int x = 1;",
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;

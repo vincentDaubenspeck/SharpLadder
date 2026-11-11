@@ -46,7 +46,26 @@
           "throws": "KeyNotFoundException",
           "source": "var stock = new Dictionary\u003Cstring, int\u003E();\nint n = stock[\u0022bolt\u0022];"
         }
-      ]
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "gotcha-fix-key/b1"
+            },
+            "text": "Reading a key that is not there throws at run time."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "gotcha-fix-key/b2"
+            },
+            "text": "Reads a missing key"
+          }
+        ],
+        "audio": "sha256:265c56f6718417305109345ddb6cb1c268bf1b2393759ba25a1ae1d6b2f0ec2e"
+      }
     },
     {
       "id": "gotcha-fix-out",
@@ -77,7 +96,26 @@
           "spoken": "The compiler reports the error",
           "source": "error CS1620"
         }
-      ]
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "gotcha-fix-out/b1"
+            },
+            "text": "TryParse without out"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "gotcha-fix-out/b2"
+            },
+            "text": "The compiler reports the error"
+          }
+        ],
+        "audio": "sha256:63440ada89699a59024264ce062372e6c047175242d9b31b9921cb33f444e9ee"
+      }
     }
   ]
 }

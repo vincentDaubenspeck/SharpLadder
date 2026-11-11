@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sharpladder.com/schema/aliases.schema.json",
+  "title": "Compiled alias registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slugs", "ids"],
+  "properties": {
+    "slugs": {
+      "type": "object",
+      "propertyNames": { "type": "string", "maxLength": 48, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(?![\\s\\S])" },
+      "additionalProperties": { "type": "string", "maxLength": 48, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(?![\\s\\S])" }
+    },
+    "ids": {
+      "type": "object",
+      "propertyNames": { "$ref": "body.schema.json#/definitions/id" },
+      "additionalProperties": { "$ref": "body.schema.json#/definitions/id" }
+    }
+  }
+}

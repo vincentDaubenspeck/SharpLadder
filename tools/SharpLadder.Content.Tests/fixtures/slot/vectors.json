@@ -1,0 +1,169 @@
+{
+  "accepted": [
+    {
+      "name": "empty array",
+      "stored": true,
+      "texts": [],
+      "canonical": "5b5d",
+      "slot": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "one empty text",
+      "stored": true,
+      "texts": [[]],
+      "canonical": "5b22225d",
+      "slot": "sha256:055539df4a0b804c58caf46c0cd2941af10d64c1395ddd8e50b5f55d945841e6"
+    },
+    {
+      "name": "two texts",
+      "stored": true,
+      "texts": [[97], [98]],
+      "canonical": "5b2261222c2262225d",
+      "slot": "sha256:0473ef2dc0d324ab659d3580c1134e9d812035905c4781fdd6d529b0c6860e13"
+    },
+    {
+      "name": "two texts swapped",
+      "stored": true,
+      "texts": [[98], [97]],
+      "canonical": "5b2262222c2261225d",
+      "slot": "sha256:02d8bc3008a9bb0dcc4b86d7fd3428ced792355c733c19756bec5a56dc61b2c5"
+    },
+    {
+      "name": "RFC 8785 section 3.2.2.2 string",
+      "stored": true,
+      "texts": [[8364, 36, 15, 10, 65, 39, 66, 34, 92, 92, 34, 47]],
+      "canonical": "5b22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f225d",
+      "slot": "sha256:23247fdde115ba9e94cc104ce7d0c5df2f563bb1c8dc765f145d1b75daac98ed"
+    },
+    {
+      "name": "every control character",
+      "stored": false,
+      "texts": [
+        [0],
+        [1],
+        [2],
+        [3],
+        [4],
+        [5],
+        [6],
+        [7],
+        [8],
+        [9],
+        [10],
+        [11],
+        [12],
+        [13],
+        [14],
+        [15],
+        [16],
+        [17],
+        [18],
+        [19],
+        [20],
+        [21],
+        [22],
+        [23],
+        [24],
+        [25],
+        [26],
+        [27],
+        [28],
+        [29],
+        [30],
+        [31]
+      ],
+      "canonical": "5b225c7530303030222c225c7530303031222c225c7530303032222c225c7530303033222c225c7530303034222c225c7530303035222c225c7530303036222c225c7530303037222c225c62222c225c74222c225c6e222c225c7530303062222c225c66222c225c72222c225c7530303065222c225c7530303066222c225c7530303130222c225c7530303131222c225c7530303132222c225c7530303133222c225c7530303134222c225c7530303135222c225c7530303136222c225c7530303137222c225c7530303138222c225c7530303139222c225c7530303161222c225c7530303162222c225c7530303163222c225c7530303164222c225c7530303165222c225c7530303166225d",
+      "slot": "sha256:3ec6c9c4007a118a9c280641e2c87e9bfa3752a8616dfdef70463e29e1a7a5ae"
+    },
+    {
+      "name": "carriage return and line feed inside a text",
+      "stored": false,
+      "texts": [[97, 13, 10, 98]],
+      "canonical": "5b22615c725c6e62225d",
+      "slot": "sha256:6d64c995121a68ad99e7d8c282c2af5925f69cee1105e760ac8cf6a8f5498e38"
+    },
+    {
+      "name": "quote and backslash",
+      "stored": true,
+      "texts": [[34], [92]],
+      "canonical": "5b225c22222c225c5c225d",
+      "slot": "sha256:e8c4c723bc3bf1f9e11c6f254a50e76ae6fbf96d47c2967098023e60789448b3"
+    },
+    {
+      "name": "delete, line separator and paragraph separator stay raw",
+      "stored": true,
+      "texts": [[127], [8232], [8233]],
+      "canonical": "5b227f222c22e280a8222c22e280a9225d",
+      "slot": "sha256:cb89475109e0c6e73314860b2c7c3dbf276bcebb9246a79b2e8eb83715703d0e"
+    },
+    {
+      "name": "non-BMP character stays raw",
+      "stored": true,
+      "texts": [[55357, 56832]],
+      "canonical": "5b22f09f9880225d",
+      "slot": "sha256:aff2a0387611973d359e99d65ccf8953b41a00e9415a4e83ee6aab1e3c72a4ab"
+    },
+    {
+      "name": "solidus, angle brackets, ampersand, plus and apostrophe stay raw",
+      "stored": true,
+      "texts": [[47, 60, 62, 38, 43, 39]],
+      "canonical": "5b222f3c3e262b27225d",
+      "slot": "sha256:ce7642785f5cc8eb9442681d766467035c311ea0898a78244089ff1b52a69620"
+    },
+    {
+      "name": "non-ASCII and noncharacter stay raw",
+      "stored": false,
+      "texts": [[233], [65535], [65534]],
+      "canonical": "5b22c3a9222c22efbfbf222c22efbfbe225d",
+      "slot": "sha256:b30070039f7f451515173917d96a9c8249edf3e89b8bea0cdfc54a6fbe17463f"
+    },
+    {
+      "name": "decomposed sequence is not composed by the writer",
+      "stored": false,
+      "texts": [[101, 769]],
+      "canonical": "5b2265cc81225d",
+      "slot": "sha256:32860394d411eb384be988968561412199087c5fd8be3004ef5516db217fb254"
+    },
+    {
+      "name": "text that looks like JSON",
+      "stored": true,
+      "texts": [[34, 44, 34], [93]],
+      "canonical": "5b225c222c5c22222c225d225d",
+      "slot": "sha256:c284d8cda05678976329639f952688c28ef46dad8f6bbac14d6b2d1dbc78869b"
+    }
+  ],
+  "rejected": [
+    {
+      "name": "lone high surrogate",
+      "texts": [[55296]]
+    },
+    {
+      "name": "lone low surrogate",
+      "texts": [[56320]]
+    },
+    {
+      "name": "high surrogate before a letter",
+      "texts": [[55296, 65]]
+    },
+    {
+      "name": "low surrogate after a letter",
+      "texts": [[65, 56320]]
+    },
+    {
+      "name": "surrogates in the wrong order",
+      "texts": [[56320, 55296]]
+    },
+    {
+      "name": "high surrogate at the end",
+      "texts": [[97, 55357]]
+    },
+    {
+      "name": "two high surrogates",
+      "texts": [[55357, 55357, 56832]]
+    },
+    {
+      "name": "lone surrogate in a later text",
+      "texts": [[111, 107], [57343]]
+    }
+  ]
+}

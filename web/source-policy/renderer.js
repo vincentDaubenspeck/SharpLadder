@@ -80,16 +80,20 @@ const markupSinks = new Set([
 ]);
 const tsDirectives = ["@ts-ignore", "@ts-nocheck", "@ts-expect-error"];
 
-// Every intrinsic may carry key; these are the only other attributes per element.
+// Every intrinsic may carry key; these are the only other attributes per element. The data
+// attributes are the hooks a spoken segment's target resolves to.
+const blockHook = "data-block-id";
+const sectionHook = "data-section-id";
 const intrinsics = new Map([
-  ["div", ["id"]],
+  ["section", [sectionHook]],
+  ["div", ["id", blockHook]],
   ["span", ["id"]],
   ["h2", ["id"]],
   ["h3", ["id"]],
-  ["p", []],
-  ["ul", []],
-  ["ol", ["start"]],
-  ["li", []],
+  ["p", [blockHook]],
+  ["ul", [blockHook]],
+  ["ol", ["start", blockHook]],
+  ["li", [blockHook]],
   ["pre", ["aria-labelledby"]],
   ["code", []],
   ["em", []],
@@ -316,6 +320,27 @@ export function rendererFindings(
     );
   };
 
+  // One plain member of the element parameter of an admitted inline map callback.
+  const isMapElementMember = (expression, field) => {
+    if (
+      expression?.type !== "MemberExpression" ||
+      expression.computed ||
+      expression.optional ||
+      expression.property.name !== field ||
+      expression.object.type !== "Identifier"
+    )
+      return false;
+    const def = onlyDef(variableOf(expression.object));
+    if (def?.type !== "Parameter") return false;
+    const callback = def.node;
+    return (
+      callback.type === "ArrowFunctionExpression" &&
+      callback.params[0] === def.name &&
+      isMapCall(callback.parent) &&
+      callback.parent.arguments[0] === callback
+    );
+  };
+
   // A reviewed callee: a top-level function declaration of this module or a value import from a
   // listed renderer module, each with one definition and never written.
   const isRendererBinding = (callee) => {
@@ -435,7 +460,14 @@ export function rendererFindings(
       if (name === "key") continue;
       const expression = expressionOf(attribute);
       let ok;
-      if (tag === "div") ok = isParamMember(expression, "block", "id");
+      if (name === blockHook)
+        ok =
+          tag === "li"
+            ? isMapElementMember(expression, "blockId")
+            : isParamMember(expression, "block", "blockId");
+      else if (name === sectionHook)
+        ok = isParamMember(expression, "section", "id");
+      else if (tag === "div") ok = isParamMember(expression, "block", "id");
       else if (tag === "h2" || tag === "h3")
         ok = isParamMember(expression, "section", "id");
       else if (tag === "ol") ok = isParamMember(expression, "block", "start");

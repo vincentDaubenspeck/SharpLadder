@@ -15,16 +15,31 @@ import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   acceptRun,
+  caseLists,
   evidenceProblems,
+  recordSetProblems,
+  registryFile,
   roundTripCases,
   roundTripFile,
   roundTripSuite,
   runnerEnv,
+  speechFile,
 } from "./acceptance.ts";
+import type { CaseList, ExpectedRecord } from "./acceptance.ts";
+import { acceptEnvelope, recordKinds } from "./envelope.ts";
+import type { RecordKind } from "./envelope.ts";
 import { recordInventory } from "./inventory.ts";
+import { runTestRecords } from "./records.ts";
 
 const web = join(import.meta.dirname, "..");
-const expected = recordInventory(join(web, "compiled"));
+// The kinds come from the compiler, as in the run itself; the global setup has built it.
+const certified = runTestRecords({ builtByGlobalSetup: true });
+const all: readonly ExpectedRecord[] = acceptEnvelope(
+  certified.stdout,
+  certified.exit,
+  recordInventory(join(web, "compiled")),
+).map(({ path, kind }) => ({ path, kind }));
+const expected = all.filter((r) => r.kind === "chapter" || r.kind === "part");
 const scratch = join(web, ".cache");
 mkdirSync(scratch, { recursive: true });
 const temp = mkdtempSync(join(scratch, "acceptance-test-"));
@@ -41,30 +56,63 @@ interface Case {
   status: string;
 }
 
-const cases = (paths: readonly string[] = expected): Case[] =>
-  paths.flatMap((path) =>
-    roundTripCases.map((title) => ({
-      ancestorTitles: [roundTripSuite + path],
-      title,
-      status: "passed",
-    })),
-  );
+const listOf = (file: string): CaseList => {
+  const list = caseLists.find((l) => l.file === file);
+  if (list === undefined) throw new Error(`no case list for ${file}`);
+  return list;
+};
+const listFor = (kind: RecordKind): CaseList => {
+  const lists = caseLists.filter((l) => l.kinds.includes(kind));
+  const [list] = lists;
+  if (list === undefined || lists.length !== 1)
+    throw new Error(`not exactly one case list for ${kind}`);
+  return list;
+};
+const roundTrip = listOf(roundTripFile);
+const speech = listOf(speechFile);
+const aliases = listFor("aliases");
+const patterns = listFor("patterns");
 
+// The cases a list declares for the records of the kinds it judges.
+const cases = (
+  records: readonly ExpectedRecord[] = expected,
+  list: CaseList = roundTrip,
+): Case[] =>
+  records
+    .filter((r) => list.kinds.includes(r.kind))
+    .flatMap(({ path }) =>
+      list.cases.map((title) => ({
+        ancestorTitles: [list.suite + path],
+        title,
+        status: "passed",
+      })),
+    );
+
+const registryCases = (records: readonly ExpectedRecord[] = all): Case[] => [
+  ...cases(records, aliases),
+  ...cases(records, patterns),
+];
+
+// The speech and registry files' results are complete unless a test replaces them.
 const report = (
   assertionResults: unknown,
   name = join(web, roundTripFile),
+  spoken: unknown = cases(expected, speech),
+  registry: unknown = registryCases(),
 ) => ({
   success: true,
   testResults: [
     { name: join(web, "src", "App.test.tsx"), assertionResults: [] },
     { name, assertionResults },
+    { name: join(web, speechFile), assertionResults: spoken },
+    { name: join(web, registryFile), assertionResults: registry },
   ],
 });
 
-const judged = (value: unknown, paths: readonly string[] = expected) =>
-  evidenceProblems(value, web, paths);
+const judged = (value: unknown, records: readonly ExpectedRecord[] = all) =>
+  evidenceProblems(value, web, records);
 
-const first = expected[0] ?? "";
+const first = expected[0]?.path ?? "";
 const firstCase = roundTripCases[0] ?? "";
 const gap = (found: string) =>
   `${first}: "${firstCase}" must pass exactly once, found [${found}]`;
@@ -98,8 +146,9 @@ describe("the round-trip evidence in a Vitest report", () => {
     const one = rootIn("İ");
     const other = rootIn("i̇");
     const named = (root: string) => report(cases(), join(root, roundTripFile));
-    expect(evidenceProblems(named(one), one, expected)).toEqual([]);
-    expect(evidenceProblems(named(other), one, expected)).toEqual([
+    const only = [roundTrip];
+    expect(evidenceProblems(named(one), one, expected, only)).toEqual([]);
+    expect(evidenceProblems(named(other), one, expected, only)).toEqual([
       `${roundTripFile} has 0 results in the Vitest report`,
     ]);
   });
@@ -171,6 +220,150 @@ describe("the round-trip evidence in a Vitest report", () => {
     ]);
   });
 
+  it("refuses a record whose speech case is missing, skipped or repeated", () => {
+    const title = speech.cases[0] ?? "";
+    const found = (results: Case[]) =>
+      judged(report(cases(), join(web, roundTripFile), results));
+    const all = () => cases(expected, speech);
+    const line = (status: string) =>
+      `${first}: "${title}" must pass exactly once, found [${status}]`;
+    expect(title).not.toBe("");
+    expect(found(all().slice(1))).toEqual([line("")]);
+    const skipped = all();
+    if (skipped[0]) skipped[0].status = "skipped";
+    expect(found(skipped)).toEqual([line("skipped")]);
+    expect(found([...all(), ...all().slice(0, 1)])).toEqual([
+      line("passed, passed"),
+    ]);
+  });
+
+  it("refuses a report without the speech file, or with only its titles elsewhere", () => {
+    const missing = `${speechFile} has 0 results in the Vitest report`;
+    const base = report(cases());
+    const isSpeech = (r: { name: string }) => r.name === join(web, speechFile);
+    const without = {
+      ...base,
+      testResults: base.testResults.filter((r) => !isSpeech(r)),
+    };
+    expect(judged(without)).toEqual([missing]);
+    const moved = report([...cases(), ...cases(expected, speech)]);
+    moved.testResults.splice(moved.testResults.findIndex(isSpeech), 1);
+    expect(judged(moved)).toEqual([missing]);
+  });
+
+  it("does not let one file's cases stand for the other's", () => {
+    const swapped = report(
+      cases(expected, speech),
+      join(web, roundTripFile),
+      cases(),
+    );
+    expect(judged(swapped)).toHaveLength(
+      expected.length * (roundTripCases.length + speech.cases.length),
+    );
+  });
+
+  it("refuses an empty list of case lists and a list without cases", () => {
+    expect(evidenceProblems(report(cases()), web, expected, [])).toEqual([
+      "no case list is given",
+    ]);
+    const empty = evidenceProblems(report(cases()), web, expected, [
+      { ...roundTrip, cases: [] },
+    ]);
+    expect(empty).toEqual(
+      expected.map((r) => `${r.path}: no case list judges the kind ${r.kind}`),
+    );
+  });
+
+  it("refuses a record whose kind no list judges", () => {
+    const stray = { path: "compiled/zz.json", kind: "registry" as RecordKind };
+    expect(judged(report(cases()), [...all, stray])).toEqual([
+      "compiled/zz.json: no case list judges the kind registry",
+    ]);
+    expect(
+      evidenceProblems(report(cases()), web, all, [roundTrip, speech]),
+    ).toEqual(
+      all
+        .filter((r) => r.kind === "aliases" || r.kind === "patterns")
+        .map((r) => `${r.path}: no case list judges the kind ${r.kind}`),
+    );
+  });
+
+  it("holds every kind to its own lists whatever the record is called", () => {
+    // A chapter record stated as an alias registry owes the alias cases, and its round-trip
+    // results no longer count for anything.
+    const relabelled = all.map((r) =>
+      r.path === first ? { ...r, kind: "aliases" as const } : r,
+    );
+    const problems = judged(report(cases()), relabelled);
+    for (const title of aliases.cases)
+      expect(problems).toContain(
+        `${first}: "${title}" must pass exactly once, found []`,
+      );
+    expect(problems).toContain(
+      `${roundTripSuite}${first}: unexpected case "${firstCase}"`,
+    );
+    // The other way round: a registry stated as a chapter owes every chapter case.
+    const registry = all.find((r) => r.kind === "patterns")?.path ?? "";
+    const promoted = all.map((r) =>
+      r.path === registry ? { ...r, kind: "chapter" as const } : r,
+    );
+    expect(judged(report(cases()), promoted)).toContain(
+      `${registry}: "${firstCase}" must pass exactly once, found []`,
+    );
+  });
+
+  it("refuses a registry case that is missing, skipped, repeated or in the wrong suite", () => {
+    const path = all.find((r) => r.kind === "aliases")?.path ?? "";
+    const title = aliases.cases[0] ?? "";
+    const found = (results: Case[]) =>
+      judged(report(cases(), join(web, roundTripFile), undefined, results));
+    const line = (status: string) =>
+      `${path}: "${title}" must pass exactly once, found [${status}]`;
+    expect(path).not.toBe("");
+    expect(found(registryCases().slice(1))).toEqual([line("")]);
+    const skipped = registryCases();
+    if (skipped[0]) skipped[0].status = "skipped";
+    expect(found(skipped)).toEqual([line("skipped")]);
+    expect(found([...registryCases(), ...registryCases().slice(0, 1)])).toEqual(
+      [line("passed, passed")],
+    );
+    // An alias case filed under the pattern suite proves nothing about either.
+    const crossed = registryCases();
+    if (crossed[0])
+      crossed[0].ancestorTitles = [
+        patterns.suite + (all.find((r) => r.kind === "patterns")?.path ?? ""),
+      ];
+    expect(found(crossed)).toContain(line(""));
+    expect(found([])).toHaveLength(
+      aliases.cases.length + patterns.cases.length,
+    );
+  });
+
+  it("refuses a report without the registry file", () => {
+    const base = report(cases());
+    base.testResults.pop();
+    expect(judged(base)).toEqual([
+      `${registryFile} has 0 results in the Vitest report`,
+    ]);
+  });
+
+  it("requires exactly one record of each registry kind", () => {
+    const without = (kind: RecordKind) => all.filter((r) => r.kind !== kind);
+    const twice = (kind: RecordKind) => [
+      ...all,
+      { path: "compiled/zz.json", kind },
+    ];
+    expect(recordSetProblems(all)).toEqual([]);
+    expect(recordSetProblems(without("aliases"))).toEqual([
+      "the compiled records must hold exactly one aliases record",
+    ]);
+    expect(recordSetProblems(twice("patterns"))).toEqual([
+      "the compiled records must hold exactly one patterns record",
+    ]);
+    expect(recordSetProblems(expected)).toHaveLength(2);
+    expect(recordSetProblems([])).toHaveLength(2);
+  });
+
   it("refuses an empty expected set whatever the report holds", () => {
     expect(judged(report(cases()), [])).toEqual([
       "the compiled inventory is empty",
@@ -178,49 +371,78 @@ describe("the round-trip evidence in a Vitest report", () => {
   });
 });
 
-describe("the record-backed case list", () => {
-  it("is exactly the cases the round-trip file declares for each record", () => {
-    const text = readFileSync(join(web, roundTripFile), "utf8");
-    const file = ts.createSourceFile(
-      "round-trip.test.tsx",
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    );
-    const suites: string[][] = [];
-    const visit = (node: ts.Node): void => {
-      const [name, body] = ts.isCallExpression(node) ? node.arguments : [];
-      if (
-        ts.isCallExpression(node) &&
-        ts.isCallExpression(node.expression) &&
-        node.expression.expression.getText(file) === "describe.each" &&
-        name !== undefined &&
-        ts.isStringLiteral(name) &&
-        name.text === `${roundTripSuite}%s` &&
-        body !== undefined &&
-        ts.isArrowFunction(body) &&
-        ts.isBlock(body.body)
-      )
-        suites.push(
-          body.body.statements.flatMap((s) => {
-            const call = ts.isExpressionStatement(s) ? s.expression : null;
-            const [title] =
-              call && ts.isCallExpression(call) ? call.arguments : [];
-            return call &&
-              ts.isCallExpression(call) &&
-              call.expression.getText(file) === "it" &&
-              title !== undefined &&
-              ts.isStringLiteral(title)
-              ? [title.text]
-              : [];
-          }),
-        );
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
-    expect(suites).toEqual([[...roundTripCases]]);
+describe("the record-backed case lists", () => {
+  it("name each suite once and no suite inside another", () => {
+    const suites = caseLists.map((l) => l.suite);
+    expect(new Set(suites).size).toBe(suites.length);
+    for (const suite of suites)
+      expect(suites.filter((other) => other.startsWith(suite))).toEqual([
+        suite,
+      ]);
+    expect([...new Set(caseLists.map((l) => l.file))]).toEqual([
+      roundTripFile,
+      speechFile,
+      registryFile,
+    ]);
   });
+
+  it.each(recordKinds)(
+    "judge the kind %s with a list of its own cases",
+    (kind) => {
+      const lists = caseLists.filter((l) => l.kinds.includes(kind));
+      expect(lists.length).toBeGreaterThan(0);
+      for (const list of lists) {
+        expect(list.cases.length).toBeGreaterThan(0);
+        expect(new Set(list.cases).size).toBe(list.cases.length);
+      }
+    },
+  );
+
+  it.each(caseLists.map((l) => [`${l.file} under "${l.suite}"`, l] as const))(
+    "are exactly the cases %s declares for each record",
+    (_, list) => {
+      const text = readFileSync(join(web, list.file), "utf8");
+      const file = ts.createSourceFile(
+        list.file,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        list.file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      );
+      const suites: string[][] = [];
+      const visit = (node: ts.Node): void => {
+        const [name, body] = ts.isCallExpression(node) ? node.arguments : [];
+        if (
+          ts.isCallExpression(node) &&
+          ts.isCallExpression(node.expression) &&
+          node.expression.expression.getText(file) === "describe.each" &&
+          name !== undefined &&
+          ts.isStringLiteral(name) &&
+          name.text === `${list.suite}%s` &&
+          body !== undefined &&
+          ts.isArrowFunction(body) &&
+          ts.isBlock(body.body)
+        )
+          suites.push(
+            body.body.statements.flatMap((s) => {
+              const call = ts.isExpressionStatement(s) ? s.expression : null;
+              const [title] =
+                call && ts.isCallExpression(call) ? call.arguments : [];
+              return call &&
+                ts.isCallExpression(call) &&
+                call.expression.getText(file) === "it" &&
+                title !== undefined &&
+                ts.isStringLiteral(title)
+                ? [title.text]
+                : [];
+            }),
+          );
+        ts.forEachChild(node, visit);
+      };
+      visit(file);
+      expect(suites).toEqual([[...list.cases]]);
+    },
+  );
 });
 
 describe("the child runner's environment", () => {
@@ -428,16 +650,40 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
   };
 
   it("fails when a name filter skips the record-backed cases", () => {
-    const { exit, lines } = run([roundTripFile, "-t", "strict binding"]);
+    const { exit, lines } = run([
+      roundTripFile,
+      speechFile,
+      registryFile,
+      "-t",
+      "strict binding",
+    ]);
     expect(exit).toBe(1);
-    expect(lines).toContain(`round trip evidence: ${gap("skipped")}`);
+    expect(lines).toContain(`acceptance evidence: ${gap("skipped")}`);
+    expect(lines).toHaveLength(
+      expected.length * (roundTripCases.length + speech.cases.length) +
+        aliases.cases.length +
+        patterns.cases.length,
+    );
   });
 
   it("fails when the round-trip file is not part of the run", () => {
     const { exit, lines } = run(["src/App.test.tsx"]);
     expect(exit).toBe(1);
     expect(lines).toEqual([
-      `round trip evidence: ${roundTripFile} has 0 results in the Vitest report`,
+      `acceptance evidence: ${roundTripFile} has 0 results in the Vitest report`,
+      `acceptance evidence: ${speechFile} has 0 results in the Vitest report`,
+      `acceptance evidence: ${registryFile} has 0 results in the Vitest report`,
+    ]);
+  });
+
+  it.each([
+    [speechFile, [roundTripFile, registryFile]],
+    [registryFile, [roundTripFile, speechFile]],
+  ])("fails when %s is not part of the run", (missing, files) => {
+    const { exit, lines } = run(files);
+    expect(exit).toBe(1);
+    expect(lines).toEqual([
+      `acceptance evidence: ${missing} has 0 results in the Vitest report`,
     ]);
   });
 
@@ -462,7 +708,7 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
     const { exit } = withVariable(
       "NODE_OPTIONS",
       `--require ${JSON.stringify(preload)}`,
-      () => run([roundTripFile]),
+      () => run([roundTripFile, speechFile, registryFile]),
     );
     expect(existsSync(marker)).toBe(false);
     expect(exit).toBe(0);
@@ -485,7 +731,7 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
       ].join("\n"),
     );
     const { exit } = withVariable("NODE_ENV", "production", () =>
-      run([roundTripFile, "--config", config]),
+      run([roundTripFile, speechFile, registryFile, "--config", config]),
     );
     expect(readFileSync(seen, "utf8")).toBe("test");
     expect(exit).toBe(0);

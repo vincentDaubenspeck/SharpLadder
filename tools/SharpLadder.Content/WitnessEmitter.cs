@@ -71,6 +71,11 @@ internal static class WitnessEmitter
             throw Fail(file + "#", "starts with a byte order mark");
         }
 
+        if (TextAdmission.HoldsCarriageReturn(bytes))
+        {
+            throw Fail(file + "#", "holds a carriage return (CR)");
+        }
+
         try
         {
             return StrictJson.Parse(StrictUtf8.GetString(bytes));

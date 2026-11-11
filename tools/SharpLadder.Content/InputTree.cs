@@ -22,7 +22,16 @@ internal sealed class InputTree
     public static InputTree Read(Folder root)
     {
         var tree = new InputTree(root);
-        tree.Walk(root, string.Empty);
+        tree.Walk(root, string.Empty, null);
+        return tree;
+    }
+
+    // A content root: an entry the allowlist does not name is listed, so it can be refused by
+    // name, but its bytes are never read and it is never entered.
+    public static InputTree ReadContent(Folder root)
+    {
+        var tree = new InputTree(root);
+        tree.Walk(root, string.Empty, RootAdmission.Admits);
         return tree;
     }
 
@@ -30,19 +39,23 @@ internal sealed class InputTree
     public IReadOnlyList<InputEntry> Children(string relative) =>
         _children.TryGetValue(relative, out var entries) ? entries : [];
 
-    private void Walk(Folder folder, string relative)
+    private void Walk(Folder folder, string relative, Func<string, bool>? admits)
     {
         var entries = new List<InputEntry>();
         _children[relative] = entries;
         foreach (var (name, isFolder) in folder.List())
         {
             var path = relative.Length == 0 ? name : $"{relative}/{name}";
-            if (isFolder)
+            if (admits is not null && !admits(name))
+            {
+                entries.Add(new InputEntry(name, path, folder.ChildDisplay(name), isFolder ? null : []));
+            }
+            else if (isFolder)
             {
                 using var child = folder.OpenFolder(name);
                 FolderIds.Add(child.Id);
                 entries.Add(new InputEntry(name, path, child.Display, null));
-                Walk(child, path);
+                Walk(child, path, null);
             }
             else
             {

@@ -45,6 +45,19 @@ export const witness = {
           ],
         },
       ],
+      spoken: {
+        segments: [
+          {
+            target: {
+              type: "block",
+              blockId: "second-start/b1",
+            },
+            text: "Links from the first fixture chapter point here.",
+          },
+        ],
+        audio:
+          "sha256:436913fb5cef2db1041548f6a4fab6c10db8b55494ae19b42172ee48fd9267a5",
+      },
     },
   ],
 } satisfies ContentDoc;

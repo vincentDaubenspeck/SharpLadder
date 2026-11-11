@@ -21,38 +21,54 @@ internal static class TestRecords
     {
         var problems = new List<string>();
         var records = new List<Record>();
+        var kinds = Payload.Kinds(committed);
         var payloads = committed
             .Where(p => p.Key.StartsWith(Payload.CompiledFolder + "/", StringComparison.Ordinal) && !string.Equals(p.Key, Payload.ManifestPath, StringComparison.Ordinal))
             .OrderBy(p => p.Key, StringComparer.Ordinal);
         foreach (var (path, bytes) in payloads)
         {
-            if (bytes.AsSpan().StartsWith((byte[])[0xEF, 0xBB, 0xBF]))
+            var (text, refusal) = Decode(bytes);
+            if (text is null)
             {
-                problems.Add($"{path}: starts with a byte-order mark");
+                problems.Add($"{path}: {refusal}");
                 continue;
             }
 
-            string text;
-            try
+            // The manifest names the kind, and the record must be valid as exactly that kind.
+            if (!kinds.TryGetValue(path, out var kind))
             {
-                text = Protocol.GetString(bytes);
-            }
-            catch (DecoderFallbackException e)
-            {
-                problems.Add($"{path}: not UTF-8: {e.Message}");
+                problems.Add($"{path}: the manifest states no kind for it");
                 continue;
             }
 
-            if (schema.Validate(text) is { } problem)
+            if (schema.Validate(text, kind) is { } problem)
             {
                 problems.Add($"{path}: schema: {problem}");
                 continue;
             }
 
-            records.Add(new Record(path, text));
+            records.Add(new Record(path, Payload.KindName(kind), text));
         }
 
-        return problems.Count > 0 ? (null, problems) : (JsonSerializer.Serialize(new Envelope(1, records), Json), []);
+        return problems.Count > 0 ? (null, problems) : (JsonSerializer.Serialize(new Envelope(2, records), Json), []);
+    }
+
+    // The text of one payload file, or why its bytes are refused before any schema sees them.
+    public static (string? Text, string? Refusal) Decode(byte[] bytes)
+    {
+        if (bytes.AsSpan().StartsWith((byte[])[0xEF, 0xBB, 0xBF]))
+        {
+            return (null, "starts with a byte-order mark");
+        }
+
+        try
+        {
+            return (Protocol.GetString(bytes), null);
+        }
+        catch (DecoderFallbackException e)
+        {
+            return (null, "not UTF-8: " + e.Message);
+        }
     }
 
     // The protocol fixes its own encoding; Console.Out would follow the console's instead.
@@ -66,5 +82,5 @@ internal static class TestRecords
 
     private sealed record Envelope(int Version, IReadOnlyList<Record> Records);
 
-    private sealed record Record(string Path, string Text);
+    private sealed record Record(string Path, string Kind, string Text);
 }

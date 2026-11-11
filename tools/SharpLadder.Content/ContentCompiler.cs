@@ -28,7 +28,7 @@ internal static class ContentCompiler
     public static CompileResult Compile(string contentRoot, IContentSchema schema, string displayBase)
     {
         using var root = Folder.OpenRoot(contentRoot, DisplayPath(displayBase, contentRoot));
-        return Compile(InputTree.Read(root), schema);
+        return Compile(InputTree.ReadContent(root), schema);
     }
 
     public static CompileResult Compile(InputTree tree, IContentSchema schema)
@@ -45,26 +45,30 @@ internal static class ContentCompiler
             .OfType<Parsed>()
             .ToList();
 
+        var patterns = Registries.ReadPatterns(tree, diagnostics);
+        AliasesFile? aliases = null;
+
         // Anchor sets are built only from unique IDs, so a duplicate is reported, never collapsed.
-        if (CheckIds(parsed, diagnostics))
+        // The alias registry is read against the same unique names, so it waits for them too.
+        if (CheckIds(parsed, patterns ?? [], tree, diagnostics) && CheckSlugs(parsed, diagnostics))
         {
-            CheckLinks(parsed, diagnostics);
+            aliases = patterns is null ? null : Registries.ReadAliases(tree, Live(parsed, patterns), diagnostics);
+            CheckLinks(parsed, aliases, diagnostics);
         }
 
         CheckChapters(parsed, diagnostics);
         var files = new List<OutputFile>();
         foreach (var file in parsed.Where(p => p.File.Model is not null))
         {
-            var bytes = Serialize(file.File.Model!);
-            var problem = schema.Validate(StrictUtf8.GetString(bytes));
-            if (problem is null)
-            {
-                files.Add(new OutputFile(Path.ChangeExtension(file.Relative, ".json"), bytes));
-            }
-            else
-            {
-                diagnostics.Add(new Diagnostic(file.Display, 1, "schema: " + problem));
-            }
+            var kind = file.File.Model is ChapterFile ? RecordKind.Chapter : RecordKind.Part;
+            Add(files, Path.ChangeExtension(file.Relative, ".json"), file.File.Model!, kind, file.Display, schema, diagnostics);
+        }
+
+        if (aliases is not null && patterns is not null)
+        {
+            var ordered = new PatternsFile { Patterns = [.. patterns.Select(p => p.Record).OrderBy(p => p.Id, StringComparer.Ordinal)] };
+            Add(files, Registries.AliasesOutput, aliases, RecordKind.Aliases, RegistryDisplay(tree, Registries.AliasesSource), schema, diagnostics);
+            Add(files, Registries.PatternsOutput, ordered, RecordKind.Patterns, RegistryDisplay(tree, Registries.PatternsSource), schema, diagnostics);
         }
 
         return diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files);
@@ -82,22 +86,34 @@ internal static class ContentCompiler
         return shown.Replace('\\', '/');
     }
 
+    private static void Add(List<OutputFile> files, string relative, object model, RecordKind kind, string display, IContentSchema schema, List<Diagnostic> diagnostics)
+    {
+        var bytes = Serialize(model);
+        var problem = schema.Validate(StrictUtf8.GetString(bytes), kind);
+        if (problem is null)
+        {
+            files.Add(new OutputFile(relative, bytes, kind));
+        }
+        else
+        {
+            diagnostics.Add(new Diagnostic(display, 1, "schema: " + problem));
+        }
+    }
+
+    private static string RegistryDisplay(InputTree tree, string name) =>
+        tree.Children(string.Empty).First(e => string.Equals(e.Name, name, StringComparison.Ordinal)).Display;
+
+    private static LiveNames Live(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns) => new(
+        parsed.Select(p => (p.File.Model as ChapterFile)?.Slug).OfType<string>().ToHashSet(StringComparer.Ordinal),
+        parsed.SelectMany(p => p.File.Ids.Select(i => i.Id)).Concat(patterns.Select(p => p.Record.Id)).ToHashSet(StringComparer.Ordinal),
+        parsed.SelectMany(p => p.File.SectionIds).ToHashSet(StringComparer.Ordinal));
+
     private static Parsed? Read(string relative, byte[] bytes, string display, List<Diagnostic> diagnostics)
     {
-        string text;
-        try
+        var (text, refusal) = TextAdmission.Read(bytes, display);
+        if (text is null)
         {
-            text = StrictUtf8.GetString(bytes);
-        }
-        catch (DecoderFallbackException)
-        {
-            diagnostics.Add(new Diagnostic(display, null, "file is not valid UTF-8"));
-            return null;
-        }
-
-        if (text.StartsWith('﻿'))
-        {
-            diagnostics.Add(new Diagnostic(display, 1, "file starts with a byte order mark; save it as UTF-8 without one"));
+            diagnostics.Add(refusal!);
             return null;
         }
 
@@ -110,6 +126,7 @@ internal static class ContentCompiler
     // chapters/ is an error, and so is finding no file at all.
     private static List<(string Relative, string Display, byte[] Bytes)> Collect(InputTree tree, List<Diagnostic> diagnostics)
     {
+        RootAdmission.Check(tree, diagnostics);
         var sources = new List<(string Relative, string Display, byte[] Bytes)>();
         var chapters = tree.Children(string.Empty).FirstOrDefault(e => string.Equals(e.Name, "chapters", StringComparison.Ordinal));
         if (chapters is { IsFolder: false })
@@ -153,19 +170,39 @@ internal static class ContentCompiler
 
     // Top-level IDs are unique across every file; the first use in path order wins. False when
     // any ID repeats.
-    private static bool CheckIds(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    private static bool CheckIds(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns, InputTree tree, List<Diagnostic> diagnostics)
     {
         var before = diagnostics.Count;
         var seen = new Dictionary<string, (string Display, int Line)>(StringComparer.Ordinal);
+        var uses = parsed.SelectMany(file => file.File.Ids.Select(i => (i.Id, file.Display, i.Line)));
+        if (patterns.Count > 0)
+        {
+            var display = RegistryDisplay(tree, Registries.PatternsSource);
+            uses = uses.Concat(patterns.Select(p => (p.Record.Id, display, p.Line)));
+        }
+
+        foreach (var (id, display, line) in uses)
+        {
+            if (!seen.TryAdd(id, (display, line)))
+            {
+                var first = seen[id];
+                diagnostics.Add(new Diagnostic(display, line, $"duplicate id \"{id}\" (first used at {first.Display}:{first.Line})"));
+            }
+        }
+
+        return diagnostics.Count == before;
+    }
+
+    // A slug names one chapter, so the alias registry can end at it without ambiguity.
+    private static bool CheckSlugs(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    {
+        var before = diagnostics.Count;
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in parsed)
         {
-            foreach (var (id, line) in file.File.Ids)
+            if (file.File.Model is ChapterFile { Slug: { } slug } && !seen.TryAdd(slug, file.Display))
             {
-                if (!seen.TryAdd(id, (file.Display, line)))
-                {
-                    var first = seen[id];
-                    diagnostics.Add(new Diagnostic(file.Display, line, $"duplicate id \"{id}\" (first used at {first.Display}:{first.Line})"));
-                }
+                diagnostics.Add(new Diagnostic(file.Display, 1, $"duplicate slug \"{slug}\" (first used at {seen[slug]})"));
             }
         }
 
@@ -174,7 +211,8 @@ internal static class ContentCompiler
 
     // A bare or current-chapter target must name an anchor of the same source file; a sibling
     // file's anchors and other chapters need cross-file checks, which do not exist yet.
-    private static void CheckLinks(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    // A retired id is refused in every link, another chapter's included, and names its successor.
+    private static void CheckLinks(List<Parsed> parsed, AliasesFile? aliases, List<Diagnostic> diagnostics)
     {
         foreach (var file in parsed.Where(p => p.File.Model is not null))
         {
@@ -182,7 +220,11 @@ internal static class ContentCompiler
             foreach (var link in file.File.Links)
             {
                 var local = link.Chapter is null || string.Equals(link.Chapter, file.File.ChapterId, StringComparison.Ordinal);
-                if (local && !anchors.Contains(link.Id))
+                if (aliases is not null && aliases.Ids.TryGetValue(link.Id, out var successor))
+                {
+                    diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names the retired id \"{link.Id}\"; link to \"{successor}\""));
+                }
+                else if (local && !anchors.Contains(link.Id))
                 {
                     diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names no section or block id in this file"));
                 }

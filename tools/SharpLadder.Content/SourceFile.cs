@@ -31,6 +31,9 @@ internal sealed partial class SourceFile
     private readonly List<Diagnostic> _diagnostics;
     private readonly string _path;
     private string[] _lines = [];
+    private Section? _current;
+    private List<Segment> _segments = [];
+    private int _headingLine;
 
     private SourceFile(string path, List<Diagnostic> diagnostics)
     {
@@ -45,6 +48,8 @@ internal sealed partial class SourceFile
     // The IDs the renderer writes as id attributes for this file: sections and code or text blocks.
     public List<string> Anchors { get; } = [];
 
+    public List<string> SectionIds { get; } = [];
+
     public List<LinkTarget> Links { get; } = [];
 
     // The chapter ID a chapter file declares, or the one a part file names.
@@ -53,7 +58,7 @@ internal sealed partial class SourceFile
     public static SourceFile Parse(string path, string text, bool isChapter, List<Diagnostic> diagnostics)
     {
         var file = new SourceFile(path, diagnostics);
-        file.Compile(text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'), isChapter);
+        file.Compile(text, isChapter);
         return file;
     }
 
@@ -114,7 +119,7 @@ internal sealed partial class SourceFile
             return "heading has more than one {#id}; write exactly one at the end of the heading";
         }
 
-        if (id is null || groups[0].ClassCount > 0 || groups[0].Properties.Count > 0)
+        if (id is null || groups[0].ClassCount > 0)
         {
             return "heading attributes other than one {#id} are not supported";
         }
@@ -131,6 +136,102 @@ internal sealed partial class SourceFile
 
         return string.Equals(id, ContentIds.IntroPrefix, StringComparison.Ordinal)
             ? "\"intro\" is reserved for the chapter intro and cannot be a heading id"
+            : null;
+    }
+
+    // speech=skip and spoken="..." are admitted only together; any other property is refused.
+    private static List<string> HeadingSpeech(AttributeGroup group, out bool skip, out string? spoken)
+    {
+        skip = false;
+        spoken = null;
+
+        // The parsed properties decide what is read, so they are held to the same rules as the raw
+        // names: the two readers split a group differently where a quote meets a name.
+        var parsed = group.Properties.Select(p => p.Key).ToList();
+        var problems = NameProblems(group.PropertyNames);
+        problems = problems.Count > 0 ? problems : NameProblems(parsed);
+        if (problems.Count == 0 && !group.PropertyNames.SequenceEqual(parsed, StringComparer.Ordinal))
+        {
+            problems.Add("heading attributes must be separated by spaces");
+        }
+
+        var values = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (name, value) in problems.Count > 0 ? [] : group.Properties)
+        {
+            values[name] = value;
+            if (value is null)
+            {
+                problems.Add($"heading attribute \"{name}\" needs a value");
+            }
+        }
+
+        if (problems.Count > 0)
+        {
+            return problems;
+        }
+
+        var rule = SpeechRule(values);
+        if (rule is not null)
+        {
+            problems.Add(rule);
+        }
+
+        if (problems.Count == 0 && values.ContainsKey("speech"))
+        {
+            skip = true;
+            spoken = values["spoken"];
+        }
+
+        return problems;
+    }
+
+    private static List<string> NameProblems(IEnumerable<string> names)
+    {
+        var problems = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            if (name is not ("speech" or "spoken"))
+            {
+                problems.Add($"unknown heading attribute \"{name}\"; only speech=skip and spoken=\"...\" are supported");
+            }
+            else if (!seen.Add(name))
+            {
+                problems.Add($"heading attribute \"{name}\" is given twice");
+            }
+        }
+
+        return problems;
+    }
+
+    private static string? SpeechRule(Dictionary<string, string?> values)
+    {
+        var hasSpeech = values.TryGetValue("speech", out var speech);
+        var hasSpoken = values.TryGetValue("spoken", out var gloss);
+        if (hasSpeech && !string.Equals(speech, "skip", StringComparison.Ordinal))
+        {
+            return "heading attribute speech must be skip";
+        }
+
+        if (hasSpeech != hasSpoken)
+        {
+            return hasSpeech
+                ? "speech=skip needs a spoken summary (spoken=\"...\")"
+                : "spoken is allowed on a heading only with speech=skip";
+        }
+
+        if (!hasSpoken)
+        {
+            return null;
+        }
+
+        if (gloss!.Trim().Length == 0)
+        {
+            return "heading spoken summary must not be empty";
+        }
+
+        return ContentIds.SpokenLength(gloss) > ContentIds.MaxSpokenLength
+            ? $"spoken summary is {ContentIds.SpokenLength(gloss).ToString(CultureInfo.InvariantCulture)} characters; at most 200 are allowed"
             : null;
     }
 
@@ -234,24 +335,18 @@ internal sealed partial class SourceFile
     private bool ReadBody(List<Block> blocks, List<BodyBlock>? intro, List<Section> sections, int? partOrder)
     {
         var before = _diagnostics.Count;
-        List<BodyBlock>? body = intro;
-        var prefix = ContentIds.IntroPrefix;
-        var skipping = false;
+        var inSection = false;
+        var number = 0;
         var preambleReported = false;
         foreach (var block in blocks)
         {
             var line = block.Line + 1;
             if (block is HeadingBlock heading)
             {
-                var section = Heading(heading, partOrder, sections.Count + 1);
-                skipping = section is null;
-                if (section is not null)
-                {
-                    sections.Add(section);
-                    body = (List<BodyBlock>)section.Body;
-                    prefix = section.Id;
-                }
-
+                Speak();
+                Open(Heading(heading, partOrder, sections.Count + 1), line, sections);
+                inSection = true;
+                number = 0;
                 continue;
             }
 
@@ -264,11 +359,12 @@ internal sealed partial class SourceFile
             }
 
             // A section whose heading failed is not compiled, so its blocks add no noise.
-            if (skipping)
+            if (inSection && _current is null)
             {
                 continue;
             }
 
+            var body = inSection ? (List<BodyBlock>)_current!.Body : intro;
             if (body is null)
             {
                 if (!preambleReported)
@@ -280,21 +376,122 @@ internal sealed partial class SourceFile
                 continue;
             }
 
-            var blockId = string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{body.Count + 1}");
-            var node = Body(block, blockId, line);
+            var prefix = inSection ? _current!.Id : ContentIds.IntroPrefix;
+            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{++number}"), line);
             if (node is not null)
             {
                 body.Add(node);
+                Segments(node, line);
             }
         }
 
+        Speak();
         return _diagnostics.Count == before;
+    }
+
+    private void Open(Section? section, int line, List<Section> sections)
+    {
+        _current = section;
+        _segments = [];
+        _headingLine = line;
+        if (section is not null)
+        {
+            sections.Add(section);
+        }
+    }
+
+    // One segment per paragraph and per list item; a fence is spoken as its gloss. The intro is
+    // never spoken, and a skipped section speaks only its summary.
+    private void Segments(BodyBlock node, int line)
+    {
+        if (_current is not { Summary: null })
+        {
+            return;
+        }
+
+        switch (node)
+        {
+            case ParagraphNode paragraph:
+                Segment(new BlockTarget { BlockId = paragraph.BlockId }, SpokenText.Flatten(paragraph.Content), line);
+                break;
+            case ListNode list:
+                foreach (var item in list.Items)
+                {
+                    Segment(new BlockTarget { BlockId = item.BlockId }, SpokenText.Flatten(item.Content), line);
+                }
+
+                break;
+            case CodeNode code:
+                Segment(new BlockTarget { BlockId = code.BlockId }, code.Spoken, line);
+                break;
+            case TextNode text:
+                Segment(new BlockTarget { BlockId = text.BlockId }, text.Spoken, line);
+                break;
+            default:
+                Error(line, "this block has no spoken form");
+                break;
+        }
+    }
+
+    private void Segment(SegmentTarget target, string raw, int line)
+    {
+        string text;
+        try
+        {
+            text = AudioSlot.Normalise(raw);
+        }
+        catch (ArgumentException)
+        {
+            Error(line, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            Error(line, "spoken text is empty");
+            return;
+        }
+
+        _segments.Add(new Segment { Target = target, Text = text });
+    }
+
+    // Closes the open section: a skipped one speaks its summary alone, targeting the section.
+    private void Speak()
+    {
+        if (_current is not { } section)
+        {
+            return;
+        }
+
+        var before = _diagnostics.Count;
+        if (section.Summary is not null)
+        {
+            _segments = [];
+            Segment(new SectionTarget { SectionId = section.Id }, section.Summary, _headingLine);
+        }
+
+        var targets = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var segment in _segments)
+        {
+            var key = segment.Target is BlockTarget block ? "block " + block.BlockId : "section " + section.Id;
+            if (!targets.Add(key))
+            {
+                Error(_headingLine, $"two spoken segments share the target {key}");
+            }
+        }
+
+        if (_diagnostics.Count == before)
+        {
+            section.Spoken = new SectionSpeech { Segments = _segments, Audio = AudioSlot.Of([.. _segments.Select(s => s.Text)]) };
+        }
+
+        _current = null;
     }
 
     private Section? Heading(HeadingBlock heading, int? partOrder, int position)
     {
         var line = heading.Line + 1;
-        var id = HeadingId(heading, line);
+        var id = HeadingId(heading, line, out var skip, out var spoken);
         var title = id is null ? null : Inlines(heading.Inline, line);
         if (id is null || title is null)
         {
@@ -303,24 +500,35 @@ internal sealed partial class SourceFile
 
         Ids.Add((id, line));
         Anchors.Add(id);
+        SectionIds.Add(id);
         return new Section
         {
             Id = id,
             Number = partOrder is int order ? string.Create(CultureInfo.InvariantCulture, $"{order}.{position}") : null,
             Title = title,
             Body = new List<BodyBlock>(),
+            Summary = skip ? spoken : null,
         };
     }
 
     // The one terminal {#id}; the groups are counted on the raw line because Markdig merges them.
-    private string? HeadingId(HeadingBlock heading, int line)
+    private string? HeadingId(HeadingBlock heading, int line, out bool skip, out string? spoken)
     {
+        skip = false;
+        spoken = null;
         var groups = AttributeGroup.Trailing(_lines[heading.Line]);
         var id = groups.Count == 1 ? groups[0].Attributes.Id : null;
         var problem = HeadingProblem(heading, groups, id);
         if (problem is not null)
         {
             Error(line, problem);
+            return null;
+        }
+
+        var speechProblems = HeadingSpeech(groups[0], out skip, out spoken);
+        speechProblems.ForEach(p => Error(line, p));
+        if (speechProblems.Count > 0)
+        {
             return null;
         }
 

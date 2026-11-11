@@ -47,7 +47,7 @@ internal static partial class TypeEmitter
     {
         try
         {
-            return (new Run(Load(entries)).Modules(), []);
+            return (new Run(Load([.. entries.Where(e => !SchemaSet.RegistryFiles.Contains(e.Name, StringComparer.Ordinal))])).Modules(), []);
         }
         catch (InvalidDataException e)
         {
@@ -125,6 +125,11 @@ internal static partial class TypeEmitter
         if (bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]))
         {
             throw Fail(file, "starts with a byte order mark");
+        }
+
+        if (TextAdmission.HoldsCarriageReturn(bytes))
+        {
+            throw Fail(file, "holds a carriage return (CR)");
         }
 
         JsonNode? node;

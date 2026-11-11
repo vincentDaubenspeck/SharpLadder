@@ -18,6 +18,11 @@ export const row19 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -40,6 +45,11 @@ export const row20 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -70,6 +80,11 @@ export const row21 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -100,6 +115,11 @@ export const row22 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -126,6 +146,11 @@ export const row23 = {
           source: "int x = 1;",
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -156,6 +181,11 @@ export const row24 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -186,6 +216,11 @@ export const row25 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;

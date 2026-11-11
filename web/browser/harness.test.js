@@ -185,13 +185,13 @@ describe("content harness preflight record set", () => {
     [
       "an extra record",
       (r) => {
-        r.push({ path: "compiled/zz.json", text: "{}" });
+        r.push({ path: "compiled/zz.json", kind: "part", text: "{}" });
       },
     ],
     [
       "a same-count wrong path",
       (r) => {
-        r.splice(-1, 1, { path: "compiled/zz.json", text: "{}" });
+        r.splice(-1, 1, { path: "compiled/zz.json", kind: "part", text: "{}" });
       },
     ],
   ])("refuses %s", { timeout: 60_000 }, (_, change) => {

@@ -333,7 +333,7 @@ describe("witness mutations", () => {
 });
 
 describe("__proto__ in a satisfies literal", () => {
-  const body = `type: "part", kind: "syntax", chapter: "ch-matrix", order: 1, sections: [{ id: "matrix-one", number: "1.1", title: [{ type: "text", text: "One"PLACE }], body: [] }]`;
+  const body = `type: "part", kind: "syntax", chapter: "ch-matrix", order: 1, sections: [{ id: "matrix-one", number: "1.1", title: [{ type: "text", text: "One"PLACE }], body: [], spoken: { segments: [], audio: "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945" } }]`;
   const module = (literal) =>
     `import type { ContentDoc } from "../src/generated/content.ts";\nexport const row = { ${literal} } satisfies ContentDoc;\n`;
 

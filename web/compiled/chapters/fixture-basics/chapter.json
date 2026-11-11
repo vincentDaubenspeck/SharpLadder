@@ -86,7 +86,19 @@
             }
           ]
         }
-      ]
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "fix-parts/b1"
+            },
+            "text": "Each part file compiles to its own JSON file, at the same relative path."
+          }
+        ],
+        "audio": "sha256:418d813c1fca023581a7488e1b36161bc59f5998714dd4e55119a88eecf64f3d"
+      }
     },
     {
       "id": "fix-links",
@@ -282,7 +294,33 @@
             }
           ]
         }
-      ]
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "fix-links/b1"
+            },
+            "text": "A bare link goes to how the parts fit, and an explicit one to the note block. Another chapter is reached as its start, and link text may hold strong with em inside."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "fix-links/b2"
+            },
+            "text": "A note to link to"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "fix-links/b3"
+            },
+            "text": "Nested-looking text stays literal: [a b](#fix-links), [a [b c](#fix-links)](#fix-note), [a b](#fix-links) and [a b](#fix-links)."
+          }
+        ],
+        "audio": "sha256:e703205d892a0525dff92e5b1438aa75dc555ba3a026d4bcc2211b639ff1c956"
+      }
     }
   ]
 }

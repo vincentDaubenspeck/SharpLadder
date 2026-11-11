@@ -38,13 +38,19 @@ public sealed class PayloadCheckTests
 
         Assert.NotEqual(0xEF, bytes[0]);
         Assert.DoesNotContain('\r', text);
-        Assert.Equal(["{", "  \"version\": 1,", "  \"files\": ["], lines[..3]);
+        Assert.Equal(["{", "  \"version\": 2,", "  \"files\": ["], lines[..3]);
         Assert.Equal(["  ]", "}", string.Empty], lines[^3..]);
         var paths = lines[3..^3].Select(l => JsonDocument.Parse(l.TrimEnd(',')).RootElement.GetProperty("path").GetString()!).ToList();
         Assert.Equal(paths.Order(StringComparer.Ordinal), paths, StringComparer.Ordinal);
-        Assert.Equal(20, paths.Count);
+        Assert.Equal(22, paths.Count);
         Assert.DoesNotContain("compiled/manifest.json", paths, StringComparer.Ordinal);
-        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/build.json\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[3]);
+        Assert.Matches("^    \\{ \"path\": \"compiled/aliases.json\", \"kind\": \"aliases\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[3]);
+        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/build.json\", \"kind\": \"part\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[4]);
+        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/chapter.json\", \"kind\": \"chapter\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[5]);
+        Assert.Contains(lines, l => l.StartsWith("    { \"path\": \"compiled/patterns.json\", \"kind\": \"patterns\", ", StringComparison.Ordinal));
+
+        // Only a compiled record states a kind.
+        Assert.All(lines[3..^3], l => Assert.Equal(l.Contains("\"compiled/", StringComparison.Ordinal), l.Contains("\"kind\"", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -53,12 +59,18 @@ public sealed class PayloadCheckTests
     [InlineData("duplicate", "listed twice")]
     [InlineData("back-slash", "a back slash is not a path separator here")]
     [InlineData("dot-segment", "empty, . and .. segments are not accepted")]
-    [InlineData("no-file", "compiled/chapters/fixture-second/zz.json: listed but no such file")]
+    [InlineData("no-file", "compiled/zz.json: listed but no such file")]
     [InlineData("wrong-hash", "sha256 does not match the file")]
     [InlineData("upper-hash", "sha256 must be 64 lower-case hex digits")]
-    [InlineData("version", "must hold exactly \"version\": 1 and a \"files\" array")]
-    [InlineData("extra-key", "must hold exactly \"version\": 1 and a \"files\" array")]
-    [InlineData("entry-key", "each entry must hold exactly a string \"path\" and a string \"sha256\"")]
+    [InlineData("version", "must hold exactly \"version\": 2 and a \"files\" array")]
+    [InlineData("extra-key", "must hold exactly \"version\": 2 and a \"files\" array")]
+    [InlineData("entry-key", "each entry must hold exactly a string \"path\", a string \"sha256\" and, for a compiled record, a \"kind\"")]
+    [InlineData("no-kind", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
+    [InlineData("unknown-kind", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
+    [InlineData("kind-in-capitals", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
+    [InlineData("kind-not-text", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
+    [InlineData("kind-on-generated", "only a compiled record has a kind")]
+    [InlineData("relabelled", ManifestDrift)]
     [InlineData("duplicate-name", "not UTF-8 JSON without duplicate names")]
     [InlineData("bom", "starts with a byte-order mark")]
     [InlineData("one-byte", ManifestDrift)]
@@ -149,10 +161,16 @@ public sealed class PayloadCheckTests
         Assert.Empty(result.Error);
         var records = ParseEnvelope(result.Stdout);
         Assert.Equal(
-            ["compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter],
+            ["compiled/aliases.json", "compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter, "compiled/patterns.json"],
             records.Select(r => r.Path),
             StringComparer.Ordinal);
         Assert.All(records, r => Assert.Equal(File.ReadAllText(Path.Combine(work.Web, r.Path)), r.Text));
+
+        // Each record carries the kind the manifest states for it.
+        Assert.Equal(
+            ["aliases", "part", "chapter", "part", "part", "part", "part", "chapter", "chapter", "chapter", "patterns"],
+            JsonNode.Parse(Strict.GetString(result.Stdout))!["records"]!.AsArray().Select(r => r!["kind"]!.GetValue<string>()),
+            StringComparer.Ordinal);
     }
 
     [Fact]
@@ -198,15 +216,31 @@ public sealed class PayloadCheckTests
     }
 
     [Theory]
-    [InlineData("bom", "starts with a byte-order mark")]
-    [InlineData("utf8", "not UTF-8")]
-    [InlineData("schema", "schema: ")]
-    public void RecordsAreRefusedFromBadPayloadBytes(string change, string expected)
+    [InlineData("bom", "chapter", "starts with a byte-order mark")]
+    [InlineData("utf8", "chapter", "not UTF-8")]
+    [InlineData("schema", "chapter", "schema: ")]
+    [InlineData("good", "part", "schema: the record is not of type \"part\"")]
+    [InlineData("good", "aliases", "schema: ")]
+    [InlineData("good", "patterns", "schema: ")]
+    [InlineData("good", null, "the manifest states no kind for it")]
+    public void RecordsAreRefusedFromBadPayloadBytes(string change, string? kind, string expected)
     {
         var good = File.ReadAllBytes(Path.Combine(Repository.Root, "web", "compiled", SecondChapter));
-        byte[] bytes = change switch { "bom" => [0xEF, 0xBB, 0xBF, .. good], "utf8" => [.. good[..^2], 0xFF, .. good[^2..]], _ => Strict.GetBytes("{\"type\":\"chapter\"}\n") };
+        byte[] bytes = change switch
+        {
+            "bom" => [0xEF, 0xBB, 0xBF, .. good],
+            "utf8" => [.. good[..^2], 0xFF, .. good[^2..]],
+            "schema" => Strict.GetBytes("{\"type\":\"chapter\"}\n"),
+            _ => good,
+        };
+        var committed = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["compiled/a.json"] = bytes };
 
-        var (envelope, problems) = TestRecords.Build(new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["compiled/a.json"] = bytes, ["compiled/manifest.json"] = [0xFF] }, Repository.Schema);
+        // A broken manifest states no kind at all.
+        committed["compiled/manifest.json"] = kind is null
+            ? [0xFF]
+            : Payload.BuildManifest([new OutputFile("compiled/a.json", bytes, Enum.Parse<RecordKind>(kind, ignoreCase: true))]);
+
+        var (envelope, problems) = TestRecords.Build(committed, Repository.Schema);
 
         Assert.Null(envelope);
         Assert.StartsWith("compiled/a.json: " + expected, Assert.Single(problems), StringComparison.Ordinal);
@@ -262,25 +296,51 @@ public sealed class PayloadCheckTests
         var first = lines[3];
         var src = lines.FindIndex(l => l.Contains("\"src/", StringComparison.Ordinal));
         var zeros = new string('0', 64);
+        if (KindChange(lines, src, change))
+        {
+            return Strict.GetBytes(string.Join('\n', lines));
+        }
+
         switch (change)
         {
             case "self": lines.Insert(src, $"    {{ \"path\": \"compiled/manifest.json\", \"sha256\": \"{zeros}\" }},"); break;
             case "unsorted": (lines[3], lines[4]) = (lines[4], lines[3]); break;
             case "duplicate": lines.Insert(3, first); break;
-            case "back-slash": lines[3] = first.Replace("compiled/chapters/", "compiled\\\\chapters/", StringComparison.Ordinal); break;
-            case "dot-segment": lines[3] = first.Replace("compiled/chapters/", "compiled/./chapters/", StringComparison.Ordinal); break;
-            case "no-file": lines.Insert(src, $"    {{ \"path\": \"compiled/chapters/fixture-second/zz.json\", \"sha256\": \"{zeros}\" }},"); break;
+            case "back-slash": lines[3] = first.Replace("compiled/", "compiled\\\\", StringComparison.Ordinal); break;
+            case "dot-segment": lines[3] = first.Replace("compiled/", "compiled/./", StringComparison.Ordinal); break;
+            case "no-file": lines.Insert(src, $"    {{ \"path\": \"compiled/zz.json\", \"kind\": \"part\", \"sha256\": \"{zeros}\" }},"); break;
             case "wrong-hash": lines[3] = first[..^68] + zeros + "\" },"; break;
             case "upper-hash": lines[3] = first[..^68] + first[^68..^4].ToUpperInvariant() + "\" },"; break;
-            case "version": lines[1] = "  \"version\": 2,"; break;
+            case "version": lines[1] = "  \"version\": 1,"; break;
             case "extra-key": lines.Insert(1, "  \"extra\": 1,"); break;
             case "entry-key": lines[3] = first.Replace(" },", ", \"size\": 1 },", StringComparison.Ordinal); break;
-            case "duplicate-name": lines.Insert(1, "  \"version\": 1,"); break;
+            case "duplicate-name": lines.Insert(1, "  \"version\": 2,"); break;
             case "bom": return [0xEF, 0xBB, 0xBF, .. Strict.GetBytes(text)];
             default: lines[^2] = "} "; break;
         }
 
         return Strict.GetBytes(string.Join('\n', lines));
+    }
+
+    // The first entry is the alias registry; the third is a chapter record.
+    private static bool KindChange(List<string> lines, int src, string change)
+    {
+        const string Stated = "\"kind\": \"aliases\"";
+        var first = lines[3];
+        var before = string.Join('\n', lines);
+        switch (change)
+        {
+            case "no-kind": lines[3] = first.Replace(" " + Stated + ",", string.Empty, StringComparison.Ordinal); break;
+            case "unknown-kind": lines[3] = first.Replace(Stated, "\"kind\": \"registry\"", StringComparison.Ordinal); break;
+            case "kind-in-capitals": lines[3] = first.Replace(Stated, "\"kind\": \"Aliases\"", StringComparison.Ordinal); break;
+            case "kind-not-text": lines[3] = first.Replace(Stated, "\"kind\": 2", StringComparison.Ordinal); break;
+            case "kind-on-generated": lines[src] = lines[src].Replace(", \"sha256\"", ", \"kind\": \"part\", \"sha256\"", StringComparison.Ordinal); break;
+            case "relabelled": lines[5] = lines[5].Replace("\"kind\": \"chapter\"", Stated, StringComparison.Ordinal); break;
+            default: return false;
+        }
+
+        Assert.NotEqual(before, string.Join('\n', lines), StringComparer.Ordinal);
+        return true;
     }
 
     private static List<(string Path, string Text)> ParseEnvelope(byte[] stdout)
@@ -289,12 +349,12 @@ public sealed class PayloadCheckTests
         using var envelope = JsonDocument.Parse(Strict.GetString(stdout));
         var root = envelope.RootElement;
         Assert.Equal(["version", "records"], Names(root), StringComparer.Ordinal);
-        Assert.Equal(1, root.GetProperty("version").GetInt32());
+        Assert.Equal(2, root.GetProperty("version").GetInt32());
         var records = new List<(string Path, string Text)>();
         using var items = root.GetProperty("records").EnumerateArray();
         foreach (var item in items)
         {
-            Assert.Equal(["path", "text"], Names(item), StringComparer.Ordinal);
+            Assert.Equal(["path", "kind", "text"], Names(item), StringComparer.Ordinal);
             records.Add((item.GetProperty("path").GetString()!, item.GetProperty("text").GetString()!));
         }
 

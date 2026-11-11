@@ -68,6 +68,19 @@ export const witness = {
           ],
         },
       ],
+      spoken: {
+        segments: [
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-nest/b1",
+            },
+            text: "Spans nest: outer middle inner middle outer.",
+          },
+        ],
+        audio:
+          "sha256:dc9e39fbd2ba71966a85fe1ee9a8c62773ea0de7fffaec2f34b4715752d90701",
+      },
     },
   ],
 } satisfies ContentDoc;

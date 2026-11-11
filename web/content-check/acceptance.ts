@@ -1,5 +1,5 @@
 // The supported way to run the suite: Vitest itself, then proof from its own results that every
-// compiled record's round-trip cases ran and passed. The entry normalises the child runner's
+// compiled record's cases ran and passed in every listed test file. The entry normalises the child runner's
 // environment for the keys named below. It trusts the launching process, the reviewed
 // configuration, dependencies and toolchain, and a quiet tree; it is not a sandbox against a
 // hostile launching environment, and configuration written to fabricate records or results is
@@ -9,7 +9,10 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { acceptEnvelope, recordKinds } from "./envelope.ts";
+import type { RecordKind } from "./envelope.ts";
 import { recordInventory } from "./inventory.ts";
+import { runTestRecords } from "./records.ts";
 
 const web = realpathSync.native(join(import.meta.dirname, ".."));
 
@@ -25,7 +28,75 @@ export const roundTripCases: readonly string[] = [
   "starts headings at h2 and never skips a level",
   "keeps each list's kind and start",
   "names every link by its author text, never its address",
+  "binds every spoken segment to one rendered hook, in order",
 ];
+
+export const speechFile = "content-check/speech.test.ts";
+export const speechSuite = "the speech of ";
+
+export const registryFile = "content-check/registry.test.ts";
+
+/**
+ * One suite's record-backed cases for the kinds of record it judges; a test binds each list to
+ * its test file's own source.
+ */
+export interface CaseList {
+  readonly file: string;
+  readonly suite: string;
+  readonly kinds: readonly RecordKind[];
+  readonly cases: readonly string[];
+}
+
+/** A compiled record as the compiler certified it: its path and its kind. */
+export interface ExpectedRecord {
+  readonly path: string;
+  readonly kind: RecordKind;
+}
+
+const content: readonly RecordKind[] = ["chapter", "part"];
+
+/** Every list a record of each kind must pass; a case missing from any of them fails. */
+export const caseLists: readonly CaseList[] = [
+  {
+    file: roundTripFile,
+    suite: roundTripSuite,
+    kinds: content,
+    cases: roundTripCases,
+  },
+  {
+    file: speechFile,
+    suite: speechSuite,
+    kinds: content,
+    cases: ["recomputes every audio slot from its segment texts"],
+  },
+  {
+    file: registryFile,
+    suite: "the aliases of ",
+    kinds: ["aliases"],
+    cases: [
+      "ends every alias at a live name of its kind",
+      "retires no name that is in use",
+    ],
+  },
+  {
+    file: registryFile,
+    suite: "the patterns of ",
+    kinds: ["patterns"],
+    cases: [
+      "lists unique pattern ids in order",
+      "keeps every title and summary as text with something to show",
+    ],
+  },
+];
+
+/** What a certified record set lacks as a whole: exactly one of each registry. */
+export function recordSetProblems(
+  expected: readonly ExpectedRecord[],
+): string[] {
+  return (["aliases", "patterns"] as const)
+    .filter((kind) => expected.filter((r) => r.kind === kind).length !== 1)
+    .map((kind) => `the compiled records must hold exactly one ${kind} record`);
+}
 
 // Keys that would choose what the child runner executes, compared without case. Everything else
 // passes through, because the run also starts the .NET content compiler.
@@ -79,35 +150,64 @@ function sameFile(a: string, b: string): boolean {
 }
 
 /**
- * What a Vitest JSON report fails to prove: exactly one passed result for every record-backed
- * case of every expected record, in the one round-trip file. A filter, a skip, an excluded file
- * or a missing global setup all end here as a case that did not pass.
+ * What a Vitest JSON report fails to prove: exactly one passed result for every case of every
+ * list that judges a record's kind, for every expected record. A filter, a skip, an excluded
+ * file or a missing global setup all end here as a case that did not pass, and a record whose
+ * kind no list judges is a problem, never a record passed over.
  */
 export function evidenceProblems(
   report: unknown,
   root: string,
-  expected: readonly string[],
+  expected: readonly ExpectedRecord[],
+  lists: readonly CaseList[] = caseLists,
 ): string[] {
   if (expected.length === 0) return ["the compiled inventory is empty"];
+  if (lists.length === 0) return ["no case list is given"];
+  const stray = expected
+    .filter(
+      (r) =>
+        !recordKinds.includes(r.kind) ||
+        !lists.some((l) => l.kinds.includes(r.kind) && l.cases.length > 0),
+    )
+    .map((r) => `${r.path}: no case list judges the kind ${r.kind}`);
+  if (stray.length > 0) return stray;
   if (!isObject(report) || !Array.isArray(report["testResults"]))
     return ["the Vitest report has no test results"];
   if (report["success"] !== true)
     return ["the Vitest report does not record a successful run"];
   const results: unknown[] = report["testResults"];
+  const problems = lists.flatMap((list) =>
+    listProblems(
+      results,
+      root,
+      expected.filter((r) => list.kinds.includes(r.kind)).map((r) => r.path),
+      list,
+    ),
+  );
+  // Two lists of one file report its absence in the same words.
+  return [...new Set(problems)];
+}
+
+function listProblems(
+  results: readonly unknown[],
+  root: string,
+  expected: readonly string[],
+  { file: listed, suite: prefix, cases }: CaseList,
+): string[] {
+  if (cases.length === 0) return [`${listed} lists no case`];
   const files = results.filter(
     (file): file is Record<string, unknown> =>
       isObject(file) &&
       typeof file["name"] === "string" &&
-      sameFile(file["name"], join(root, roundTripFile)),
+      sameFile(file["name"], join(root, listed)),
   );
   const [file] = files;
   if (file === undefined || files.length !== 1)
     return [
-      `${roundTripFile} has ${String(files.length)} results in the Vitest report`,
+      `${listed} has ${String(files.length)} results in the Vitest report`,
     ];
   const assertions: unknown = file["assertionResults"];
-  if (!Array.isArray(assertions))
-    return [`${roundTripFile} has no case results`];
+  if (!Array.isArray(assertions)) return [`${listed} has no case results`];
   const outcomes = new Map<string, string[]>();
   const problems: string[] = [];
   for (const assertion of assertions as unknown[]) {
@@ -118,17 +218,16 @@ export function evidenceProblems(
       typeof assertion["title"] !== "string" ||
       typeof assertion["status"] !== "string"
     )
-      return [`${roundTripFile} has a malformed case result`];
+      return [`${listed} has a malformed case result`];
     const titles: unknown[] = suites;
     const [suite, ...deeper] = titles;
-    if (typeof suite !== "string" || !suite.startsWith(roundTripSuite))
-      continue;
-    const path = suite.slice(roundTripSuite.length);
+    if (typeof suite !== "string" || !suite.startsWith(prefix)) continue;
+    const path = suite.slice(prefix.length);
     const title = assertion["title"];
     if (
       deeper.length > 0 ||
       !expected.includes(path) ||
-      !roundTripCases.includes(title)
+      !cases.includes(title)
     ) {
       problems.push(`${suite}: unexpected case "${title}"`);
       continue;
@@ -137,7 +236,7 @@ export function evidenceProblems(
     outcomes.set(key, [...(outcomes.get(key) ?? []), assertion["status"]]);
   }
   for (const path of expected) {
-    for (const title of roundTripCases) {
+    for (const title of cases) {
       const found = outcomes.get(JSON.stringify([path, title])) ?? [];
       if (found.length !== 1 || found[0] !== "passed")
         problems.push(
@@ -175,16 +274,26 @@ export function acceptRun(
     if (run.status !== 0) return run.status ?? 1;
     let problems: string[];
     try {
-      // The global setup of the run above has just had the compiler certify this folder.
-      problems = evidenceProblems(
-        JSON.parse(readFileSync(results, "utf8")),
-        web,
+      // The compiler certifies the folder again and states each record's kind; a file name
+      // or anything a test printed never decides which lists a record must pass.
+      const { stdout, exit } = runTestRecords();
+      const expected = acceptEnvelope(
+        stdout,
+        exit,
         recordInventory(join(web, "compiled")),
-      );
+      ).map(({ path, kind }) => ({ path, kind }));
+      problems = [
+        ...recordSetProblems(expected),
+        ...evidenceProblems(
+          JSON.parse(readFileSync(results, "utf8")),
+          web,
+          expected,
+        ),
+      ];
     } catch (error) {
       problems = [`the Vitest report could not be judged: ${String(error)}`];
     }
-    for (const problem of problems) log(`round trip evidence: ${problem}`);
+    for (const problem of problems) log(`acceptance evidence: ${problem}`);
     return problems.length > 0 ? 1 : 0;
   } finally {
     rmSync(out, { recursive: true, force: true });

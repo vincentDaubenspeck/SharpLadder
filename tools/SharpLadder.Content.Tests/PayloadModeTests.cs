@@ -6,6 +6,7 @@ public sealed class PayloadModeTests
 {
     private static readonly string[] PayloadFiles =
     [
+        "compiled/aliases.json",
         "compiled/chapters/fixture-basics/build.json",
         "compiled/chapters/fixture-basics/chapter.json",
         "compiled/chapters/fixture-basics/gotchas.json",
@@ -16,6 +17,7 @@ public sealed class PayloadModeTests
         "compiled/chapters/fixture-no-sections/chapter.json",
         "compiled/chapters/fixture-second/chapter.json",
         "compiled/manifest.json",
+        "compiled/patterns.json",
         "src/generated/body.ts",
         "src/generated/content.ts",
         "src/generated/witness/chapters/fixture-basics/build.ts",
@@ -57,17 +59,14 @@ public sealed class PayloadModeTests
     }
 
     [Fact]
-    public void GenerationIsTheSameFromLfAndCrlfSources()
+    public void GenerationFromCrlfSourcesIsRefused()
     {
-        using var lf = new PayloadWorkspace(seed: false);
         using var crlf = new PayloadWorkspace(seed: false, newline: "\r\n");
-        var (first, second) = (lf.NewStage(), crlf.NewStage());
 
-        Assert.Equal(0, lf.Run("generate", first).Code);
-        Assert.Equal(0, crlf.Run("generate", second).Code);
+        var result = crlf.Run("generate", crlf.NewStage());
 
-        Assert.Equal(PayloadFiles, Files(second), StringComparer.Ordinal);
-        Assert.All(PayloadFiles, f => Assert.Equal(File.ReadAllBytes(Path.Combine(first, f)), File.ReadAllBytes(Path.Combine(second, f))));
+        Assert.NotEqual(0, result.Code);
+        Assert.Contains("carriage return", result.Output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public sealed class PayloadModeTests
         var result = work.Run("compare");
 
         Assert.Equal(0, result.Code);
-        Assert.Equal("21 committed files equal fresh output\nPASS content compare\n", result.Output);
+        Assert.Equal("23 committed files equal fresh output\nPASS content compare\n", result.Output);
         Assert.Equal(PayloadFiles, Files(work.Web), StringComparer.Ordinal);
     }
 
@@ -147,7 +146,10 @@ public sealed class PayloadModeTests
         using var outside = new TempFolder();
         var target = outside.Write("shared.txt", "x\n");
         var stage = work.NewStage();
-        using var linked = Links.Hard(Path.Combine(work.RootOf(root), "shared.txt"), target);
+
+        // Below chapters/ for the content root, whose own entries are refused by name, unread.
+        var folder = string.Equals(root, "content", StringComparison.Ordinal) ? Path.Combine(work.RootOf(root), "chapters") : work.RootOf(root);
+        using var linked = Links.Hard(Path.Combine(folder, "shared.txt"), target);
 
         var result = work.Run("compare", stage);
 

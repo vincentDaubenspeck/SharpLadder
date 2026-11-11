@@ -24,6 +24,11 @@ export const row01 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
   // @ts-expect-error Row 1: Required property missing (slug).
@@ -54,6 +59,11 @@ export const row02 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
   // @ts-expect-error Row 2: No extra properties (extra at the top level).
@@ -86,6 +96,11 @@ export const row03 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -116,6 +131,11 @@ export const row04 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -146,6 +166,11 @@ export const row05 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -168,6 +193,11 @@ export const row06 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -190,6 +220,11 @@ export const row07 = {
           content: [{ type: "text", text: "Cell." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -213,6 +248,11 @@ export const row08 = {
           ordered: true,
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -233,6 +273,11 @@ export const row09 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
   // @ts-expect-error Row 9: Root choice: part without kind.
@@ -256,6 +301,11 @@ export const row10 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -288,6 +338,11 @@ export const row12 = {
           items: [{ type: "text", text: "Item." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -312,6 +367,11 @@ export const row13 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -341,6 +401,11 @@ export const row14 = {
           ],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -363,6 +428,11 @@ export const row15 = {
           content: [{ type: "text", text: "Text." }],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -391,6 +461,11 @@ export const row16 = {
           ],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -418,6 +493,11 @@ export const row17 = {
           source: "int x = 1;",
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;
@@ -447,6 +527,11 @@ export const row18 = {
           ],
         },
       ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
     },
   ],
 } satisfies ContentDoc;

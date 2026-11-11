@@ -185,13 +185,15 @@ public sealed class NegativeTests
         using var parent = new TempFolder();
         using var outside = new TempFolder();
         outside.Write("chapters/c/chapter.md", Chapter);
+        outside.Write("aliases.yml", "slugs: {}\nids: {}\n");
+        outside.Write("patterns.yml", "patterns: []\n");
         var link = Path.Combine(parent.Path, "content");
         using var linked = Links.Folder(link, outside.Path);
 
         var result = ContentCompiler.Compile(link, Repository.Schema, parent.Path);
 
         Assert.Empty(result.Diagnostics);
-        Assert.Equal(["chapters/c/chapter.json"], result.Files.Select(f => f.RelativePath), StringComparer.Ordinal);
+        Assert.Equal(["chapters/c/chapter.json", "aliases.json", "patterns.json"], result.Files.Select(f => f.RelativePath), StringComparer.Ordinal);
     }
 
     [Fact]

@@ -1,0 +1,11 @@
+# A comment may hold &anchor, *alias, !tag and <<: without meaning any of them.
+slugs:
+  2: fixture-basics
+  10: fixture-basics
+  fixture-older: fixture-old
+  fixture-old: fixture-basics
+ids:
+  constructor: lib-fix-one
+  lib-fix-first: lib-fix-one
+  fix-linking: fix-links
+  fix-link-notes: fix-linking

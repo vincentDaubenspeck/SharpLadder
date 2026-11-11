@@ -132,7 +132,61 @@
             }
           ]
         }
-      ]
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b1"
+            },
+            "text": "To add up the readings, visit each one in turn and keep a running total."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b2"
+            },
+            "text": "Sums it"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b3"
+            },
+            "text": "Shows it"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b4"
+            },
+            "text": "Prints seventy-four"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b5.i1"
+            },
+            "text": "Start the total at zero."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b5.i2"
+            },
+            "text": "Add each reading in turn."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sum/b6"
+            },
+            "text": "Back to the first sum or this section."
+          }
+        ],
+        "audio": "sha256:380a29fa4d76bee1ffbf5ece0277f63d62a8acdb44c761a91d665e11dd54693c"
+      }
     }
   ]
 }

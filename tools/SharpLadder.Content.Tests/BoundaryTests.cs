@@ -160,7 +160,7 @@ public sealed class BoundaryTests
         if (state is "missing" or "empty")
         {
             Assert.Equal(0, code);
-            Assert.Equal(9, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(11, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -185,7 +185,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(9, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(11, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
     }
 
     // The link is the last component of each argument, which is still above the root it reaches.
@@ -204,7 +204,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(9, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(11, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
     }
 
     [Fact]
@@ -421,10 +421,35 @@ public sealed class BoundaryTests
         Assert.Contains($"  {output}: {Outside} content root", refusal, StringComparison.Ordinal);
     }
 
+    // An entry the root allowlist does not name is refused by name; nothing in it is opened, so
+    // a link or a second hard link inside it is never followed or read.
+    [Theory]
+    [InlineData("unused/link", "unused")]
+    [InlineData("unused/deeper/notes.txt", "unused")]
+    [InlineData("notes.txt", "notes.txt")]
+    public void EntryOutsideTheRootAllowlistIsRefusedUnread(string relative, string entry)
+    {
+        using var work = new TempFolder();
+        var content = Copy(Repository.Fixture, Path.Combine(work.Path, "content"));
+        var path = Path.Combine(content, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var linked = relative.EndsWith("link", StringComparison.Ordinal)
+            ? Links.Folder(path, Path.Combine(work.Path, "nowhere"))
+            : Links.Hard(path, work.Write("outside.txt", "notes\n"));
+
+        var (code, text) = Run(Repository.SchemaFolder, content, Path.Combine(work.Path, "out"));
+
+        Assert.Equal(1, code);
+        Assert.Contains($"{entry}: the content root holds only chapters/, schema/, aliases.yml and patterns.yml", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("hard links", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(LinkRefused, text, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(work.Path, "out")));
+    }
+
     // Folders no compile step reads are walked all the same.
     [Theory]
     [InlineData("unused-link")]
-    [InlineData("unused/link")]
+    [InlineData("chapters/fixture-basics/unused/link")]
     public void LinkAnywhereBelowTheContentRootIsRefused(string relative)
     {
         using var work = new TempFolder();
@@ -461,8 +486,8 @@ public sealed class BoundaryTests
     }
 
     [Theory]
-    [InlineData("notes.txt")]
-    [InlineData("unused/deeper/notes.txt")]
+    [InlineData("chapters/notes.txt")]
+    [InlineData("chapters/fixture-basics/deeper/notes.txt")]
     public void HardLinkedFileAnywhereBelowTheContentRootIsRefused(string relative)
     {
         using var work = new TempFolder();
@@ -572,7 +597,7 @@ public sealed class BoundaryTests
         {
             Assert.Equal(0, code);
             Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-            Assert.Equal(9, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(11, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -597,7 +622,7 @@ public sealed class BoundaryTests
         return to;
     }
 
-    private static string GoldenLine() => $"9 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
+    private static string GoldenLine() => $"11 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
 
     // The entries a stray folder could appear among: the temporary folder, the working folder and
     // the root of their drives.

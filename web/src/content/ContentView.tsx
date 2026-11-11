@@ -54,12 +54,12 @@ function ChapterSectionView({
   slugs: SlugMap;
 }): ReactElement {
   return (
-    <>
+    <section data-section-id={section.id}>
       <h2 id={section.id}>
         <Spans spans={section.title} slugs={slugs} />
       </h2>
       <Blocks blocks={section.body} slugs={slugs} />
-    </>
+    </section>
   );
 }
 
@@ -106,11 +106,11 @@ function PartSectionView({
   slugs: SlugMap;
 }): ReactElement {
   return (
-    <>
+    <section data-section-id={section.id}>
       <h3 id={section.id}>
         {section.number} <Spans spans={section.title} slugs={slugs} />
       </h3>
       <Blocks blocks={section.body} slugs={slugs} />
-    </>
+    </section>
   );
 }

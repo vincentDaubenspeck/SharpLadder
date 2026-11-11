@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sharpladder.com/schema/patterns.schema.json",
+  "title": "Compiled pattern registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["patterns"],
+  "properties": {
+    "patterns": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/pattern" }
+    }
+  },
+  "definitions": {
+    "plainText": {
+      "type": "string",
+      "pattern": "[^\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "summary"],
+      "properties": {
+        "id": {
+          "allOf": [
+            { "$ref": "body.schema.json#/definitions/id" },
+            { "pattern": "^pat-" }
+          ]
+        },
+        "title": { "$ref": "#/definitions/plainText" },
+        "summary": { "$ref": "#/definitions/plainText" }
+      }
+    }
+  }
+}

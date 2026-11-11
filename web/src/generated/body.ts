@@ -10,6 +10,28 @@ export type ItemId = string;
 
 export type Spoken = string;
 
+export type BlockTarget = {
+  type: "block";
+  blockId: string;
+};
+
+export type SectionTarget = {
+  type: "section";
+  sectionId: SectionId;
+};
+
+export type SegmentTarget = BlockTarget | SectionTarget;
+
+export type Segment = {
+  target: SegmentTarget;
+  text: string;
+};
+
+export type Speech = {
+  segments: Segment[];
+  audio: string;
+};
+
 export type Body = Block[];
 
 export type Block = ParagraphBlock | ListBlock | CodeBlock | TextBlock;

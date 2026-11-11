@@ -14,6 +14,15 @@ internal static class Payload
     public const string GeneratedFolder = "src/generated";
     public const string ManifestPath = "compiled/manifest.json";
 
+    // The manifest's name for each record kind; a name outside this list is no kind.
+    private static readonly (RecordKind Kind, string Name)[] KindNames =
+    [
+        (RecordKind.Chapter, "chapter"),
+        (RecordKind.Part, "part"),
+        (RecordKind.Aliases, "aliases"),
+        (RecordKind.Patterns, "patterns"),
+    ];
+
     private static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     // Files is null on failure: Code 1 for content errors, 2 for a schema or type emitter refusal.
@@ -38,10 +47,10 @@ internal static class Payload
         }
 
         var witnesses = new List<OutputFile>();
-        foreach (var file in result.Files)
+        foreach (var file in result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part))
         {
             // The witness is emitted only from bytes the schema accepts, the same bytes compiled/ receives.
-            var invalid = schema.Validate(Strict.GetString(file.Bytes));
+            var invalid = schema.Validate(Strict.GetString(file.Bytes), file.Kind!.Value);
             var (witness, witnessProblems) = invalid is null ? WitnessEmitter.Emit(file.RelativePath, file.Bytes) : (null, [$"{file.RelativePath}: {invalid}"]);
             if (witness is null)
             {
@@ -52,7 +61,7 @@ internal static class Payload
         }
 
         var files = result.Files
-            .Select(f => new OutputFile($"{CompiledFolder}/{f.RelativePath}", f.Bytes))
+            .Select(f => new OutputFile($"{CompiledFolder}/{f.RelativePath}", f.Bytes, f.Kind))
             .Concat(modules.Select(m => new OutputFile($"{GeneratedFolder}/{m.Key}", Strict.GetBytes(m.Value))))
             .Concat(witnesses)
             .ToList();
@@ -65,10 +74,33 @@ internal static class Payload
         var entries = files
             .Where(f => !string.Equals(f.RelativePath, ManifestPath, StringComparison.Ordinal))
             .OrderBy(f => f.RelativePath, StringComparer.Ordinal)
-            .Select(f => $"    {{ \"path\": {JsonSerializer.Serialize(f.RelativePath)}, \"sha256\": \"{Convert.ToHexStringLower(SHA256.HashData(f.Bytes))}\" }}")
+            .Select(f => $"    {{ \"path\": {JsonSerializer.Serialize(f.RelativePath)},{(f.Kind is { } kind ? $" \"kind\": \"{KindName(kind)}\"," : string.Empty)} \"sha256\": \"{Convert.ToHexStringLower(SHA256.HashData(f.Bytes))}\" }}")
             .ToList();
         var list = entries.Count == 0 ? "[]" : "[\n" + string.Join(",\n", entries) + "\n  ]";
-        return Strict.GetBytes($"{{\n  \"version\": 1,\n  \"files\": {list}\n}}\n");
+        return Strict.GetBytes($"{{\n  \"version\": 2,\n  \"files\": {list}\n}}\n");
+    }
+
+    public static string KindName(RecordKind kind) => KindNames.First(k => k.Kind == kind).Name;
+
+    // The kind the committed manifest states for each compiled record. A manifest that fails
+    // CheckManifest states none, so every record then goes without a kind and is refused.
+    public static Dictionary<string, RecordKind> Kinds(IReadOnlyDictionary<string, byte[]> committed)
+    {
+        var kinds = new Dictionary<string, RecordKind>(StringComparer.Ordinal);
+        if (CheckManifest(committed).Count > 0 || StrictJson.Parse(Strict.GetString(committed[ManifestPath])) is not JsonObject manifest)
+        {
+            return kinds;
+        }
+
+        foreach (var entry in manifest["files"]!.AsArray().OfType<JsonObject>())
+        {
+            if (entry["kind"] is JsonValue value && KindOf(value.GetValue<string>()) is { } kind)
+            {
+                kinds.Add(entry["path"]!.GetValue<string>(), kind);
+            }
+        }
+
+        return kinds;
     }
 
     public static void Collect(InputTree tree, string prefix, Dictionary<string, byte[]> into, string relative = "")
@@ -137,10 +169,10 @@ internal static class Payload
 
         if (root is not JsonObject manifest || !Keys(manifest, "version", "files")
             || manifest["version"] is not JsonValue version || version.GetValueKind() != JsonValueKind.Number
-            || !string.Equals(version.ToJsonString(), "1", StringComparison.Ordinal)
+            || !string.Equals(version.ToJsonString(), "2", StringComparison.Ordinal)
             || manifest["files"] is not JsonArray entries)
         {
-            return [$"{ManifestPath}: must hold exactly \"version\": 1 and a \"files\" array"];
+            return [$"{ManifestPath}: must hold exactly \"version\": 2 and a \"files\" array"];
         }
 
         var problems = new List<string>();
@@ -171,16 +203,26 @@ internal static class Payload
     // Path is null when the entry names no well-formed path; Problem is null when the entry holds.
     private static (string? Path, string? Problem) Entry(JsonNode? item, IReadOnlyDictionary<string, byte[]> committed, string? previous)
     {
-        if (item is not JsonObject entry || !Keys(entry, "path", "sha256")
+        if (item is not JsonObject entry || !(Keys(entry, "path", "sha256") || Keys(entry, "path", "kind", "sha256"))
             || entry["path"] is not JsonValue pathValue || !pathValue.TryGetValue<string>(out var path)
             || entry["sha256"] is not JsonValue hashValue || !hashValue.TryGetValue<string>(out var hash))
         {
-            return (null, "each entry must hold exactly a string \"path\" and a string \"sha256\"");
+            return (null, "each entry must hold exactly a string \"path\", a string \"sha256\" and, for a compiled record, a \"kind\"");
         }
 
         if (PathProblem(path) is { } problem)
         {
             return (null, $"{path}: {problem}");
+        }
+
+        // A compiled record states its kind, and nothing else may.
+        var compiled = path.StartsWith(CompiledFolder + "/", StringComparison.Ordinal);
+        var named = entry["kind"] is JsonValue kindValue && kindValue.TryGetValue<string>(out var kindName) && KindOf(kindName) is not null;
+        if (compiled != entry.ContainsKey("kind") || (compiled && !named))
+        {
+            return (path, compiled
+                ? $"{path}: kind must be one of {string.Join(", ", KindNames.Select(k => k.Name))}"
+                : $"{path}: only a compiled record has a kind");
         }
 
         if (previous is not null && string.CompareOrdinal(previous, path) >= 0)
@@ -202,6 +244,9 @@ internal static class Payload
             ? (path, null)
             : (path, $"{path}: sha256 does not match the file");
     }
+
+    private static RecordKind? KindOf(string name) =>
+        KindNames.Where(k => string.Equals(k.Name, name, StringComparison.Ordinal)).Select(k => (RecordKind?)k.Kind).FirstOrDefault();
 
     private static string? PathProblem(string path)
     {

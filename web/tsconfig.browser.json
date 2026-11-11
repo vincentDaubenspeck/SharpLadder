@@ -1,7 +1,13 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["es2023", "esnext.disposable", "dom", "dom.iterable"],
+    "lib": [
+      "es2023",
+      "es2024.string",
+      "esnext.disposable",
+      "dom",
+      "dom.iterable"
+    ],
     "module": "preserve",
     "moduleResolution": "bundler",
     "types": ["node"],

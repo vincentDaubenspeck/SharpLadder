@@ -8,12 +8,16 @@ namespace SharpLadder.Content;
 // last #id of a group and merges adjacent groups, so the counts come from the raw text.
 internal sealed class AttributeGroup
 {
-    private AttributeGroup(HtmlAttributes attributes, int idCount, int classCount)
+    private AttributeGroup(HtmlAttributes attributes, int idCount, int classCount, IReadOnlyList<string> propertyNames)
     {
         Attributes = attributes;
         IdCount = idCount;
         ClassCount = classCount;
+        PropertyNames = propertyNames;
     }
+
+    // As spelled in the raw text, repeats included, because Markdig may merge them.
+    public IReadOnlyList<string> PropertyNames { get; }
 
     public HtmlAttributes Attributes { get; }
 
@@ -35,6 +39,7 @@ internal sealed class AttributeGroup
 
         var ids = 0;
         var classes = 0;
+        var names = new List<string>();
         foreach (var token in Tokens(text.Trim()[1..^1]))
         {
             if (token.StartsWith('#'))
@@ -45,9 +50,14 @@ internal sealed class AttributeGroup
             {
                 classes++;
             }
+            else
+            {
+                var equals = token.IndexOf('=', StringComparison.Ordinal);
+                names.Add(equals < 0 ? token : token[..equals]);
+            }
         }
 
-        return new AttributeGroup(attributes, ids, classes);
+        return new AttributeGroup(attributes, ids, classes, names);
     }
 
     // The groups at the end of a line, in line order.
