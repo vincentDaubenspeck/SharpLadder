@@ -16,7 +16,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,7 +108,7 @@ jobs:
 
   tests-ps:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       REQUIRE_PARITY: "1"
     steps:
@@ -134,7 +134,7 @@ jobs:
         # read through the deny ACLs the census tests rely on.
         shell: pwsh
         working-directory: web
-        run: npx vitest run
+        run: npm test
       - name: Hook and check tests (Windows PowerShell, parity with sh)
         run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 
@@ -239,6 +239,23 @@ jobs:
           mv ".tools/$dir" .tools/node
           [ "$(.tools/node/bin/node -v)" = "$version" ]
           echo "$GITHUB_WORKSPACE/.tools/node/bin" >> "$GITHUB_PATH"
+      # The content harness server runs the compiler-backed preflight, which builds with this SDK.
+      - name: Install the pinned .NET SDK (checksum verified)
+        shell: bash
+        run: |
+          set -eu
+          read -r url sha version < <(node -e '
+            const p = require("./tools/tool-pins.json");
+            const a = p.dotnet.assets["linux-x64"];
+            console.log(a.url, a.sha512, p.dotnet.version);
+          ')
+          curl -fsSL -o "$RUNNER_TEMP/dotnet.tar.gz" "$url"
+          echo "$sha  $RUNNER_TEMP/dotnet.tar.gz" | sha512sum -c -
+          mkdir -p .tools/dotnet
+          python3 -I -c 'import sys, tarfile
+          tarfile.open(sys.argv[1], "r:gz").extractall(sys.argv[2], filter="data")
+          ' "$RUNNER_TEMP/dotnet.tar.gz" .tools/dotnet
+          [ "$(.tools/dotnet/dotnet --version)" = "$version" ]
       - name: Install web dependencies (no install scripts)
         shell: bash
         working-directory: web

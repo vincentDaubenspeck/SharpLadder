@@ -8,6 +8,9 @@ internal static partial class ContentIds
     // Blocks of a chapter's intro use this prefix, so no heading may take it.
     public const string IntroPrefix = "intro";
 
+    // Chapter IDs carry this prefix, so a link target names its chapter unambiguously.
+    public const string ChapterPrefix = "ch-";
+
     public const int MaxSpokenLength = 200;
 
     public const string FormatRule = "is not lowercase letters, digits and hyphens starting with a letter, at most 48 characters";

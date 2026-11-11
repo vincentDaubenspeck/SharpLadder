@@ -57,6 +57,19 @@ internal sealed record OutputTarget(string Display, string BaseCanonical, FileId
         }
     }
 
+    // Two folders one run writes stay apart: by canonical path, and by kernel identity wherever
+    // one of them exists already, so neither lies in the other or is it.
+    public void CheckApart(OutputTarget other, string role)
+    {
+        var (mine, theirs) = (Path.Join([BaseCanonical, .. Missing]), Path.Join([other.BaseCanonical, .. other.Missing]));
+        if (Overlaps(mine, theirs)
+            || (other.Missing.Count == 0 && KernelPath.Ancestors(BaseCanonical, Display).Contains(other.BaseId))
+            || (Missing.Count == 0 && KernelPath.Ancestors(other.BaseCanonical, other.Display).Contains(BaseId)))
+        {
+            throw new BoundaryException($"{Display}: must lie outside the {role}, and must not be it");
+        }
+    }
+
     // The deepest folder of path that exists, followed through links as the kernel follows them;
     // missing receives the names below it, outermost first.
     private static SafeFileHandle OpenDeepest(string path, List<string> missing, out string found)

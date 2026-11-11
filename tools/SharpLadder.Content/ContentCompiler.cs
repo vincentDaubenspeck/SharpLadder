@@ -44,7 +44,13 @@ internal static class ContentCompiler
             .Select(s => Read(s.Relative, s.Bytes, s.Display, diagnostics))
             .OfType<Parsed>()
             .ToList();
-        CheckIds(parsed, diagnostics);
+
+        // Anchor sets are built only from unique IDs, so a duplicate is reported, never collapsed.
+        if (CheckIds(parsed, diagnostics))
+        {
+            CheckLinks(parsed, diagnostics);
+        }
+
         CheckChapters(parsed, diagnostics);
         var files = new List<OutputFile>();
         foreach (var file in parsed.Where(p => p.File.Model is not null))
@@ -145,9 +151,11 @@ internal static class ContentCompiler
         return sources;
     }
 
-    // Top-level IDs are unique across every file; the first use in path order wins.
-    private static void CheckIds(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    // Top-level IDs are unique across every file; the first use in path order wins. False when
+    // any ID repeats.
+    private static bool CheckIds(List<Parsed> parsed, List<Diagnostic> diagnostics)
     {
+        var before = diagnostics.Count;
         var seen = new Dictionary<string, (string Display, int Line)>(StringComparer.Ordinal);
         foreach (var file in parsed)
         {
@@ -157,6 +165,26 @@ internal static class ContentCompiler
                 {
                     var first = seen[id];
                     diagnostics.Add(new Diagnostic(file.Display, line, $"duplicate id \"{id}\" (first used at {first.Display}:{first.Line})"));
+                }
+            }
+        }
+
+        return diagnostics.Count == before;
+    }
+
+    // A bare or current-chapter target must name an anchor of the same source file; a sibling
+    // file's anchors and other chapters need cross-file checks, which do not exist yet.
+    private static void CheckLinks(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    {
+        foreach (var file in parsed.Where(p => p.File.Model is not null))
+        {
+            var anchors = file.File.Anchors.ToHashSet(StringComparer.Ordinal);
+            foreach (var link in file.File.Links)
+            {
+                var local = link.Chapter is null || string.Equals(link.Chapter, file.File.ChapterId, StringComparison.Ordinal);
+                if (local && !anchors.Contains(link.Id))
+                {
+                    diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names no section or block id in this file"));
                 }
             }
         }

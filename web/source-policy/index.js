@@ -2,6 +2,7 @@
 // guard. Both judge the typescript-eslint tree and its scope manager, so binding and hoisting
 // follow the parser of record, and no disable comment can reach the build's verdict.
 import { parseForESLint } from "@typescript-eslint/parser";
+import { rendererFindings } from "./renderer.js";
 
 // A run-time read or write of one of these fails unless a run-time binding shadows it.
 const bannedGlobals = new Set([
@@ -330,10 +331,18 @@ export function parseSource(code, filePath) {
   });
 }
 
-// Returns every finding in source order as { node, kind, name }; kind is importMeta,
-// dynamicImport, attributes, requireImport, global or unsupported. An unknown node type is a
-// finding, never a pass.
-export function checkProgram(program, scopeManager) {
+// Returns every finding as { node, kind, name }; kind is importMeta, dynamicImport, attributes,
+// requireImport, global, unsupported or renderer. An unknown node type is a finding, never a
+// pass. The unit is the file's path under src, which selects the renderer rules; the text is the
+// file's source, which a pinned helper must match, and hasBOM says a byte order mark was taken
+// off it before the text was handed over.
+export function checkProgram(
+  program,
+  scopeManager,
+  unit = null,
+  text = null,
+  hasBOM = false,
+) {
   const found = [];
   const report = (node, kind, name = node.type) => {
     found.push({ node, kind, name });
@@ -389,7 +398,10 @@ export function checkProgram(program, scopeManager) {
   };
 
   visit(program, false);
-  return found;
+  return [
+    ...found,
+    ...rendererFindings(program, scopeManager, unit, children, text, hasBOM),
+  ];
 }
 
 export function describeFinding({ kind, name }) {
@@ -404,6 +416,8 @@ export function describeFinding({ kind, name }) {
       return "import = require()";
     case "global":
       return `reference to ${name}`;
+    case "renderer":
+      return name;
     default:
       return `unsupported syntax ${name}`;
   }

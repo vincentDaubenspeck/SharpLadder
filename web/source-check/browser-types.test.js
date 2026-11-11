@@ -10,15 +10,25 @@ const parsed = ts.getParsedCommandLineOfConfigFile(
   { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined },
 );
 
-/** Diagnostics of the browser program with one module's text replaced in memory. */
-function diagnostics(file, from, to) {
+// Unchanged files parse to the same trees in every case, so each is parsed once per file.
+const unchanged = new Map();
+
+/**
+ * Diagnostics of the browser program with one module's text replaced in memory: of the whole
+ * program, or of the replaced module alone where a case asserts only what that module reports.
+ */
+function diagnostics(file, from, to, { targetOnly = false } = {}) {
   const target = resolve(web, "browser", file);
   const host = ts.createCompilerHost(parsed.options);
   const read = host.getSourceFile.bind(host);
   let swapped = from === undefined;
   host.getSourceFile = (name, language, ...rest) => {
-    if (from === undefined || resolve(name) !== target)
-      return read(name, language, ...rest);
+    if (from === undefined || resolve(name) !== target) {
+      const key = `${resolve(name)}\n${JSON.stringify(language)}`;
+      if (!unchanged.has(key))
+        unchanged.set(key, read(name, language, ...rest));
+      return unchanged.get(key);
+    }
     const text = ts.sys.readFile(name) ?? "";
     swapped = text.includes(from);
     return ts.createSourceFile(name, text.replace(from, to), language);
@@ -28,8 +38,13 @@ function diagnostics(file, from, to) {
     options: parsed.options,
     host,
   });
+  const only = targetOnly
+    ? program.getSourceFiles().find((f) => resolve(f.fileName) === target)
+    : undefined;
+  if (targetOnly && only === undefined)
+    throw new Error(`${file} is not in the program`);
   const found = ts
-    .getPreEmitDiagnostics(program)
+    .getPreEmitDiagnostics(program, only)
     .map(
       (d) =>
         `${d.file ? resolve(d.file.fileName) === target : false}:TS${String(d.code)}`,
@@ -37,7 +52,7 @@ function diagnostics(file, from, to) {
   return { swapped, found };
 }
 
-// Each case calls the real TypeScript compiler on the whole browser program.
+// Each case builds the whole browser program with the real TypeScript compiler.
 
 describe("browser modules are type-checked", () => {
   it("passes the unchanged browser program", () => {
@@ -53,7 +68,9 @@ describe("browser modules are type-checked", () => {
     ],
     ["fonts.ts", "  return actual;\n", "  return bytes.length;\n"],
   ])("fails a wrong return type in %s", (file, from, to) => {
-    const { swapped, found } = diagnostics(file, from, to);
+    const { swapped, found } = diagnostics(file, from, to, {
+      targetOnly: true,
+    });
     expect(swapped).toBe(true);
     expect(found).toContain("true:TS2322");
   });
@@ -71,7 +88,9 @@ describe("browser modules are type-checked", () => {
       "TS2339",
     ],
   ])("types the response body as the real Buffer: %s", (_, to, code) => {
-    const { swapped, found } = diagnostics("fonts.pw.ts", body, to);
+    const { swapped, found } = diagnostics("fonts.pw.ts", body, to, {
+      targetOnly: true,
+    });
     expect(swapped).toBe(true);
     expect(found).toContain(`true:${code}`);
   });
@@ -80,9 +99,10 @@ describe("browser modules are type-checked", () => {
     const check = (verdict) =>
       `${body}      type IsAny<T> = 0 extends 1 & T ? true : false;\n      const notAny: IsAny<Awaited<ReturnType<import("@playwright/test").APIResponse["body"]>>> = ${verdict};\n      void notAny;\n`;
     expect(diagnostics("fonts.pw.ts", body, check("false")).found).toEqual([]);
-    expect(diagnostics("fonts.pw.ts", body, check("true")).found).toContain(
-      "true:TS2322",
-    );
+    expect(
+      diagnostics("fonts.pw.ts", body, check("true"), { targetOnly: true })
+        .found,
+    ).toContain("true:TS2322");
   });
 
   it("compiles DOM fetch types beside the Node declarations", () => {

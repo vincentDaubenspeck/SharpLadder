@@ -1,0 +1,97 @@
+// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "part",
+  empty: {},
+  none: [],
+  flag: true,
+  off: false,
+  low: -9007199254740991,
+  high: 9007199254740991,
+  zero: 0,
+  abcd: "This value is long enough to pass the line width, but its key is only four long",
+  abcde:
+    "This value is long enough to pass the line width, and its key is five long",
+  fits: "This one fits its line exactly when the trailing comma is counted, at 80",
+  words: ["one", "two", "three"],
+  longWords: [
+    "the first of three strings",
+    "the second of three strings",
+    "the third",
+  ],
+  single: [
+    "a lone string that is long enough to push this array past the width",
+  ],
+  numbers: [
+    -100000000, 200000000, 300000000, 400000000, 500000000, 600000000, 7000000,
+    1,
+  ],
+  pair: [-1, 2],
+  grid: [
+    [1, 2],
+    [3, 4],
+  ],
+  ragged: [["a"], ["b", "c"]],
+  mixed: [1, "a", true, {}, []],
+  a: {
+    b: {
+      c: {
+        d: {
+          e: {
+            f: {
+              g: {
+                keyOfFortyEightCharactersXxxxxxxxxxxxxxxxxxxxxxx: 9007199254740991,
+                otherKeyOfFortyEightCharactersXxxxxxxxxxxxxxxxxx: true,
+                negativeKeyOfFortyEightCharactersXxxxxxxxxxxxxxx:
+                  -9007199254740991,
+                h: {
+                  i: {
+                    j: {
+                      k: {
+                        l: {
+                          m: {
+                            emptyObjectKeyOfFortyEightCharactersXxxxxxxxxxxx:
+                              {},
+                            emptyArrayKeyOfFortyEightCharactersXxxxxxxxxxxxx:
+                              [],
+                            falseKeyOfFortyEightCharactersXxxxxxxxxxxxxxxxxx: false,
+                            pairKeyOfFortyEightCharactersXxxxxxxxxxxxxxxxxxx: [
+                              1, 2,
+                            ],
+                            abcd: -9007199254740991,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  nested: {
+    level: {
+      deeper: [
+        {
+          text: "quote \u0022 backslash \\ cr \r lf \n tab \t nul \u0000 apostrophe \u0027 backtick \u0060",
+          more: "caf\u00E9 \uD83D\uDE00 line \u2028 para \u2029 template ${x} comment */ /* \u003Cb\u003E\u0026\u003C/b\u003E \u003C!-- --\u003E",
+        },
+        {},
+      ],
+    },
+  },
+  objects: [
+    {
+      only: 1,
+    },
+    {
+      first: 1,
+      second: 2,
+    },
+  ],
+} satisfies ContentDoc;

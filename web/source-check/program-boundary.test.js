@@ -386,6 +386,7 @@ const toolingRun = (files, spec = tooling) =>
       "playwright.config.ts": "export {};\n",
       "vite.config.ts": "export {};\n",
       "browser/a.ts": "export {};\n",
+      "content-check/c.ts": "export {};\n",
       ...files,
     }),
     spec,
@@ -402,7 +403,7 @@ describe("the tooling program", () => {
         "vite.config.ts": 'import { a } from "./src/a";\nexport default a;\n',
         "src/a.ts": "export const a = 1;\n",
       }),
-    ).toEqual(["program input outside the admitted set: src/a.ts"]);
+    ).toEqual(["tsconfig.browser.json must not reach src/a.ts"]);
   });
 
   it("refuses first-party global augmentations", () => {

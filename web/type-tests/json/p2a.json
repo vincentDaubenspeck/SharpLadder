@@ -1,0 +1,13 @@
+{
+  "type": "chapter",
+  "id": "ch-matrix",
+  "slug": "matrix",
+  "title": "Matrix",
+  "order": 1,
+  "targets": {
+    "csharp": 12,
+    "dotnet": 8
+  },
+  "intro": [],
+  "sections": []
+}

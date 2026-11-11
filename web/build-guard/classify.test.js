@@ -8,7 +8,6 @@ import {
   guardContext,
   htmlViolations,
   isReservedSpecifier,
-  pathKey,
   scriptViolations,
 } from "./classify.js";
 import { approvedHtml, cleanUp, fixture } from "./fixture.js";
@@ -36,16 +35,6 @@ function project() {
   put("node_modules/broken/package.json", "{");
   return { root, ctx: guardContext(root), put };
 }
-
-describe("pathKey", () => {
-  it("folds case and separators on Windows only", () => {
-    expect(pathKey("C:\\Web\\Src", "win32")).toBe(
-      pathKey("c:/web/src", "win32"),
-    );
-    if (process.platform !== "win32")
-      expect(pathKey("/Web/Src")).toBe("/Web/Src");
-  });
-});
 
 describe("classifyId", () => {
   const { root, ctx, put } = project();

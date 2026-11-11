@@ -14,7 +14,7 @@ public sealed class CliTests
 
         Assert.Equal(0, code);
         Assert.Equal("PASS content compiler", lines[^1]);
-        Assert.Equal(3, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(9, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
         Assert.Equal(["out"], Directory.EnumerateFileSystemEntries(work.Path).Select(Path.GetFileName), StringComparer.Ordinal);
     }
 

@@ -11,8 +11,10 @@ import {
   guardContext,
   htmlViolations,
   isReservedSpecifier,
-  pathKey,
+  projectPath,
+  isTestOnly,
   scriptViolations,
+  sourceUnit,
 } from "./classify.js";
 import {
   configViolations,
@@ -22,6 +24,8 @@ import {
   snapshot,
 } from "./output.js";
 import { lightningViolations } from "./contract.js";
+import { rendererModules } from "../source-policy/renderer.js";
+import { canonical } from "../source-policy/unit.js";
 import { layerPrelude } from "./prelude.js";
 import {
   collect,
@@ -153,7 +157,7 @@ export function guard({ worker = false } = {}) {
         if (id.startsWith("\0")) continue;
         const kind = check(plugin, id, "getModuleIds");
         if (kind.kind === "first-party" && kind.lang === "css")
-          carried.add(pathKey(realpathSync.native(id)));
+          carried.add(canonical(id));
       }
     }
     for (const key of carried) {
@@ -233,6 +237,22 @@ export function guard({ worker = false } = {}) {
       const pipeline = pipelineViolations(this.environment?.plugins ?? []);
       if (pipeline.length > 0)
         this.error(`build guard: ${pipeline.join("; ")}`);
+      // The App never imports the renderer, so the transform hook alone would not see its modules.
+      const renderer = [];
+      for (const unit of rendererModules.keys()) {
+        const file = join(ctx.root, "src", unit);
+        try {
+          const text = readFileSync(file, "utf8");
+          const actual = sourceUnit(ctx, file);
+          if (actual !== unit)
+            renderer.push(`src/${unit} is on disk as src/${actual}`);
+          else renderer.push(...scriptViolations(text, file, unit));
+        } catch (error) {
+          renderer.push(`src/${unit} cannot be read: ${message(error)}`);
+        }
+      }
+      if (renderer.length > 0)
+        this.error(`build guard: ${[...new Set(renderer)].join("; ")}`);
       ledger.clear();
       manifest = null;
       // The licence texts reach the output only through the inventory that binds their hashes.
@@ -264,7 +284,7 @@ export function guard({ worker = false } = {}) {
       handler(html, { filename }) {
         if (worker || ctx === null)
           throw new GuardError("build guard: page outside the guarded build");
-        if (pathKey(realpathSync.native(filename)) !== ctx.htmlKey) {
+        if (canonical(filename) !== ctx.html) {
           throw new GuardError(`build guard: unexpected page ${filename}`);
         }
         const found = htmlViolations(html);
@@ -339,8 +359,8 @@ export function guard({ worker = false } = {}) {
         // Anything that changed the bytes before this hook would otherwise be bound as source.
         if (raw.toString("utf8") !== code)
           this.error(`build guard: ${id} reached the guard altered`);
-        const key = pathKey(realpathSync.native(id));
-        const source = key.slice(pathKey(ctx.root).length + 1);
+        const key = canonical(id);
+        const source = projectPath(ctx, key);
         const held = ledger.get(key);
         const sha256 = createHash("sha256").update(raw).digest("hex");
         const tokens = source === tokensPath;
@@ -381,7 +401,7 @@ export function guard({ worker = false } = {}) {
         }
       } else {
         try {
-          found = scriptViolations(code, id);
+          found = scriptViolations(code, id, sourceUnit(ctx, id));
         } catch (error) {
           this.error(`build guard: cannot parse ${id}: ${message(error)}`);
         }
@@ -404,6 +424,12 @@ export function guard({ worker = false } = {}) {
         const info = this.getModuleInfo(id);
         if (info === null || info.isExternal)
           this.error(`build guard: ${id} has no bundled module`);
+        // The resolved production graph: every module the entry reaches.
+        if (kind.kind === "first-party" && isTestOnly(sourceUnit(ctx, id))) {
+          this.error(
+            `build guard: test-only module ${sourceUnit(ctx, id)} is reachable from the production entry through ${info.importers.join(", ")}`,
+          );
+        }
         if (
           kind.kind === "first-party" &&
           info.dynamicallyImportedIds.length > 0

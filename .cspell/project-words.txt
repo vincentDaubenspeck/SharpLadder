@@ -5,6 +5,7 @@ atrule
 bbggrr
 bbox
 bdat
+blockid
 bsdtar
 bsln
 cacache
@@ -47,7 +48,9 @@ fdsc
 fmtx
 fonteditor
 fontkit
+formaction
 fpgm
+fsutil
 fvar
 gdef
 gethighcontrast
@@ -57,6 +60,7 @@ gloc
 glyf
 gnueabihf
 gpos
+Grüße
 gsub
 gvar
 hdmx
@@ -76,9 +80,11 @@ ihdr
 iidfile
 isexe
 jstf
+jsxs
 jzazbz
 jzczhz
 katex
+labelledby
 LASTEXITCODE
 lcar
 lede
@@ -126,6 +132,7 @@ opbd
 openat
 OPTOUT
 ossf
+paragrph
 PATHCONV
 PATHEXT
 pathspec
@@ -204,6 +211,8 @@ windir
 winldd
 wordmark
 XDEV
+xlink
+xlinkhref
 xunit
 Zapf
 zizmor

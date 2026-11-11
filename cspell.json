@@ -16,6 +16,7 @@
     "**/packages.lock.json",
     "LICENSE",
     ".git/**",
-    ".cspell/project-words.txt"
+    ".cspell/project-words.txt",
+    "web/compiled/**"
   ]
 }

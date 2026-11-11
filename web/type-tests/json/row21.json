@@ -1,0 +1,46 @@
+{
+  "type": "chapter",
+  "id": "ch-matrix",
+  "slug": "two words",
+  "title": "Matrix",
+  "order": 1,
+  "targets": {
+    "csharp": 12,
+    "dotnet": 8
+  },
+  "intro": [
+    {
+      "type": "paragraph",
+      "blockId": "intro/b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "Text."
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "matrix-intro",
+      "title": [
+        {
+          "type": "text",
+          "text": "Intro"
+        }
+      ],
+      "body": [
+        {
+          "type": "paragraph",
+          "blockId": "matrix-intro/b1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Text."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -17,9 +17,19 @@ export default {
     "build-guard/index.d.ts",
     // Types for the registry import in browser/catalogue.ts, which knip resolves to the .js file.
     "stylelint/registry.d.ts",
+    // Generated modules export every schema definition and one witness each, used or not.
+    "src/generated/body.ts",
+    "src/generated/content.ts",
+    "src/generated/witness/**/*.ts",
+    // Compile-only fixtures, checked by the type-test program and never imported.
+    "type-tests/**/*.ts",
+    // The harness entry is loaded by its own Vite page, never by the app.
+    "harness/content/main.tsx",
   ],
   // Loaded by path in fonts/convert.js, so its version and WASM bytes are checked before use.
   ignoreDependencies: ["fonteditor-core"],
+  // Part of Windows; a test uses it to make a folder keep letter cases apart.
+  ignoreBinaries: ["fsutil.exe"],
   project: ["**/*.{js,mjs,ts,tsx}", "**/*.module.css"],
   // The config refuses to load outside the pinned browser environment, so the entries are named.
   playwright: {

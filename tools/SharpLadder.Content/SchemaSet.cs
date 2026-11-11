@@ -84,6 +84,15 @@ internal sealed class SchemaSet : IContentSchema
 
     public string? Validate(string json)
     {
+        try
+        {
+            _ = StrictJson.Parse(json);
+        }
+        catch (JsonException e)
+        {
+            return "not JSON without duplicate names: " + e.Message;
+        }
+
         var result = _validator.Validate(json);
         if (result.IsValid)
         {
@@ -119,7 +128,7 @@ internal sealed class SchemaSet : IContentSchema
         try
         {
             text = StrictUtf8.GetString(bytes);
-            node = JsonNode.Parse(text);
+            node = StrictJson.Parse(text);
         }
         catch (Exception e) when (e is JsonException or DecoderFallbackException)
         {

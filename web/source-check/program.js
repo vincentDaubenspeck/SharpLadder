@@ -20,15 +20,24 @@ export const programs = [
     types: ["vite/client"],
     root: "src",
     extensions: [".ts", ".tsx"],
-    config: [],
+    // The round trip declares the records the Vitest global setup provides.
+    config: ["src/content/provided.d.ts"],
     forbiddenPackages: nodeTypePackages,
+    // Every generated module is checked by the app program, never only by a test-only one.
+    members: ["src/generated"],
     parser: { projectService: true },
   },
   {
     tsconfig: "tsconfig.browser.json",
-    include: ["playwright.config.ts", "vite.config.ts", "browser"],
+    include: [
+      "playwright.config.ts",
+      "vite.config.ts",
+      "browser",
+      "content-check",
+    ],
     types: ["node"],
     root: "browser",
+    roots: ["content-check"],
     // The browser program has no JSX setting, so a .tsx file there is refused, never half-checked.
     extensions: [".ts"],
     config: [
@@ -38,7 +47,34 @@ export const programs = [
       "stylelint/registry.d.ts",
     ],
     globalAugmentations: [],
+    // Node tooling only drives built pages, so app, generated, renderer and harness code stay out.
+    excluded: ["src", "harness"],
     parser: { projectService: false, project: "./tsconfig.browser.json" },
+  },
+  {
+    tsconfig: "tsconfig.type-tests.json",
+    include: ["type-tests"],
+    types: ["vite/client"],
+    root: "type-tests",
+    extensions: [".ts"],
+    config: [],
+    admitted: ["src/generated/body.ts", "src/generated/content.ts"],
+    forbiddenPackages: nodeTypePackages,
+    equivalentTo: "tsconfig.json",
+    parser: { projectService: false, project: "./tsconfig.type-tests.json" },
+  },
+  {
+    tsconfig: "tsconfig.harness.json",
+    include: ["harness/content/main.tsx"],
+    types: ["vite/client"],
+    root: "harness",
+    extensions: [".ts", ".tsx"],
+    config: [],
+    rootFiles: ["harness/content/main.tsx"],
+    admitted: ["src/content", "src/generated"],
+    forbiddenPackages: nodeTypePackages,
+    equivalentTo: "tsconfig.json",
+    parser: { projectService: false, project: "./tsconfig.harness.json" },
   },
 ];
 
@@ -53,15 +89,21 @@ const absentOptions = [
 
 const configName = /^(?:js|ts)config.*\.json$/iu;
 
-/** Any config name beyond the pinned ones could start a program no check describes. */
+/**
+ * Walks web one folder at a time, skipping only installed packages, because any config beyond
+ * the pinned ones could start a program no check describes. A linked folder is refused: walking
+ * it could leave web, and skipping it could hide a config.
+ */
 function tsconfigSetProblems(web, specs, readdir) {
   const expected = new Set(specs.map((s) => s.tsconfig));
   const found = new Set();
   const problems = [];
-  for (const dir of ["", ...specs.map((s) => s.root)]) {
+  const pending = [""];
+  while (pending.length > 0) {
+    const dir = pending.shift();
     let entries;
     try {
-      entries = readdir(join(web, dir), { recursive: dir !== "" });
+      entries = readdir(join(web, dir), { withFileTypes: true });
     } catch (error) {
       problems.push(
         `${dir || "."}: cannot list for TypeScript configs: ${error.code ?? error.message}`,
@@ -69,12 +111,12 @@ function tsconfigSetProblems(web, specs, readdir) {
       continue;
     }
     for (const entry of entries) {
-      const at = [dir, String(entry)]
-        .filter(Boolean)
-        .join("/")
-        .split(sep)
-        .join("/");
-      if (configName.test(basename(at))) found.add(at);
+      const at = dir ? `${dir}/${entry.name}` : entry.name;
+      if (configName.test(entry.name)) found.add(at);
+      else if (entry.isSymbolicLink())
+        problems.push(`${at}: a link is not walked for TypeScript configs`);
+      else if (entry.isDirectory() && entry.name !== "node_modules")
+        pending.push(at);
     }
   }
   for (const at of [...found].sort())
@@ -250,11 +292,35 @@ export function programInputs(
     projectReferences: parsed.projectReferences,
   });
   const webReal = realpathSync.native(web);
-  let root;
-  try {
-    root = realpathSync.native(join(web, spec.root));
-  } catch {
+  const existing = (paths) =>
+    paths.flatMap((p) => {
+      try {
+        return [realpathSync.native(join(webReal, p))];
+      } catch {
+        return [];
+      }
+    });
+  const roots = existing([spec.root]);
+  if (roots.length === 0)
     problems.push(`${spec.root}: first-party root is missing`);
+  for (const group of spec.roots ?? []) {
+    const found = existing([group]);
+    if (found.length === 0)
+      problems.push(`${group}: first-party root group is missing`);
+    roots.push(...found);
+  }
+  const admitted = existing(spec.admitted ?? []);
+  const excluded = existing(spec.excluded ?? []);
+  if (spec.rootFiles) {
+    const want = existing(spec.rootFiles).sort();
+    const got = parsed.fileNames.map((f) => realpathSync.native(f)).sort();
+    if (
+      want.length !== spec.rootFiles.length ||
+      JSON.stringify(got) !== JSON.stringify(want)
+    )
+      problems.push(
+        `${label} root files must be exactly ${spec.rootFiles.join(", ")}`,
+      );
   }
   const named = new Set(spec.config.map((p) => join(webReal, p)));
   const libDir = realpathSync.native(
@@ -294,15 +360,25 @@ export function programInputs(
         continue;
       }
     }
+    if (excluded.some((dir) => inside(dir, real))) {
+      problems.push(`${label} must not reach ${at}`);
+      inputs.push({ path: real, kind: undefined });
+      continue;
+    }
+    const source = sourceOf(spec, real) && !declaration.test(real);
     let kind;
     if (
-      root &&
-      inside(root, real) &&
-      !inPackageFolder(root, real) &&
-      sourceOf(spec, real) &&
-      !declaration.test(real)
+      source &&
+      roots.some((root) => inside(root, real) && !inPackageFolder(root, real))
     )
       kind = "first-party";
+    else if (
+      source &&
+      admitted.some(
+        (p) => p === real || (inside(p, real) && !inPackageFolder(p, real)),
+      )
+    )
+      kind = "admitted";
     else if (named.has(real)) kind = "config";
     else if (
       dirname(real) === libDir &&
@@ -333,6 +409,76 @@ export function programInputs(
   return { problems, inputs };
 }
 
+/** Every file under each member folder must be a first-party input of the program. */
+function memberProblems(web, spec, inputs, readdir) {
+  const label = spec.tsconfig;
+  const own = new Set(
+    inputs.filter((i) => i.kind === "first-party").map((i) => i.path),
+  );
+  const problems = [];
+  for (const folder of spec.members ?? []) {
+    const pending = [folder];
+    while (pending.length > 0) {
+      const dir = pending.shift();
+      let entries;
+      try {
+        entries = readdir(join(web, dir), { withFileTypes: true });
+      } catch (error) {
+        problems.push(
+          `${dir}: cannot list for ${label} members: ${error.code ?? error.message}`,
+        );
+        continue;
+      }
+      for (const entry of entries) {
+        const at = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) pending.push(at);
+        else if (!own.has(realpathSync.native(join(web, at))))
+          problems.push(`${at}: not in the ${label} program`);
+      }
+    }
+  }
+  return problems;
+}
+
+/** The option set the compiler computes, so a config that only looks alike is told apart. */
+function resolvedOptions(tsconfig) {
+  const { parsed, errors } = parse(tsconfig);
+  if (!parsed) return { errors };
+  const options = { ...parsed.options };
+  delete options.configFilePath;
+  const sorted = (value) =>
+    Array.isArray(value)
+      ? value.map(sorted)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map((k) => [k, sorted(value[k])]),
+          )
+        : value;
+  return { errors, text: JSON.stringify(sorted(options)) };
+}
+
+/** A test-only program must check exactly as the app program does, or it proves nothing. */
+export function equivalenceProblems(web, spec, specs = programs) {
+  if (!spec.equivalentTo) return [];
+  const base = specs.find((s) => s.tsconfig === spec.equivalentTo);
+  if (!base) return [`${spec.tsconfig}: no ${spec.equivalentTo} program`];
+  const want = resolvedOptions(join(web, base.tsconfig));
+  const got = resolvedOptions(join(web, spec.tsconfig));
+  if (want.text === undefined || got.text === undefined)
+    return [...want.errors, ...got.errors];
+  if (want.text === got.text) return [];
+  const a = JSON.parse(want.text);
+  const b = JSON.parse(got.text);
+  const differing = [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+    .sort();
+  return [
+    `${spec.tsconfig} resolved options differ from ${base.tsconfig}: ${differing.join(", ")}`,
+  ];
+}
+
 /**
  * Runs the config set, shape and input checks for every pinned program, and returns each
  * program's own sources with the parser options their lint must use, and every input path.
@@ -343,14 +489,20 @@ export function programProblems(
   { readdir = readdirSync } = {},
 ) {
   const problems = tsconfigSetProblems(web, specs, readdir);
-  const linted = [];
   for (const spec of specs) {
     // The set check already reports a missing config; parsing it would only repeat that.
-    if (!existsSync(join(web, spec.tsconfig))) continue;
+    if (existsSync(join(web, spec.tsconfig)))
+      problems.push(...tsconfigShapeProblems(join(web, spec.tsconfig), spec));
+  }
+  // An unpinned or reshaped config is never handed to the compiler.
+  if (problems.length > 0) return { problems, linted: [] };
+  const linted = [];
+  for (const spec of specs) {
     const { problems: found, inputs } = programInputs(web, spec);
     problems.push(
-      ...tsconfigShapeProblems(join(web, spec.tsconfig), spec),
       ...found,
+      ...memberProblems(web, spec, inputs, readdir),
+      ...equivalenceProblems(web, spec, specs),
     );
     const files = inputs
       .filter(

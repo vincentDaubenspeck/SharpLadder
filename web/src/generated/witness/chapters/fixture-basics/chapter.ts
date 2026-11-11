@@ -1,0 +1,292 @@
+// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "chapter",
+  id: "ch-fixture",
+  slug: "fixture-basics",
+  title: "Fixture Basics",
+  order: 1,
+  targets: {
+    csharp: 12,
+    dotnet: 8,
+  },
+  intro: [
+    {
+      type: "paragraph",
+      blockId: "intro/b1",
+      content: [
+        {
+          type: "text",
+          text: "This fixture chapter exercises every rule of the content compiler. It is ",
+        },
+        {
+          type: "em",
+          content: [
+            {
+              type: "text",
+              text: "test data",
+            },
+          ],
+        },
+        {
+          type: "text",
+          text: ", not teaching material.",
+        },
+      ],
+    },
+    {
+      type: "list",
+      blockId: "intro/b2",
+      ordered: false,
+      items: [
+        {
+          blockId: "intro/b2.i1",
+          content: [
+            {
+              type: "text",
+              text: "Intro blocks take the reserved ",
+            },
+            {
+              type: "code",
+              text: "intro",
+            },
+            {
+              type: "text",
+              text: " prefix.",
+            },
+          ],
+        },
+        {
+          blockId: "intro/b2.i2",
+          content: [
+            {
+              type: "text",
+              text: "Part files sit beside this file.",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  sections: [
+    {
+      id: "fix-parts",
+      title: [
+        {
+          type: "text",
+          text: "How the parts fit",
+        },
+      ],
+      body: [
+        {
+          type: "paragraph",
+          blockId: "fix-parts/b1",
+          content: [
+            {
+              type: "text",
+              text: "Each part file compiles to its own JSON file, at the same relative path.",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "fix-links",
+      title: [
+        {
+          type: "text",
+          text: "Links between ids",
+        },
+      ],
+      body: [
+        {
+          type: "paragraph",
+          blockId: "fix-links/b1",
+          content: [
+            {
+              type: "text",
+              text: "A bare link goes to ",
+            },
+            {
+              type: "link",
+              id: "fix-parts",
+              content: [
+                {
+                  type: "text",
+                  text: "how the parts fit",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: ", and an explicit one to ",
+            },
+            {
+              type: "link",
+              id: "fix-note",
+              chapter: "ch-fixture",
+              content: [
+                {
+                  type: "text",
+                  text: "the ",
+                },
+                {
+                  type: "code",
+                  text: "note",
+                },
+                {
+                  type: "text",
+                  text: " block",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: ". Another chapter is reached as ",
+            },
+            {
+              type: "link",
+              id: "second-start",
+              chapter: "ch-second",
+              content: [
+                {
+                  type: "text",
+                  text: "its ",
+                },
+                {
+                  type: "em",
+                  content: [
+                    {
+                      type: "text",
+                      text: "start",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: ", and link text may hold ",
+            },
+            {
+              type: "link",
+              id: "fix-links",
+              content: [
+                {
+                  type: "strong",
+                  content: [
+                    {
+                      type: "text",
+                      text: "strong with ",
+                    },
+                    {
+                      type: "em",
+                      content: [
+                        {
+                          type: "text",
+                          text: "em",
+                        },
+                      ],
+                    },
+                    {
+                      type: "text",
+                      text: " inside",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: ".",
+            },
+          ],
+        },
+        {
+          type: "text",
+          blockId: "fix-links/b2",
+          id: "fix-note",
+          spoken: "A note to link to",
+          source: "note",
+        },
+        {
+          type: "paragraph",
+          blockId: "fix-links/b3",
+          content: [
+            {
+              type: "text",
+              text: "Nested-looking text stays literal: [a ",
+            },
+            {
+              type: "link",
+              id: "fix-parts",
+              content: [
+                {
+                  type: "text",
+                  text: "b",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: "](#fix-links), [a [b ",
+            },
+            {
+              type: "link",
+              id: "fix-parts",
+              content: [
+                {
+                  type: "text",
+                  text: "c",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: "](#fix-links)](#fix-note), [",
+            },
+            {
+              type: "em",
+              content: [
+                {
+                  type: "text",
+                  text: "a ",
+                },
+                {
+                  type: "link",
+                  id: "fix-parts",
+                  content: [
+                    {
+                      type: "text",
+                      text: "b",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: "](#fix-links) and [a ",
+            },
+            {
+              type: "link",
+              id: "fix-parts",
+              content: [
+                {
+                  type: "text",
+                  text: "b",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: "](#fix-links).",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+} satisfies ContentDoc;

@@ -21,6 +21,7 @@ import { generateFaces } from "../asset-licence-check.js";
 import { releaseBuild } from "./build.mjs";
 import { classPattern, lightningTargets } from "./contract.js";
 import { layerPrelude } from "./prelude.js";
+import { rendererModules } from "../source-policy/renderer.js";
 
 const web = join(import.meta.dirname, "..");
 const configFile = join(web, "vite.config.ts");
@@ -64,6 +65,14 @@ export const tokensSheet = `@layer tokens, base, components, overrides;
 
 const tokensFile = "src/theme/tokens.css";
 
+// Every build checks the renderer modules, so a fixture carries the real ones unless it brings its own.
+const helperFiles = Object.fromEntries(
+  [...rendererModules.keys()].map((unit) => [
+    `src/${unit}`,
+    readFileSync(join(web, "src", unit), "utf8"),
+  ]),
+);
+
 // A fixture entry imports the token sheet first unless it brings its own or opts out.
 function withTokens(files) {
   const main = files["src/main.tsx"];
@@ -87,14 +96,21 @@ export function link(target, path) {
 }
 
 // Lays out base/web (the project root) and base/outside; paths starting "../" land beside web.
-export function fixture(files, { modules = true, tokens = true } = {}) {
+// A fixture can put its project one named folder deeper, to choose the name of an ancestor,
+// and can set up the empty project folder before any file is written.
+export function fixture(
+  files,
+  { modules = true, tokens = true, helpers = true, under = "", prepare } = {},
+) {
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), "sl-guard-")));
   bases.push(base);
-  const root = join(base, "web");
-  mkdirSync(root);
+  const root = join(base, under, "web");
+  mkdirSync(root, { recursive: true });
+  prepare?.(root);
   const all = {
     "index.html": approvedHtml,
     [inventoryFile]: emptyInventory,
+    ...(helpers ? helperFiles : {}),
     ...(tokens ? withTokens(files) : files),
   };
   // A fixture that brings no record gets the one its inventory implies; a broken one gets none.

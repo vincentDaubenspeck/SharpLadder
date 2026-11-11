@@ -44,7 +44,12 @@ describe("TypeScript program inputs", () => {
     const { problems, inputs } = programInputs(web);
     expect(problems).toEqual([]);
     const kinds = new Set(inputs.map((i) => i.kind));
-    expect([...kinds].sort()).toEqual(["first-party", "lib", "package"]);
+    expect([...kinds].sort()).toEqual([
+      "config",
+      "first-party",
+      "lib",
+      "package",
+    ]);
     const names = inputs.map((i) => i.path.split(sep).slice(-3).join("/"));
     expect(names).toContain("@types/react/index.d.ts");
     expect(names).toContain("typescript/lib/lib.dom.d.ts");
@@ -196,7 +201,7 @@ describe("app and browser programs", () => {
     expect(twoPrograms({})).toEqual([]);
   });
 
-  it("fails a browser file added to the app include", () => {
+  it("fails a browser file added to the app include before building it", () => {
     expect(
       twoPrograms({
         "tsconfig.json": JSON.stringify({
@@ -204,10 +209,7 @@ describe("app and browser programs", () => {
           include: ["src", "browser"],
         }),
       }),
-    ).toEqual([
-      'tsconfig.json include must be ["src"]',
-      "program input outside the admitted set: browser/b.ts",
-    ]);
+    ).toEqual(['tsconfig.json include must be ["src"]']);
   });
 
   it("fails an app file pulled into the browser program", () => {
@@ -281,7 +283,7 @@ describe("app and browser programs", () => {
     );
   });
 
-  it("fails an altered browser include", () => {
+  it("fails an altered browser include before building it", () => {
     expect(
       twoPrograms({
         "tsconfig.browser.json": JSON.stringify({
@@ -289,10 +291,7 @@ describe("app and browser programs", () => {
           include: ["browser", "src"],
         }),
       }),
-    ).toEqual([
-      'tsconfig.browser.json include must be ["browser"]',
-      "program input outside the admitted set: src/a.ts",
-    ]);
+    ).toEqual(['tsconfig.browser.json include must be ["browser"]']);
   });
 
   it("fails an unknown third config, beside web or inside a root", () => {

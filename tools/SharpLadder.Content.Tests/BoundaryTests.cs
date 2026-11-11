@@ -160,7 +160,7 @@ public sealed class BoundaryTests
         if (state is "missing" or "empty")
         {
             Assert.Equal(0, code);
-            Assert.Equal(3, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(9, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -185,7 +185,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(3, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(9, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
     }
 
     // The link is the last component of each argument, which is still above the root it reaches.
@@ -204,7 +204,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(3, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(9, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
     }
 
     [Fact]
@@ -572,7 +572,7 @@ public sealed class BoundaryTests
         {
             Assert.Equal(0, code);
             Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-            Assert.Equal(3, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(9, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -597,7 +597,7 @@ public sealed class BoundaryTests
         return to;
     }
 
-    private static string GoldenLine() => $"3 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
+    private static string GoldenLine() => $"9 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
 
     // The entries a stray folder could appear among: the temporary folder, the working folder and
     // the root of their drives.

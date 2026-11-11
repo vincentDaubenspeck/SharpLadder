@@ -7,6 +7,7 @@ namespace SharpLadder.Content;
 [JsonDerivedType(typeof(CodeSpan), "code")]
 [JsonDerivedType(typeof(EmphasisSpan), "em")]
 [JsonDerivedType(typeof(StrongSpan), "strong")]
+[JsonDerivedType(typeof(LinkSpan), "link")]
 internal abstract class Span
 {
 }

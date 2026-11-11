@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 const repo = join(import.meta.dirname, "..", "..");
 
-type Kind = "dist" | "specimen";
+type Kind = "dist" | "specimen" | "harness";
 type Engine = "chromium" | "firefox" | "webkit";
 interface Build {
   dir: string;
@@ -18,10 +18,11 @@ interface Pins {
   image: { browsersPath: string };
 }
 
-/** The two read-only servers: the release dist and the specimen build. */
-export const ports: { readonly dist: number; readonly specimen: number } = {
+/** The read-only servers: the release dist, the specimen build and the content harness. */
+export const ports: Readonly<Record<Kind, number>> = {
   dist: 4173,
   specimen: 4174,
+  harness: 4175,
 };
 
 /** The server command, run by the pinned Node that runs the tests; any other Node fails. */

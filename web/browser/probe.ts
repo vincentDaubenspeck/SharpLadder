@@ -5,6 +5,7 @@ import { ports } from "./pins.ts";
 
 export const distUrl = `http://127.0.0.1:${String(ports.dist)}/`;
 export const specimenUrl = `http://127.0.0.1:${String(ports.specimen)}/`;
+export const harnessUrl = `http://127.0.0.1:${String(ports.harness)}/`;
 
 /** Puts the page in one theme state: the root attribute plus emulated scheme and media. */
 export async function setState(page: Page, state: Omit<PageState, "work">) {

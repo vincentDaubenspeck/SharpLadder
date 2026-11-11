@@ -94,5 +94,12 @@ export default defineConfig({
       timeout: 300_000,
       stdout: "pipe",
     },
+    {
+      command: serverCommand("harness"),
+      url: `http://127.0.0.1:${String(ports.harness)}/`,
+      reuseExistingServer: false,
+      timeout: 300_000,
+      stdout: "pipe",
+    },
   ],
 });

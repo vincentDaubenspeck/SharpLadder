@@ -56,6 +56,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
+    // The round trip takes its records only from this setup, and the acceptance run requires
+    // every record-backed case to pass.
+    globalSetup: ["./content-check/global-setup.ts"],
     fsModuleCachePath: ".cache/vitest",
   },
 });

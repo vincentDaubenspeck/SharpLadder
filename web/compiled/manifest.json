@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "files": [
+    { "path": "compiled/chapters/fixture-basics/build.json", "sha256": "e83c2fb6a54f11c96ec36d09d725c503bc113ffbeb9cbfe6c574dad6dca9b557" },
+    { "path": "compiled/chapters/fixture-basics/chapter.json", "sha256": "7cf4b976c4d9c0bad768c5ccd26feac135249ae1d4b16ec508fbfeeac2105c97" },
+    { "path": "compiled/chapters/fixture-basics/gotchas.json", "sha256": "c88b8bffeee366b8acaf280b7570be551963073fe1b136883caa11d7b54ca17a" },
+    { "path": "compiled/chapters/fixture-basics/idioms.json", "sha256": "e997f91b5b998745b1d6b956f07f92ac32dc6a8d39e0e8ac8d30a9bce79fd4a6" },
+    { "path": "compiled/chapters/fixture-basics/library.json", "sha256": "54dd60e495b22eb315224b14686fb1333723fb7a36d257d46cb31f710f55868e" },
+    { "path": "compiled/chapters/fixture-basics/syntax.json", "sha256": "c005d60b9caeb0dc93c73f80445f42046faae5711660da34f6350f975a6caa32" },
+    { "path": "compiled/chapters/fixture-empty-intro/chapter.json", "sha256": "c5e71572d09950992cb46ac0a56d08f3de4450ce7eea210a15f2130275d5c418" },
+    { "path": "compiled/chapters/fixture-no-sections/chapter.json", "sha256": "95274b5b9da9c9e111c75e083754a1479404dff2edde20ee20ab5bee36b00a28" },
+    { "path": "compiled/chapters/fixture-second/chapter.json", "sha256": "c7ce14c3b9e069fd122dde645619885721ec0d84ec0e96c7fc124be1ea2b7dee" },
+    { "path": "src/generated/body.ts", "sha256": "edf53915e807e9abfa851c892bde18d90c1ce54f15af1d68b28de488aaf155ec" },
+    { "path": "src/generated/content.ts", "sha256": "07fcb2111a546d505c60ba536c4d37ffc855634e3fbb2383e5461f0b5ee87f80" },
+    { "path": "src/generated/witness/chapters/fixture-basics/build.ts", "sha256": "4e53da81b8b4514df29c70b611b8092de917cfa35b7435a94a8c5fe12379d1ee" },
+    { "path": "src/generated/witness/chapters/fixture-basics/chapter.ts", "sha256": "9b267ddc1f9390b155e57b6e36f8c90a6c5529bb183c72ca68964839c1723583" },
+    { "path": "src/generated/witness/chapters/fixture-basics/gotchas.ts", "sha256": "cec937a166791db1eb0003f607c9dd8b7338c692c3e7d8421113dbbd45e55dd7" },
+    { "path": "src/generated/witness/chapters/fixture-basics/idioms.ts", "sha256": "54d9f54516f1b5ba29a8954323db3e1a5ff88ff180ecfab45fb4c570e52d98f6" },
+    { "path": "src/generated/witness/chapters/fixture-basics/library.ts", "sha256": "98be86d2634aa6c4ed550eddcf90e183179d7029ec4dab691f4e18aec7e38e04" },
+    { "path": "src/generated/witness/chapters/fixture-basics/syntax.ts", "sha256": "151a02a812060cf9682ea3327cf202ec5958bb40a58c6f28fd6deefd3a2f356d" },
+    { "path": "src/generated/witness/chapters/fixture-empty-intro/chapter.ts", "sha256": "d8ab9a363237d2ae6e3714e2ce586bd11834e3aac0fc197871c40e28b496a4d9" },
+    { "path": "src/generated/witness/chapters/fixture-no-sections/chapter.ts", "sha256": "7f1b8e670570016a21f244c54334eebbf20458ac9f2164125acd8670898b455e" },
+    { "path": "src/generated/witness/chapters/fixture-second/chapter.ts", "sha256": "2f1763721aa1e3dfc22f80919719d3d034842fec339348075e7b961b1ef7acb8" }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "type": "part",
+  "kind": "syntax",
+  "chapter": "ch-matrix",
+  "order": 1,
+  "sections": [
+    {
+      "id": "matrix-one",
+      "number": "1.1",
+      "title": [
+        {
+          "type": "text",
+          "text": "One"
+        }
+      ],
+      "body": [
+        {
+          "type": "code",
+          "blockId": "matrix-one/b1",
+          "id": "matrix-code",
+          "group": "matrix-group",
+          "spoken": "Runs it",
+          "fail": "CS0029",
+          "source": "int x = 1;"
+        }
+      ]
+    }
+  ]
+}

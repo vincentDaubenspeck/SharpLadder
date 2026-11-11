@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { browserTreeProblems } from "./browser-tree.js";
 import { eslintCoverage, stylelintCoverage } from "./coverage.js";
+import { generatedProblems } from "./generated.js";
 import { programProblems } from "./program.js";
+import { vitestSetupProblems } from "./vitest-setup.js";
 import { admitTree } from "./walk.js";
 
 const scriptKinds = new Set(["ts", "tsx"]);
@@ -27,8 +29,10 @@ export async function sourceTreeProblems(webDir, { readdir } = {}) {
         tree.admitted.filter((f) => kinds.has(f.kind)).map((f) => f.path);
       problems.push(...(await eslintCoverage(web, of(scriptKinds))));
       problems.push(...stylelintCoverage(web, tree.root, of(styleKinds)));
+      problems.push(...generatedProblems(tree.root, tree.admitted));
     }
   }
+  problems.push(...vitestSetupProblems(web));
   const programs = programProblems(web, undefined, readdir ? { readdir } : {});
   problems.push(...programs.problems);
   for (const { files, parser } of programs.linted)

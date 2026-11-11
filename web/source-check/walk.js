@@ -113,10 +113,15 @@ function stillHeld(io, root, { dir, fd, expected }) {
     );
 }
 
+// The one declaration in src, pinned by path: the round trip's typing of the Vitest records.
+const providedDeclaration = ["content", "provided.d.ts"];
+
 /** The src rule: fonts only in theme/fonts, everything else by name. */
 function classifySource(name, dir, root) {
   if (name.endsWith(".woff2") && dir === join(root, ...fontDir))
     return { kind: "font" };
+  if (join(dir, name) === join(root, ...providedDeclaration))
+    return { kind: "ts" };
   return classifyName(name);
 }
 

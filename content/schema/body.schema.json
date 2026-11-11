@@ -120,7 +120,8 @@
         { "$ref": "#/definitions/textSpan" },
         { "$ref": "#/definitions/codeSpan" },
         { "$ref": "#/definitions/emSpan" },
-        { "$ref": "#/definitions/strongSpan" }
+        { "$ref": "#/definitions/strongSpan" },
+        { "$ref": "#/definitions/linkSpan" }
       ]
     },
     "textSpan": {
@@ -157,6 +158,54 @@
       "properties": {
         "type": { "const": "strong" },
         "content": { "$ref": "#/definitions/spans" }
+      }
+    },
+    "chapterRef": {
+      "allOf": [
+        { "$ref": "#/definitions/id" },
+        { "pattern": "^ch-" }
+      ]
+    },
+    "linkSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "content"],
+      "properties": {
+        "type": { "const": "link" },
+        "id": { "$ref": "#/definitions/id" },
+        "chapter": { "$ref": "#/definitions/chapterRef" },
+        "content": { "$ref": "#/definitions/linkContent" }
+      }
+    },
+    "linkContent": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/linkContentSpan" }
+    },
+    "linkContentSpan": {
+      "oneOf": [
+        { "$ref": "#/definitions/textSpan" },
+        { "$ref": "#/definitions/codeSpan" },
+        { "$ref": "#/definitions/linkEmSpan" },
+        { "$ref": "#/definitions/linkStrongSpan" }
+      ]
+    },
+    "linkEmSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "const": "em" },
+        "content": { "$ref": "#/definitions/linkContent" }
+      }
+    },
+    "linkStrongSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "const": "strong" },
+        "content": { "$ref": "#/definitions/linkContent" }
       }
     }
   }

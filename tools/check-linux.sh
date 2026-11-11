@@ -460,7 +460,7 @@ step npm-ci sh -c 'cd web && npm ci'
 step vitest-source-check sh -c 'cd web && npx vitest run source-check'
 step sh-cases env REQUIRE_PARITY=1 sh tools/tests/run.sh
 step check-sh sh tools/check.sh
-step vitest-verbose sh -c 'cd web && npx vitest run --reporter=verbose'
+step vitest-accept sh -c 'cd web && npm test'
 step build-verbose sh -c 'cd web && npm run build'
 
 echo "==== summary ===="

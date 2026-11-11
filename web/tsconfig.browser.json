@@ -22,5 +22,10 @@
     "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["playwright.config.ts", "vite.config.ts", "browser"]
+  "include": [
+    "playwright.config.ts",
+    "vite.config.ts",
+    "browser",
+    "content-check"
+  ]
 }

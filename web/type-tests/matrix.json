@@ -1,0 +1,459 @@
+{
+  "rows": [
+    {
+      "name": "p1",
+      "rule": "Optional properties left out: no list start, no code label",
+      "module": "valid.ts",
+      "json": "json/p1.json",
+      "typescript": null,
+      "validator": "accepted"
+    },
+    {
+      "name": "p2a",
+      "rule": "Empty arrays where allowed: chapter intro and sections",
+      "module": "valid.ts",
+      "json": "json/p2a.json",
+      "typescript": null,
+      "validator": "accepted"
+    },
+    {
+      "name": "p2b",
+      "rule": "Empty array where allowed: section body",
+      "module": "valid.ts",
+      "json": "json/p2b.json",
+      "typescript": null,
+      "validator": "accepted"
+    },
+    {
+      "name": "p3",
+      "rule": "One exclusive field alone: fail without check or throws",
+      "module": "valid.ts",
+      "json": "json/p3.json",
+      "typescript": null,
+      "validator": "accepted"
+    },
+    {
+      "name": "row01",
+      "rule": "Required property missing (slug)",
+      "module": "rejected.ts",
+      "json": "json/row01.json",
+      "typescript": {
+        "code": 1360,
+        "text": "Property 'slug' is missing"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["slug"],
+        "value": "matrix"
+      }
+    },
+    {
+      "name": "row02",
+      "rule": "No extra properties (extra at the top level)",
+      "module": "rejected.ts",
+      "json": "json/row02.json",
+      "typescript": {
+        "code": 2353,
+        "text": "'extra' does not exist in type 'ChapterFile'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "delete",
+        "path": ["extra"]
+      }
+    },
+    {
+      "name": "row03",
+      "rule": "No extra properties in a nested object (targets)",
+      "module": "rejected.ts",
+      "json": "json/row03.json",
+      "typescript": {
+        "code": 2353,
+        "text": "'java' does not exist"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "delete",
+        "path": ["targets", "java"]
+      }
+    },
+    {
+      "name": "row04",
+      "rule": "Fixed text value (type \"chapter\")",
+      "module": "rejected.ts",
+      "json": "json/row04.json",
+      "typescript": {
+        "code": 2820,
+        "text": "Type '\"chapters\"' is not assignable"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["type"],
+        "value": "chapter"
+      }
+    },
+    {
+      "name": "row05",
+      "rule": "Fixed number value (csharp 12)",
+      "module": "rejected.ts",
+      "json": "json/row05.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type '11' is not assignable to type '12'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["targets", "csharp"],
+        "value": 12
+      }
+    },
+    {
+      "name": "row06",
+      "rule": "Allowed list (kind)",
+      "module": "rejected.ts",
+      "json": "json/row06.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type '\"recipes\"' is not assignable"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["kind"],
+        "value": "syntax"
+      }
+    },
+    {
+      "name": "row07",
+      "rule": "Discriminated union: unknown block type",
+      "module": "rejected.ts",
+      "json": "json/row07.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type '\"table\"' is not assignable"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "body", 0, "type"],
+        "value": "paragraph"
+      }
+    },
+    {
+      "name": "row08",
+      "rule": "Discriminated union: a field from another block type",
+      "module": "rejected.ts",
+      "json": "json/row08.json",
+      "typescript": {
+        "code": 2353,
+        "text": "'ordered' does not exist in type 'ParagraphBlock'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "delete",
+        "path": ["sections", 0, "body", 0, "ordered"]
+      }
+    },
+    {
+      "name": "row09",
+      "rule": "Root choice: part without kind",
+      "module": "rejected.ts",
+      "json": "json/row09.json",
+      "typescript": {
+        "code": 1360,
+        "text": "Property 'kind' is missing"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["kind"],
+        "value": "syntax"
+      }
+    },
+    {
+      "name": "row10",
+      "rule": "At least one item (empty spans)",
+      "module": "rejected.ts",
+      "json": "json/row10.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Source has 0 element(s) but target requires 1"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "title"],
+        "value": [
+          {
+            "type": "text",
+            "text": "One"
+          }
+        ]
+      }
+    },
+    {
+      "name": "row11",
+      "rule": "At least one item (part with no sections)",
+      "module": "rejected.ts",
+      "json": "json/row11.json",
+      "typescript": {
+        "code": 1360,
+        "text": "Types of property 'sections' are incompatible"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections"],
+        "value": [
+          {
+            "id": "matrix-one",
+            "number": "1.1",
+            "title": [
+              {
+                "type": "text",
+                "text": "One"
+              }
+            ],
+            "body": [
+              {
+                "type": "paragraph",
+                "blockId": "matrix-one/b1",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Text."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "row12",
+      "rule": "Nested arrays: wrong element inside list items",
+      "module": "rejected.ts",
+      "json": "json/row12.json",
+      "typescript": {
+        "code": 2353,
+        "text": "'type' does not exist in type 'ListItem'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "body", 0, "items", 0],
+        "value": {
+          "blockId": "matrix-one/b1.i1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Item."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "row13",
+      "rule": "Reference into the other schema file (chapter intro)",
+      "module": "rejected.ts",
+      "json": "json/row13.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'string' is not assignable to type 'Spans'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["intro", 0, "content"],
+        "value": [
+          {
+            "type": "text",
+            "text": "Text."
+          }
+        ]
+      }
+    },
+    {
+      "name": "row14",
+      "rule": "Recursion: bad value two levels inside emphasis",
+      "module": "rejected.ts",
+      "json": "json/row14.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'number' is not assignable to type 'string'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": [
+          "sections",
+          0,
+          "body",
+          0,
+          "content",
+          0,
+          "content",
+          0,
+          "content",
+          0,
+          "text"
+        ],
+        "value": "Five"
+      }
+    },
+    {
+      "name": "row15",
+      "rule": "Number, not text (order \"1\")",
+      "module": "rejected.ts",
+      "json": "json/row15.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'string' is not assignable to type 'number'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["order"],
+        "value": 1
+      }
+    },
+    {
+      "name": "row16",
+      "rule": "True or false only (ordered)",
+      "module": "rejected.ts",
+      "json": "json/row16.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'string' is not assignable to type 'boolean'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "body", 0, "ordered"],
+        "value": false
+      }
+    },
+    {
+      "name": "row17",
+      "rule": "At most one of check, throws and fail",
+      "module": "rejected.ts",
+      "json": "json/row17.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'string' is not assignable to type 'undefined'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "delete",
+        "path": ["sections", 0, "body", 0, "throws"]
+      }
+    },
+    {
+      "name": "row18",
+      "rule": "Optional property present but undefined (list start)",
+      "module": "rejected.ts",
+      "json": "json/row18.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type 'undefined' is not assignable to type 'number'"
+      },
+      "validator": "accepted"
+    },
+    {
+      "name": "row19",
+      "rule": "Whole number (order 1.5)",
+      "module": "schema-only.ts",
+      "json": "json/row19.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["order"],
+        "value": 1
+      }
+    },
+    {
+      "name": "row20",
+      "rule": "Minimum (order 0)",
+      "module": "schema-only.ts",
+      "json": "json/row20.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["order"],
+        "value": 1
+      }
+    },
+    {
+      "name": "row21",
+      "rule": "Pattern (slug with a space)",
+      "module": "schema-only.ts",
+      "json": "json/row21.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["slug"],
+        "value": "two-words"
+      }
+    },
+    {
+      "name": "row22",
+      "rule": "Minimum length (empty title)",
+      "module": "schema-only.ts",
+      "json": "json/row22.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["title"],
+        "value": "Matrix"
+      }
+    },
+    {
+      "name": "row23",
+      "rule": "Maximum length (spoken text over 200)",
+      "module": "schema-only.ts",
+      "json": "json/row23.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "body", 0, "spoken"],
+        "value": "Runs it"
+      }
+    },
+    {
+      "name": "row24",
+      "rule": "Reference plus pattern (chapter id must start ch-)",
+      "module": "schema-only.ts",
+      "json": "json/row24.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["id"],
+        "value": "ch-matrix"
+      }
+    },
+    {
+      "name": "row25",
+      "rule": "Reference plus \"not this value\" (section id intro)",
+      "module": "schema-only.ts",
+      "json": "json/row25.json",
+      "typescript": null,
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["sections", 0, "id"],
+        "value": "matrix-intro"
+      }
+    }
+  ]
+}

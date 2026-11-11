@@ -13,6 +13,8 @@ const files = {
   "eslint.config.js": lint,
   "playwright.config.ts": "export {};\n",
   "browser/a.ts": "export {};\n",
+  "browser/harness.mjs": "export {};\n",
+  "browser/harness.test.js": "export {};\n",
   "browser/observed.mjs": "export {};\n",
   "browser/run.mjs": "export {};\n",
   "browser/serve.mjs": "export {};\n",
@@ -58,6 +60,8 @@ describe("browser tree inventory", () => {
   it("admits a named declaration only as a browser program input", async () => {
     const inventory = {
       tooling: [
+        "harness.mjs",
+        "harness.test.js",
         "observed.mjs",
         "run.mjs",
         "serve.mjs",

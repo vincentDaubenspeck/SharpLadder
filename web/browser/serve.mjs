@@ -4,6 +4,7 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { releaseBuild } from "../build-guard/build.mjs";
 import { sameInventory, walkDist } from "../build-guard/output.js";
+import { buildHarness } from "./harness.mjs";
 import { buildSpecimen, cleanUp } from "./specimen.mjs";
 
 const types = new Map([
@@ -45,7 +46,7 @@ function verified(record) {
   return files;
 }
 
-export async function serve(kind, port) {
+export async function serve(kind, port, { tree, records } = {}) {
   let files;
   if (kind === "dist") files = verified(await releaseBuild());
   else if (kind === "specimen") {
@@ -55,8 +56,20 @@ export async function serve(kind, port) {
     } finally {
       cleanUp();
     }
-  } else
-    throw new Error(`serve: unknown build ${kind}; expected dist or specimen`);
+  } else if (kind === "harness")
+    // The harness has no release record; its build refuses to start before the preflight passes.
+    files = walkDist(
+      (
+        await buildHarness({
+          ...(tree === undefined ? {} : { tree }),
+          ...(records === undefined ? {} : { records }),
+        })
+      ).outDir,
+    );
+  else
+    throw new Error(
+      `serve: unknown build ${kind}; expected dist, specimen or harness`,
+    );
   const server = createServer(handler(files));
   await new Promise((done, fail) => {
     server.once("error", fail);

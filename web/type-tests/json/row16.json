@@ -1,0 +1,36 @@
+{
+  "type": "part",
+  "kind": "syntax",
+  "chapter": "ch-matrix",
+  "order": 1,
+  "sections": [
+    {
+      "id": "matrix-one",
+      "number": "1.1",
+      "title": [
+        {
+          "type": "text",
+          "text": "One"
+        }
+      ],
+      "body": [
+        {
+          "type": "list",
+          "blockId": "matrix-one/b1",
+          "ordered": "yes",
+          "items": [
+            {
+              "blockId": "matrix-one/b1.i1",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

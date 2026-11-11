@@ -42,6 +42,11 @@ internal sealed partial class SourceFile
 
     public List<(string Id, int Line)> Ids { get; } = [];
 
+    // The IDs the renderer writes as id attributes for this file: sections and code or text blocks.
+    public List<string> Anchors { get; } = [];
+
+    public List<LinkTarget> Links { get; } = [];
+
     // The chapter ID a chapter file declares, or the one a part file names.
     public string? ChapterId { get; private set; }
 
@@ -51,6 +56,12 @@ internal sealed partial class SourceFile
         file.Compile(text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'), isChapter);
         return file;
     }
+
+    // CommonMark never builds a link inside a link, so this guards the parser, not the author.
+    internal static Diagnostic? NestedLink(string path, int line, LinkInline link) =>
+        link.Descendants<LinkInline>().Any(l => !l.IsImage)
+            ? new Diagnostic(path, line, "a link cannot hold another link")
+            : null;
 
     private static void AddText(List<Span> spans, string text)
     {
@@ -64,15 +75,19 @@ internal sealed partial class SourceFile
         }
     }
 
+    private static string Shown(string text) =>
+        string.Concat(text.Select(c => char.IsControl(c) ? $"\\u{(int)c:x4}" : c.ToString()));
+
+    private static bool IsChapterRef(string text) =>
+        ContentIds.IsValid(text) && text.StartsWith(ContentIds.ChapterPrefix, StringComparison.Ordinal);
+
     private static string Describe(IMarkdownObject node) => node switch
     {
         QuoteBlock => "block quote",
         ThematicBreakBlock => "thematic break",
         FencedCodeBlock => "code fence",
         CodeBlock => "indented code block",
-        LinkReferenceDefinitionGroup => "link reference definition",
         LinkInline { IsImage: true } => "image",
-        LinkInline => "link",
         AutolinkInline => "autolink",
         LineBreakInline => "hard line break",
         EmphasisInline => "emphasis other than *em* or **strong**",
@@ -189,8 +204,7 @@ internal sealed partial class SourceFile
         }
 
         var index = Array.FindIndex(yaml.Split('\n'), l => l.StartsWith(key + ":", StringComparison.Ordinal));
-        var shown = string.Concat(id.Select(c => char.IsControl(c) ? $"\\u{(int)c:x4}" : c.ToString()));
-        Error(yamlStart + 1 + Math.Max(0, index), $"{what} \"{shown}\" {ContentIds.FormatRule}");
+        Error(yamlStart + 1 + Math.Max(0, index), $"{what} \"{Shown(id)}\" {ContentIds.FormatRule}");
         return false;
     }
 
@@ -241,6 +255,14 @@ internal sealed partial class SourceFile
                 continue;
             }
 
+            // Definitions render nothing, so they take no block position; their targets meet the
+            // same form rule as inline links even when no link uses them.
+            if (block is LinkReferenceDefinitionGroup definitions)
+            {
+                definitions.OfType<LinkReferenceDefinition>().ToList().ForEach(d => Target(d.Url, d.Title, d.Line + 1));
+                continue;
+            }
+
             // A section whose heading failed is not compiled, so its blocks add no noise.
             if (skipping)
             {
@@ -280,6 +302,7 @@ internal sealed partial class SourceFile
         }
 
         Ids.Add((id, line));
+        Anchors.Add(id);
         return new Section
         {
             Id = id,
@@ -329,6 +352,7 @@ internal sealed partial class SourceFile
                 if (fenceId is not null)
                 {
                     Ids.Add((fenceId, line));
+                    Anchors.Add(fenceId);
                 }
 
                 return node;
@@ -422,6 +446,9 @@ internal sealed partial class SourceFile
                     }
 
                     break;
+                case LinkInline { IsImage: false } link:
+                    ok = Link(spans, link, line) && ok;
+                    break;
                 case HtmlInline:
                     Error(line, "raw HTML is not allowed");
                     ok = false;
@@ -434,6 +461,67 @@ internal sealed partial class SourceFile
         }
 
         return ok ? spans : null;
+    }
+
+    private bool Link(List<Span> spans, LinkInline link, int line)
+    {
+        if (NestedLink(_path, line, link) is { } nested)
+        {
+            _diagnostics.Add(nested);
+            return false;
+        }
+
+        var target = Target(link.Url, link.Title, line);
+        if (link.FirstChild is null)
+        {
+            Error(line, "link text is empty");
+            return false;
+        }
+
+        var content = Inlines(link, line);
+        if (target is null || content is null)
+        {
+            return false;
+        }
+
+        Links.Add(target);
+        spans.Add(new LinkSpan { Id = target.Id, Chapter = target.Chapter, Content = content });
+        return true;
+    }
+
+    // Only #id and ch-chapter#id are admitted, checked by the ID grammar alone, so a URL in any
+    // spelling fails by form without ever being parsed as one.
+    private LinkTarget? Target(string? url, string? title, int line)
+    {
+        var target = url ?? string.Empty;
+        var hash = target.IndexOf('#', StringComparison.Ordinal);
+        var chapter = hash < 0 ? target : target[..hash];
+        var id = hash < 0 ? null : target[(hash + 1)..];
+        string? problem = null;
+        if (id is null && IsChapterRef(chapter))
+        {
+            problem = "names a chapter but no #id; link to a section or block id in it";
+        }
+        else if (id is null || (chapter.Length > 0 && !IsChapterRef(chapter)) || !ContentIds.IsValid(id))
+        {
+            problem = "is not an internal target; write [text](#id) or [text](ch-chapter#id)";
+        }
+        else if (string.Equals(id, ContentIds.IntroPrefix, StringComparison.Ordinal))
+        {
+            problem = "names \"intro\", which is not a link target";
+        }
+        else if (!string.IsNullOrEmpty(title))
+        {
+            problem = "has a title, which links do not take";
+        }
+
+        if (problem is not null)
+        {
+            Error(line, $"link target \"{Shown(target)}\" {problem}");
+            return null;
+        }
+
+        return new LinkTarget(target, id!, chapter.Length > 0 ? chapter : null, line);
     }
 
     private bool NoAttributes(IMarkdownObject node, int line)

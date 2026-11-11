@@ -76,6 +76,7 @@ export default defineConfig([
       "vite.config.ts",
       "build-guard/index.d.ts",
       "browser/**/*.ts",
+      "content-check/**/*.ts",
       "stylelint/registry.d.ts",
     ],
     languageOptions: {
@@ -86,6 +87,16 @@ export default defineConfig([
       },
     },
   },
+  ...["type-tests", "harness"].map((name) => ({
+    files: [`${name}/**/*.{ts,tsx}`],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: `./tsconfig.${name}.json`,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  })),
   {
     files: ["**/*.{js,mjs}"],
     extends: [js.configs.recommended],
@@ -97,6 +108,24 @@ export default defineConfig([
       "no-eval": "error",
       "no-new-func": "error",
       "sharpladder/app-capabilities": "error",
+    },
+  },
+  // The type emitter's grammar admits only type aliases, so it never emits an interface.
+  {
+    files: ["src/generated/body.ts", "src/generated/content.ts"],
+    rules: { "@typescript-eslint/consistent-type-definitions": "off" },
+  },
+  // A default that calls assertNever is kept, but never counts as covering a missing case.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        {
+          allowDefaultCaseForExhaustiveSwitch: true,
+          considerDefaultExhaustiveForUnions: false,
+        },
+      ],
     },
   },
   // Any other code extension in src would skip the type-aware lint, so it is

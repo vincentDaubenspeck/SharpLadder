@@ -26,3 +26,5 @@ Console.WriteLine(sum);
 
 1. Start the total at zero.
 2. Add each reading in turn.
+
+Back to [the first sum](ch-fixture#syn-fix-sum1) or [this section](#syn-fix-sum).

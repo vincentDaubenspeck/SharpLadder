@@ -1,0 +1,44 @@
+{
+  "type": "part",
+  "kind": "syntax",
+  "chapter": "ch-matrix",
+  "order": 1,
+  "sections": [
+    {
+      "id": "matrix-one",
+      "number": "1.1",
+      "title": [
+        {
+          "type": "text",
+          "text": "One"
+        }
+      ],
+      "body": [
+        {
+          "type": "list",
+          "blockId": "matrix-one/b1",
+          "ordered": false,
+          "items": [
+            {
+              "blockId": "matrix-one/b1.i1",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Item."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "blockId": "matrix-one/b2",
+          "id": "matrix-code",
+          "group": "matrix-group",
+          "spoken": "Runs it",
+          "source": "int x = 1;"
+        }
+      ]
+    }
+  ]
+}

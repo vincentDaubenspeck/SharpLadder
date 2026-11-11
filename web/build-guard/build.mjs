@@ -9,6 +9,11 @@ import { parse as parseHtml } from "parse5";
 import { build, parseAst } from "vite";
 import { assetAdmission } from "../asset-licence-check.js";
 import { GuardError } from "./classify.js";
+import {
+  exclusionViolations,
+  harnessOutput,
+  overlapping,
+} from "./exclusion.js";
 import { sameInventory, takeInventory, walkDist } from "./output.js";
 import {
   canonical,
@@ -245,6 +250,14 @@ export async function releaseBuild(inline = {}, { ceiling = limits } = {}) {
   const provenance = terminalProvenance(terminal, record.manifest);
   const report = measure(terminal, ceiling);
   if (report.problems.length > 0) fail(report.problems.join("; "));
+  const excluded = exclusionViolations(terminal);
+  for (const harness of new Set([
+    harnessOutput(record.root),
+    harnessOutput(web),
+  ]))
+    if (overlapping(record.outDir, harness))
+      excluded.push(`${record.outDir} overlaps the harness output ${harness}`);
+  if (excluded.length > 0) fail(`production exclusion: ${excluded.join("; ")}`);
   const evidence = writeEvidence(
     record,
     terminal,

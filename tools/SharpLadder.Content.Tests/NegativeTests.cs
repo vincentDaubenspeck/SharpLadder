@@ -117,7 +117,7 @@ public sealed class NegativeTests
     [InlineData("> quoted\n", "unsupported Markdown: block quote")]
     [InlineData("***\n", "unsupported Markdown: thematic break")]
     [InlineData("    indented code\n", "unsupported Markdown: indented code block")]
-    [InlineData("A [link](https://example.com) here.\n", "unsupported Markdown: link")]
+    [InlineData("A [link](https://example.com) here.\n", "link target \"https://example.com\" is not an internal target; write [text](#id) or [text](ch-chapter#id)")]
     [InlineData("An ![image](a.png) here.\n", "unsupported Markdown: image")]
     [InlineData("A <https://example.com> link.\n", "unsupported Markdown: autolink")]
     [InlineData("Hard  \nbreak.\n", "unsupported Markdown: hard line break")]

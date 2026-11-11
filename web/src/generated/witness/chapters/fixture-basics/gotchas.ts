@@ -1,0 +1,89 @@
+// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "part",
+  kind: "gotchas",
+  chapter: "ch-fixture",
+  order: 2,
+  sections: [
+    {
+      id: "gotcha-fix-key",
+      number: "2.1",
+      title: [
+        {
+          type: "text",
+          text: "A missing key throws",
+        },
+      ],
+      body: [
+        {
+          type: "paragraph",
+          blockId: "gotcha-fix-key/b1",
+          content: [
+            {
+              type: "text",
+              text: "Reading a key that is not there throws ",
+            },
+            {
+              type: "em",
+              content: [
+                {
+                  type: "text",
+                  text: "at run time",
+                },
+              ],
+            },
+            {
+              type: "text",
+              text: ".",
+            },
+          ],
+        },
+        {
+          type: "code",
+          blockId: "gotcha-fix-key/b2",
+          id: "gotcha-fix-key1",
+          group: "fix-key",
+          spoken: "Reads a missing key",
+          throws: "KeyNotFoundException",
+          source:
+            "var stock = new Dictionary\u003Cstring, int\u003E();\nint n = stock[\u0022bolt\u0022];",
+        },
+      ],
+    },
+    {
+      id: "gotcha-fix-out",
+      number: "2.2",
+      title: [
+        {
+          type: "code",
+          text: "out",
+        },
+        {
+          type: "text",
+          text: " needs its keyword",
+        },
+      ],
+      body: [
+        {
+          type: "code",
+          blockId: "gotcha-fix-out/b1",
+          id: "gotcha-fix-out1",
+          group: "fix-out",
+          spoken: "TryParse without out",
+          fail: "CS1620",
+          source:
+            "string text = \u002242\u0022;\nint value;\nbool ok = int.TryParse(text, value);",
+        },
+        {
+          type: "text",
+          blockId: "gotcha-fix-out/b2",
+          spoken: "The compiler reports the error",
+          source: "error CS1620",
+        },
+      ],
+    },
+  ],
+} satisfies ContentDoc;

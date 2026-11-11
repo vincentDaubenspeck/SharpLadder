@@ -89,6 +89,26 @@ describe("source tree admission", () => {
     });
   });
 
+  it("admits only content/provided.d.ts among declarations", () => {
+    const base = tree({
+      ...current,
+      "src/content/provided.d.ts": "",
+      "src/content/other.d.ts": "",
+      "src/provided.d.ts": "",
+      "src/content-tests/provided.d.ts": "",
+    });
+    const { admitted } = admitTree(join(base, "src"));
+    expect(
+      admitted.filter((f) => f.path.endsWith(".d.ts")).map((f) => f.path),
+    ).toEqual([join(base, "src", "content", "provided.d.ts")]);
+    const declaration = "declaration file (.d.ts) is not admitted";
+    expect(reasons(base)).toEqual({
+      "content/other.d.ts": declaration,
+      "content-tests/provided.d.ts": declaration,
+      "provided.d.ts": declaration,
+    });
+  });
+
   it("finds a bad file in a nested directory and rejects dot directories", () => {
     const base = tree({
       ...current,

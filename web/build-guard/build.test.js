@@ -77,7 +77,10 @@ describe("build guard: module ids", () => {
   });
 
   it("fails when src itself is a link", async () => {
-    const { base, root } = fixture({ "../outside/main.tsx": "export {};\n" });
+    const { base, root } = fixture(
+      { "../outside/main.tsx": "export {};\n" },
+      { helpers: false },
+    );
     link(join(base, "outside"), join(root, "src"));
     await expect(buildRoot(root)).rejects.toThrow(
       /build guard: src resolves outside/u,

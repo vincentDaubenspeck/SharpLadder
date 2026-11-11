@@ -1,11 +1,15 @@
-import { isAbsolute, relative, sep } from "node:path";
+import { relative, sep } from "node:path";
 
-/** Compares canonical paths, so ".." segments and look-alike prefixes never pass. */
+/**
+ * True when a path is the root or lies below it. Both are resolved paths and are compared
+ * character for character, so a name that differs only in letter case is never inside.
+ * @param {string} root The resolved directory.
+ * @param {string} path The resolved path.
+ * @returns {boolean} Whether the path is the root or below it.
+ */
 export function inside(root, path) {
-  const r = relative(root, path);
-  return (
-    r === "" || (r !== ".." && !r.startsWith(`..${sep}`) && !isAbsolute(r))
-  );
+  const base = root.endsWith(sep) ? root : root + sep;
+  return path === root || path.startsWith(base);
 }
 
 export const shown = (root, path) => relative(root, path).split(sep).join("/");

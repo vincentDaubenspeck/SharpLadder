@@ -11,6 +11,8 @@ import { admitTree } from "./walk.js";
  */
 const browserInventory = {
   tooling: [
+    "harness.mjs",
+    "harness.test.js",
     "observed.mjs",
     "run.mjs",
     "serve.mjs",

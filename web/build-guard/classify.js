@@ -1,6 +1,6 @@
 // Pure checks behind the build guard, kept apart from the plugin so tests can drive them directly.
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, join, sep } from "node:path";
 import { parse as parseHtml } from "parse5";
 import postcss from "postcss";
 import {
@@ -8,6 +8,12 @@ import {
   describeFinding,
   parseSource,
 } from "../source-policy/index.js";
+import { isReservedPath } from "../source-policy/renderer.js";
+import {
+  canonical,
+  descendant,
+  sourceIdentity,
+} from "../source-policy/unit.js";
 
 export class GuardError extends Error {}
 
@@ -33,17 +39,9 @@ const anyModuleStyle =
   /\.module\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/iu;
 const firstPartyExtension = /\.(tsx|ts|css)$/u;
 
-// Windows paths compare without case and with one separator; the canonical form is only a key.
-export const pathKey = (p, platform = process.platform) => {
-  const forward = resolve(p).replaceAll("\\", "/");
-  return platform === "win32" ? forward.toLowerCase() : forward;
-};
-
-const inside = (dirKey, key) => dirKey !== null && key.startsWith(`${dirKey}/`);
-
 const realpath = (p) => {
   try {
-    return realpathSync.native(p);
+    return canonical(p);
   } catch (error) {
     return fail(`cannot canonicalise ${JSON.stringify(p)}: ${error.message}`);
   }
@@ -57,47 +55,51 @@ const readJson = (file) => {
   }
 };
 
-// Resolves the fixed locations once; src must be a real directory, never a link elsewhere.
+// Resolves the fixed locations once, in the spelling the disk holds; every later comparison is
+// character for character. The src folder and the page are the project's own, never a link
+// elsewhere.
 export function guardContext(root) {
   const realRoot = realpath(root);
-  const srcKey = pathKey(realpath(join(root, "src")));
-  if (srcKey !== pathKey(join(realRoot, "src"))) {
-    fail(`src resolves outside the project root (${srcKey})`);
+  const src = realpath(join(root, "src"));
+  if (src !== join(realRoot, "src")) {
+    fail(`src resolves outside the project root (${src})`);
   }
   const modules = join(root, "node_modules");
   return {
     root: realRoot,
-    srcKey,
-    htmlKey: pathKey(join(realRoot, "index.html")),
-    modulesKey: existsSync(modules) ? pathKey(realpath(modules)) : null,
+    src,
+    html: join(realRoot, "index.html"),
+    modules: existsSync(modules) ? realpath(modules) : null,
   };
 }
 
+/** A project file's path below the project directory, with forward slashes, or null. */
+export const projectPath = (ctx, real) =>
+  descendant(ctx.root, real)?.split(sep).join("/") ?? null;
+
 // The first named package.json above a dependency file must be its package directory's own.
-function dependency(ctx, real, key) {
-  const segments = key.slice(ctx.modulesKey.length + 1).split("/");
+function dependency(ctx, real, below) {
+  const segments = below.split(sep);
   const width = segments[0]?.startsWith("@") ? 2 : 1;
   const dirName = segments.slice(0, width).join("/");
   if (
     segments.length <= width ||
     dirName.startsWith(".") ||
-    segments.includes("node_modules")
+    segments.some((segment) => segment.toLowerCase() === "node_modules")
   ) {
     fail(`dependency id outside a top-level package: ${real}`);
   }
-  const packageKey = `${ctx.modulesKey}/${dirName}`;
+  const packageDir = join(ctx.modules, ...segments.slice(0, width));
   for (
     let dir = dirname(real);
-    inside(ctx.modulesKey, pathKey(dir));
+    descendant(ctx.modules, dir) !== null;
     dir = dirname(dir)
   ) {
     const manifest = join(dir, "package.json");
     if (!existsSync(manifest)) continue;
     const owner = readJson(manifest).name;
     if (owner === undefined) continue;
-    const ownerKey =
-      process.platform === "win32" ? String(owner).toLowerCase() : owner;
-    if (pathKey(dir) !== packageKey || ownerKey !== dirName) {
+    if (dir !== packageDir || owner !== dirName) {
       fail(
         `dependency ${real} is owned by ${JSON.stringify(owner)}, not its directory`,
       );
@@ -118,9 +120,8 @@ export function classifyId(ctx, id, hook) {
     fail(`query or fragment on id ${id}`);
   if (!isAbsolute(id)) fail(`id is not an absolute path: ${id}`);
   const real = realpath(id);
-  const key = pathKey(real);
-  if (key === ctx.htmlKey) return { kind: "html" };
-  if (inside(ctx.srcKey, key)) {
+  if (real === ctx.html) return { kind: "html" };
+  if (descendant(ctx.src, real) !== null) {
     const extension = firstPartyExtension.exec(real)?.[1];
     if (extension === undefined)
       fail(`first-party file is not .ts, .tsx or .css: ${real}`);
@@ -129,16 +130,35 @@ export function classifyId(ctx, id, hook) {
     }
     return { kind: "first-party", lang: extension };
   }
-  if (inside(ctx.modulesKey, key)) return dependency(ctx, real, key);
+  const below = ctx.modules === null ? null : descendant(ctx.modules, real);
+  if (below !== null) return dependency(ctx, real, below);
   return fail(`id outside src and node_modules: ${real}`);
 }
 
 // The build verdict parses the original source as the editor does and reads the tree alone,
 // so no disable comment can reach it; a parse failure throws.
-export function scriptViolations(code, filePath) {
+export function scriptViolations(code, filePath, unit = null) {
   const { ast, scopeManager } = parseSource(code, filePath);
-  return checkProgram(ast, scopeManager).map(describeFinding);
+  return checkProgram(
+    ast,
+    scopeManager,
+    unit,
+    code,
+    code.startsWith("\uFEFF"),
+  ).map(describeFinding);
 }
+
+// A first-party module's path under src, in its real case, with forward slashes. A module the
+// guard holds to be first-party always has one, so the two can never disagree in silence.
+export const sourceUnit = (ctx, id) => {
+  const { unit, error } = sourceIdentity(ctx.root, id);
+  if (error !== undefined) fail(`${id}: ${error}`);
+  return unit ?? fail(`${id}: it has no place under src`);
+};
+
+// The renderer, its tests and the generated content are test-only and never reach production,
+// under any letter case of their folders.
+export const isTestOnly = (unit) => isReservedPath(unit);
 
 // Returns the forbidden constructs in a source stylesheet; an escaped name is refused because
 // the CSS transformer would decode it.
