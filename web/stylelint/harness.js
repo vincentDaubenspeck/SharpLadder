@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -110,10 +111,32 @@ export function fontsSheet(faces = shippedFonts.map((f) => fontFace(f))) {
   return ["@layer base {", faces.join("\n\n"), "}", ""].join("\n");
 }
 
+// Removal touches only the roots this module made, and only once no lint still reads them.
+const roots = new Set();
+const lints = new Set();
+
+function track(lint) {
+  lints.add(lint);
+  return lint.finally(() => lints.delete(lint));
+}
+
+function remove(repo) {
+  // A scanner can hold a new file open for a moment on Windows, so removal retries.
+  rmSync(repo, { recursive: true, force: true, maxRetries: 10 });
+  roots.delete(repo);
+}
+
+/** For afterAll, so the roots go even when setup or an assertion throws. */
+export async function removeRoots() {
+  await Promise.allSettled(lints);
+  for (const repo of roots) remove(repo);
+}
+
 /** The repository copy sits one level up, so inventory source paths resolve as in production. */
 export function makeRoot({ inventory } = {}) {
   // Stylelint globs its file list by long names, so a short-name temp root would match nothing.
   const repo = realpathSync.native(mkdtempSync(join(tmpdir(), "sl-tokens-")));
+  roots.add(repo);
   const root = join(repo, "web");
   const paths = {
     src: join(root, "src"),
@@ -158,24 +181,36 @@ export function fixtureConfig(paths) {
 const fixtureComposed = (options) =>
   composedConfig({ ...options, registry: "fixture" });
 
+/** The production lint over a fixture root, tracked so removal waits for it. */
+export function lintRoot(
+  paths,
+  registry = fixtureRegistry,
+  config = fixtureComposed,
+) {
+  return track(lintProduction(paths, registry, config));
+}
+
 /** Accepted only with no warning from any rule, in a fresh root so earlier cases cannot leak in. */
 export async function lintComposed(place, code) {
   const { root, paths } = makeRoot();
-  write(place(paths), code);
-  return lintProduction(
-    { ...paths, src: root },
-    fixtureRegistry,
-    fixtureComposed,
-  );
+  try {
+    write(place(paths), code);
+    // Awaited here, so the root outlives the lint that reads it.
+    return await lintRoot({ ...paths, src: root });
+  } finally {
+    remove(paths.repoRoot);
+  }
 }
 
 export async function lintAs(paths, file, code) {
-  const { results } = await stylelint.lint({
-    code,
-    codeFilename: file,
-    config: fixtureConfig(paths),
-    configBasedir: web,
-  });
+  const { results } = await track(
+    stylelint.lint({
+      code,
+      codeFilename: file,
+      config: fixtureConfig(paths),
+      configBasedir: web,
+    }),
+  );
   const [r] = results;
   return {
     all: r.warnings,

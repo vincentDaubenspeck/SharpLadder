@@ -1,10 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { perimeter } from "./indicators.ts";
-import { harnessUrl, paintOf, setState } from "./probe.ts";
+import { harnessUrl, paintOf, setState, settle } from "./probe.ts";
 
 test.beforeEach(async ({ page }) => {
   await page.goto(harnessUrl);
   await expect(page.locator("main[data-harness]")).toBeVisible();
+  await settle(page);
 });
 
 /**

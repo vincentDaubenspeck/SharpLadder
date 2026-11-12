@@ -2,7 +2,7 @@
 import { fork } from "css-tree";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   colourFunctions,
   deprecatedColours,
@@ -15,6 +15,7 @@ import {
   lintAs,
   lintComposed,
   makeRoot,
+  removeRoots,
   write,
 } from "./harness.js";
 
@@ -32,6 +33,7 @@ beforeAll(() => {
   ({ paths } = makeRoot());
   write(paths.headerModule, inModule("background: var(--header-bg);"));
 });
+afterAll(removeRoots);
 
 // A case names its sheet by role, so the same case can be placed in any fixture root.
 const at = (place, code) => ({ place, code });

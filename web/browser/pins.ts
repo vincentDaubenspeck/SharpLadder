@@ -32,7 +32,7 @@ export function serverCommand(kind: Kind): string {
     throw new Error(
       `browser pins: Node ${process.version} runs the tests, ${pinned} is pinned`,
     );
-  return `"${process.execPath}" browser/serve.mjs ${kind} ${String(ports[kind])}`;
+  return `"${process.execPath}" --no-concurrent-array-buffer-sweeping browser/serve.mjs ${kind} ${String(ports[kind])}`;
 }
 
 const real = (p: string): string => {

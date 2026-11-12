@@ -60,5 +60,9 @@ export default defineConfig({
     // every record-backed case to pass.
     globalSetup: ["./content-check/global-setup.ts"],
     fsModuleCachePath: ".cache/vitest",
+    // Tests run the build guard in each forked worker, which inherits none of the runner's own
+    // startup flags; a thread pool would refuse this V8 flag outright.
+    pool: "forks",
+    execArgv: ["--no-concurrent-array-buffer-sweeping"],
   },
 });

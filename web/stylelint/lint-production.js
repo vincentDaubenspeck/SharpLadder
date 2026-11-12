@@ -53,6 +53,8 @@ export async function lintProduction(
 
   const { results } = await stylelint.lint({
     files,
+    // Stylelint globs from cwd, so cwd is this tree's web folder; production already runs from there.
+    cwd: join(paths.repoRoot, "web"),
     config: config({ registry: "production", ...ruleOptions(paths) }),
     configBasedir: fileURLToPath(new URL("..", import.meta.url)),
     disableDefaultIgnores: true,

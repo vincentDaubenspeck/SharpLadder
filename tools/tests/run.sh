@@ -19,6 +19,7 @@
 #   m. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
 #   n. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
 #   n. Linux check cases (tools/tests/check-linux-cases.sh): input identity and image selection, stand-in docker
+#   o. Flake check cases (tools/tests/flake-check-cases.mjs): refusals, prior chains and selection, stand-in build and Playwright
 # Usage: sh tools/tests/run.sh
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d to g need PowerShell; set REQUIRE_PARITY=1 to fail instead of skipping.
 set -eu
@@ -464,6 +465,10 @@ else
   rc=0
   "$node" "$src/tools/tests/browser-cases.mjs" "$tmp/browsers" > "$tmp/out" 2>&1 || rc=$?
   count_lines "browser provisioning cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/flake-check-cases.mjs" "$tmp/flake" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "flake check cases" "$rc" "$tmp/out"
 fi
 
 rc=0

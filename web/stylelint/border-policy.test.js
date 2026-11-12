@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
-import { composedConfig } from "./config.js";
-import { fixtureTokens, inModule, lintAs, makeRoot, write } from "./harness.js";
-import { lintProduction } from "./lint-production.js";
-import { fixtureRegistry } from "./registry.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  fixtureTokens,
+  inModule,
+  lintAs,
+  lintRoot,
+  makeRoot,
+  removeRoots,
+  write,
+} from "./harness.js";
 
 const webref = createRequire(import.meta.url)("@webref/css/css.json");
-const fixture = (options) =>
-  composedConfig({ ...options, registry: "fixture" });
 
 let paths;
 let batch;
@@ -49,7 +52,7 @@ beforeAll(async () => {
     write(file, code);
     files.set(file, code);
   }
-  const production = await lintProduction(paths, fixtureRegistry, fixture);
+  const production = await lintRoot(paths);
   batch = new Map([...registered].map((code) => [code, []]));
   unattributed = [];
   for (const line of production.lines) {
@@ -59,6 +62,8 @@ beforeAll(async () => {
     else batch.get(code).push(bare(at[2]));
   }
 }, 120_000);
+
+afterAll(removeRoots);
 
 it("every production warning belongs to a case", () => {
   expect(unattributed).toEqual([]);
@@ -73,7 +78,7 @@ async function tokenMessages(code, file, root = paths) {
     production = batch.get(code);
   } else {
     write(file, code);
-    const result = await lintProduction(root, fixtureRegistry, fixture);
+    const result = await lintRoot(root);
     production = result.lines.flatMap((l) => {
       const at = located.exec(l);
       return at?.[1] === file ? [bare(at[2])] : [];

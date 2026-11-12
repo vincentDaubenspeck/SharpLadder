@@ -100,6 +100,15 @@ on the bundle in the pipeline and again on the files on disk after the terminal
 step. Its provenance manifest, ledger and admitted font slice are written to
 `web/.cache/build-evidence/`, outside the build output.
 
+Every process that runs the build guard starts with the V8 flag
+`--no-concurrent-array-buffer-sweeping`: on the pinned Node a concurrent sweeper
+thread can abort the process at exit. The build script, the browser test
+servers and the forked Vitest workers pass it; the guard's entry points refuse
+to start without exactly that one spelling on the command line, refuse any
+other spelling of the flag there, and refuse every spelling, the canonical one
+included, in `NODE_OPTIONS`. The flag is a mitigation, not a fix: it is removed
+only once a Node release with the fix is pinned by checksum.
+
 The .NET build settings live in `Directory.Build.props`, analyzer versions in
 `Directory.Packages.props` (central package management), rule severities in
 `.globalconfig` and banned APIs in `BannedSymbols.txt`. The test suites also

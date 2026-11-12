@@ -1,12 +1,20 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import stylelint from "stylelint";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { composedConfig } from "./config.js";
-import { fixtureConfig, inModule, makeRoot, write } from "./harness.js";
+import {
+  fixtureConfig,
+  inModule,
+  lintRoot,
+  makeRoot,
+  removeRoots,
+  write,
+} from "./harness.js";
 import {
   discoverStylesheets,
   lintProduction,
@@ -17,7 +25,9 @@ import { fixtureRegistry, productionRegistry } from "./registry.js";
 const fixture = (options) =>
   composedConfig({ ...options, registry: "fixture" });
 const run = (paths, registry = fixtureRegistry) =>
-  lintProduction(paths, registry, fixture);
+  lintRoot(paths, registry, fixture);
+
+afterAll(removeRoots);
 
 // Suites timed at 30_000 run the real Stylelint, in-process or by spawn; it loads cold.
 
@@ -131,6 +141,35 @@ describe("production lint with stylesheets", () => {
       readFileSync(new URL("../package.json", import.meta.url), "utf8"),
     );
     expect(pkg.scripts.build.startsWith("npm run lint:css && ")).toBe(true);
+  });
+}, 30_000);
+
+describe("production glob root", () => {
+  it("is web, the lint:css directory, and gives the results of stylelint's default cwd", async () => {
+    const web = realpathSync.native(
+      fileURLToPath(new URL("..", import.meta.url)),
+    );
+    const lint = vi.spyOn(stylelint, "lint");
+    try {
+      expect(await lintProduction()).toEqual({ state: "pass", lines: [] });
+      expect(lint).toHaveBeenCalledTimes(1);
+      const [[options]] = lint.mock.calls;
+      expect(realpathSync.native(options.cwd)).toBe(web);
+      // npm runs lint:css from web, and the acceptance run starts Vitest there too.
+      expect(realpathSync.native(process.cwd())).toBe(web);
+      const view = ({ results }) =>
+        results
+          .map((r) => [r.source, r.warnings, r.invalidOptionWarnings])
+          .sort(([a], [b]) => (a < b ? -1 : 1));
+      const rooted = view(await lint.mock.results[0].value);
+      const plain = view(await stylelint.lint({ ...options, cwd: undefined }));
+      expect(rooted.map(([source]) => source)).toEqual(
+        discoverStylesheets(fileURLToPath(new URL("../src", import.meta.url))),
+      );
+      expect(plain).toEqual(rooted);
+    } finally {
+      lint.mockRestore();
+    }
   });
 }, 30_000);
 

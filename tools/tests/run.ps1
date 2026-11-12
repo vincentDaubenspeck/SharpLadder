@@ -17,6 +17,7 @@
 #   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   m. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
 #   n. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
+#   o. Flake check cases (tools/tests/flake-check-cases.mjs): refusals, prior chains and selection, stand-in build and Playwright
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
 # Parts h, i and k need the pinned .NET SDK and nuget.org. Parts d, f and g need sh; set REQUIRE_PARITY=1 to fail instead of skipping.
 $ErrorActionPreference = 'Stop'
@@ -397,6 +398,8 @@ try {
         (Join-Path -Path $tmp -ChildPath 'pssa')) -dir $src)
     Add-CaseLine 'browser provisioning cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/browser-cases.mjs'),
         (Join-Path -Path $tmp -ChildPath 'browsers')) -dir $src)
+    Add-CaseLine 'flake check cases' (Invoke-Program $node @((Join-Path -Path $src -ChildPath 'tools/tests/flake-check-cases.mjs'),
+        (Join-Path -Path $tmp -ChildPath 'flake')) -dir $src)
   }
 } finally {
   Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

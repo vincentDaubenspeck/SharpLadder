@@ -295,8 +295,30 @@ describe(".vite-temp", () => {
     mkdirSync(nm(dir, ".vite-temp"));
     writeFileSync(nm(dir, ".vite-temp", "vite.config.mjs"), "");
     expect(await check(dir)).toContain(
-      "census: node_modules/.vite-temp is not empty",
+      'census: node_modules/.vite-temp is not empty: "vite.config.mjs"',
     );
+  });
+
+  it("lists the entries sorted and escaped, follows no link and deletes nothing", async () => {
+    const dir = fixtureCopy();
+    const temp = nm(dir, ".vite-temp");
+    mkdirSync(temp);
+    mkdirSync(join(dir, "outside"));
+    writeFileSync(join(dir, "outside", "hidden.mjs"), "");
+    // Windows file names cannot hold a control character, so escaping is shown where they can.
+    const odd = win ? [] : ["line\nbreak"];
+    const names = ["vite.config.ts.timestamp-2-b.mjs", "linked", ...odd];
+    for (const name of names.filter((n) => n !== "linked"))
+      writeFileSync(join(temp, name), "");
+    link(join(dir, "outside"), join(temp, "linked"));
+    const listed = win
+      ? '"linked", "vite.config.ts.timestamp-2-b.mjs"'
+      : '"line\\nbreak", "linked", "vite.config.ts.timestamp-2-b.mjs"';
+    expect(await check(dir)).toContain(
+      `census: node_modules/.vite-temp is not empty: ${listed}`,
+    );
+    expect(readdirSync(temp).sort()).toEqual([...names].sort());
+    expect(readdirSync(join(dir, "outside"))).toEqual(["hidden.mjs"]);
   });
 
   it("fails a linked folder", async () => {

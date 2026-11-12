@@ -2,7 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, renameSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   fontFace,
   fontsSheet,
@@ -10,9 +10,12 @@ import {
   lintComposed,
   makeRoot,
   productionInventory,
+  removeRoots,
   shippedFonts,
   write,
 } from "./harness.js";
+
+afterAll(removeRoots);
 
 const [sans, display, code] = shippedFonts;
 const faces = (overrides = {}) =>

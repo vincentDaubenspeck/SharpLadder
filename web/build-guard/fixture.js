@@ -21,6 +21,7 @@ import { generateFaces } from "../asset-licence-check.js";
 import { releaseBuild } from "./build.mjs";
 import { classPattern, lightningTargets } from "./contract.js";
 import { layerPrelude } from "./prelude.js";
+import { admitStartup } from "./startup.js";
 import { rendererModules } from "../source-policy/renderer.js";
 
 const web = join(import.meta.dirname, "..");
@@ -170,6 +171,7 @@ async function agree(root) {
 
 // A build that passes also proves P12 over the stylesheets it was given.
 export const buildRoot = async (root, options = {}) => {
+  admitStartup();
   const result = await build({
     root,
     configFile,
@@ -211,8 +213,11 @@ export async function harness(files, mutate) {
 export const pluginNamed = (config, name) =>
   config.plugins.flat().find((plugin) => plugin?.name === name);
 
-export const buildFixture = (files, options) =>
-  buildRoot(fixture(files, options).root);
+// Admitted before the fixture exists, so a refused process leaves nothing behind.
+export const buildFixture = (files, options) => {
+  admitStartup();
+  return buildRoot(fixture(files, options).root);
+};
 
 export const outputFiles = (result) =>
   [result]

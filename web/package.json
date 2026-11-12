@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run lint:css && npm run lint && npm run typecheck && node build-guard/build.mjs",
+    "build": "npm run lint:css && npm run lint && npm run typecheck && node --no-concurrent-array-buffer-sweeping build-guard/build.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json && tsc -p tsconfig.type-tests.json && tsc -p tsconfig.harness.json",
     "lint": "eslint --max-warnings 0 .",
     "lint:css": "node stylelint/lint-production.js",

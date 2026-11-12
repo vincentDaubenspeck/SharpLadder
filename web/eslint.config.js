@@ -21,6 +21,84 @@ const markers = readFileSync(
   .filter((line) => line.startsWith("~"))
   .map((line) => line.slice(1).trim());
 
+// A static key: a plain name, or a string or substitution-free template in brackets. A plain
+// name needs computed=false, so obj[fonts] reads as a variable, not as the key "fonts".
+const keyed = (prefixes, key, name) =>
+  `:matches(${prefixes
+    .flatMap((at) => [
+      `[${at}computed=false][${at}${key}.name="${name}"]`,
+      `[${at}${key}.value="${name}"]`,
+      `[${at}${key}.expressions.length=0][${at}${key}.quasis.0.value.cooked="${name}"]`,
+    ])
+    .join(", ")})`;
+// The expression form sees through one wrapper: an optional chain in brackets, ! or a cast.
+const fontsAt = (field) =>
+  keyed([`${field}.`, `${field}.expression.`], "property", "fonts");
+const keyIs = (name) => keyed([""], "key", name);
+const memberIs = (name) => keyed([""], "property", name);
+
+// An entry names its subject node type so an exemption can spare that node. A helper exemption
+// is lexical, so a function nested inside the helper is exempt too. Not caught: an alias
+// (const f = document.fonts; f.ready), a second wrapper level
+// ((document.fonts! as FontFaceSet).ready), a defaulted nested pattern
+// (const { fonts: { ready } = {} } = document), a viewport set through newContext, test.use or
+// CDP, and string-form evaluate.
+const fontsReady = [
+  [
+    "MemberExpression",
+    `MemberExpression${memberIs("ready")}${fontsAt("object")}`,
+  ],
+  [
+    "Property",
+    `VariableDeclarator${fontsAt("init")} > ObjectPattern > Property${keyIs("ready")}`,
+  ],
+  [
+    "Property",
+    `AssignmentExpression${fontsAt("right")} > ObjectPattern > Property${keyIs("ready")}`,
+  ],
+  [
+    "Property",
+    `Property${keyIs("fonts")} > ObjectPattern > Property${keyIs("ready")}`,
+  ],
+];
+const anyObject = (name) => [
+  ["MemberExpression", `MemberExpression${memberIs(name)}`],
+  ["Property", `ObjectPattern > Property${keyIs(name)}`],
+];
+const bans = {
+  fontsReady: {
+    entries: fontsReady,
+    message:
+      "Wait for fonts through settle(page) in probe.ts, never a bare document.fonts.ready (Project-Standards section 12).",
+  },
+  viewport: {
+    entries: anyObject("setViewportSize"),
+    message:
+      "Change the viewport through resize() in indicators.ts, which waits for the change to apply (Project-Standards section 12).",
+  },
+  sleep: {
+    entries: anyObject("waitForTimeout"),
+    message:
+      "A fixed sleep is never a readiness point; wait for the state itself (Project-Standards section 12).",
+  },
+};
+
+/** Every ban; an exempted ban still applies everywhere outside its helper function. */
+function browserTiming(exempt = {}) {
+  return [
+    "error",
+    ...Object.entries(bans).flatMap(([ban, { entries, message }]) =>
+      entries.map(([subject, selector]) => ({
+        selector:
+          exempt[ban] === undefined
+            ? selector
+            : `${selector}:not(FunctionDeclaration[id.name="${exempt[ban]}"] ${subject})`,
+        message,
+      })),
+    ),
+  ];
+}
+
 export default defineConfig([
   globalIgnores(["dist", "coverage", ".cache"]),
   {
@@ -101,6 +179,19 @@ export default defineConfig([
     files: ["**/*.{js,mjs}"],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
+  },
+  // A later matching block replaces rule options whole, so each block repeats every ban.
+  {
+    files: ["browser/**/*.{ts,mjs}"],
+    rules: { "no-restricted-syntax": browserTiming() },
+  },
+  {
+    files: ["browser/probe.ts"],
+    rules: { "no-restricted-syntax": browserTiming({ fontsReady: "settle" }) },
+  },
+  {
+    files: ["browser/indicators.ts"],
+    rules: { "no-restricted-syntax": browserTiming({ viewport: "resize" }) },
   },
   {
     files: ["src/**"],

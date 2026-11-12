@@ -19,7 +19,10 @@ export const webStages = [
   ["ESLint comment policy", "lint:comments"],
   ["Prettier", "format:check"],
   ["TypeScript", "typecheck"],
-  ["Vitest", "test"],
+  // Hosted runners set CI=true, which changes tool defaults, so the local suite runs under it too.
+  ["Vitest", "test", { CI: "true" }],
+  // Vitest loads the Vite config into the real tree, so a leftover .vite-temp entry shows here.
+  ["Install health (after Vitest)", ["source-check/install-health.js"]],
   // The same script CI runs; it lints and typechecks before vite build replaces web/dist.
   ["Production build", "build"],
   // Array form, so the stage's own environment turns off the jiti cache in node_modules.
@@ -31,11 +34,10 @@ export const webStages = [
 ];
 
 export function runWebStage(web, [name, script, stageEnv = {}], extra = []) {
+  const opts = { cwd: web, env: { ...env, ...stageEnv } };
   const r = Array.isArray(script)
-    ? exec(process.execPath, [...script, ...extra], { cwd: web, env: { ...env, ...stageEnv } })
-    : exec("npm", ["run", "--silent", script, ...(extra.length > 0 ? ["--", ...extra] : [])], {
-        cwd: web,
-      });
+    ? exec(process.execPath, [...script, ...extra], opts)
+    : exec("npm", ["run", "--silent", script, ...(extra.length > 0 ? ["--", ...extra] : [])], opts);
   if (r.code === 0 && script === "lint:css" && r.out.trim() === stylesheetBootstrap) {
     // The bootstrap stage is reported as inapplicable, never relabelled PASS.
     notApplicable(name, "no source stylesheets");

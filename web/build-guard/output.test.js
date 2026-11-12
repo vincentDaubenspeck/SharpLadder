@@ -23,6 +23,7 @@ import {
   walkDist,
 } from "./output.js";
 import { layerPrelude } from "./prelude.js";
+import { sweepingFlag } from "./startup.js";
 
 const web = join(import.meta.dirname, "..");
 const outs = [];
@@ -138,9 +139,10 @@ describe("output admission: clean builds", () => {
       `const config = await resolveConfig({ root: ${JSON.stringify(web)}, configFile: ${JSON.stringify(join(web, "vite.config.ts"))}, logLevel: "silent" }, "build");`,
       "console.log(JSON.stringify({ agent: detectAgent().name ?? '', plugins: config.plugins.map(({ name }) => name) }));",
     ].join("\n");
+    // Resolving the build configuration runs the guard's startup admission.
     const r = spawnSync(
       process.execPath,
-      ["--input-type=module", "--eval", script],
+      [sweepingFlag, "--input-type=module", "--eval", script],
       { cwd: web, env, encoding: "utf8", timeout: 30_000 },
     );
     // The test timer cannot interrupt spawnSync, so a hung Vite is killed here.

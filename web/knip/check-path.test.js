@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -73,3 +79,60 @@ describe("knip stage with the production config", () => {
     expect(r.status).toBe(0);
   }, 60_000);
 }, 30_000);
+
+// Every stage runs in a fixture whose script only prints the CI and jiti cache values it gets.
+const envStages = `
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { runWebStage, webStages } from ${JSON.stringify(stages)};
+const [dir] = process.argv.slice(1);
+const probe = "console.log(JSON.stringify([process.env.CI, process.env.JITI_FS_CACHE]));";
+const scripts = {};
+for (const [, script] of webStages) {
+  const file = Array.isArray(script) ? script[0] : "probe.js";
+  if (!Array.isArray(script)) scripts[script] = "node probe.js";
+  mkdirSync(dirname(join(dir, file)), { recursive: true });
+  writeFileSync(join(dir, file), probe);
+}
+writeFileSync(join(dir, "package.json"), JSON.stringify({ private: true, scripts }));
+const seen = webStages.map((step) => [step[0], runWebStage(dir, step).out.trim()]);
+console.error(JSON.stringify(seen));
+`;
+
+describe("check run stage environments", () => {
+  it("gives CI=true to the Vitest stage alone", () => {
+    const root = mkdtempSync(join(tmpdir(), "sl-stage-env-"));
+    // Sentinels, so an unchanged stage shows the parent's value even when the suite runs under CI.
+    const parent = Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([k]) => !["CI", "JITI_FS_CACHE"].includes(k.toUpperCase()),
+      ),
+    );
+    try {
+      const r = spawnSync(
+        process.execPath,
+        ["--input-type=module", "-e", envStages, root],
+        {
+          encoding: "utf8",
+          env: { ...parent, CI: "parent", JITI_FS_CACHE: "parent" },
+          timeout: 90_000,
+        },
+      );
+      if (r.error) throw r.error;
+      if (r.signal) throw new Error(`the stages were killed by ${r.signal}.`);
+      expect(r.status).toBe(0);
+      expect(r.stdout).not.toMatch(/^FAIL /m);
+      const seen = Object.fromEntries(
+        JSON.parse(r.stderr.trim().split("\n").at(-1)),
+      );
+      const want = Object.fromEntries(
+        Object.keys(seen).map((name) => [name, '["parent","parent"]']),
+      );
+      want["Vitest"] = '["true","parent"]';
+      want["knip"] = '["parent","false"]';
+      expect(seen).toEqual(want);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+});

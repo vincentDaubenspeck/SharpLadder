@@ -421,9 +421,15 @@ function level(root, dir, isTop, out) {
       if (plainDir(stat, at, problems)) bins.push(path);
     } else if (name === ".vite-temp") {
       if (topOnly(isTop, at, problems) && plainDir(stat, at, problems)) {
+        // Names only, from a folder lstat has shown is no link, so the listing follows nothing.
         const inside = listDir(path, at, problems);
         if (inside && inside.length > 0)
-          problems.push(`census: ${at} is not empty`);
+          problems.push(
+            `census: ${at} is not empty: ${inside
+              .sort()
+              .map((entry) => JSON.stringify(entry))
+              .join(", ")}`,
+          );
       }
     } else if (name === ".cache")
       problems.push(

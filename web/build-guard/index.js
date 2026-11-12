@@ -27,6 +27,7 @@ import { lightningViolations } from "./contract.js";
 import { rendererModules } from "../source-policy/renderer.js";
 import { canonical } from "../source-policy/unit.js";
 import { layerPrelude } from "./prelude.js";
+import { admitStartup } from "./startup.js";
 import {
   collect,
   minifySheet,
@@ -198,6 +199,8 @@ export function guard({ worker = false } = {}) {
     minify,
 
     configResolved(config) {
+      // Outside the catch, which defers every other refusal to buildStart.
+      admitStartup();
       try {
         const found = worker ? [] : configViolations(config);
         lightning = config.css.lightningcss ?? {};

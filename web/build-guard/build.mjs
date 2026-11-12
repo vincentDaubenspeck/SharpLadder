@@ -22,6 +22,9 @@ import {
   parseSheet,
   sameEntries,
 } from "./provenance.js";
+// Every export admits the process before anything else, argument defaults included, so no work
+// runs in a process that could abort at exit.
+import { admitStartup } from "./startup.js";
 
 const web = join(import.meta.dirname, "..");
 
@@ -35,7 +38,9 @@ const fail = (message) => {
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** Measures verified bytes in memory; nothing is written beside them in dist. */
-export function measure(files, { cssGzip, fontTotal } = limits) {
+export function measure(files, ceiling = limits) {
+  admitStartup();
+  const { cssGzip, fontTotal } = ceiling;
   const css = [];
   const fonts = [];
   for (const [path, { bytes }] of files) {
@@ -104,6 +109,7 @@ function scriptStrings(node, found = []) {
 
 /** T 4.6 routes: every stylesheet link resolves to a shipped sheet; no other CSS route exists. */
 export function routeViolations(terminal) {
+  admitStartup();
   const problems = [];
   const sheets = new Set(
     [...terminal.keys()].filter((p) => p.endsWith(".css")),
@@ -150,6 +156,7 @@ export function routeViolations(terminal) {
 
 /** C3: the colour sequence on disk equals the expected transformed manifest, in order. */
 export function terminalProvenance(terminal, manifest) {
+  admitStartup();
   if (manifest === null || manifest === undefined)
     fail("the build published no token manifest");
   const routes = routeViolations(terminal);
@@ -182,6 +189,7 @@ export function terminalProvenance(terminal, manifest) {
  * owned hashes are the snapshot's. Returns the admitted font slice.
  */
 export async function terminalAdmission(record, terminal) {
+  admitStartup();
   const admission = await assetAdmission({ root: join(record.root, "..") });
   if (admission.problems.length > 0)
     fail(`assets: ${admission.problems.join("; ")}`);
@@ -199,6 +207,7 @@ export async function terminalAdmission(record, terminal) {
 
 /** After the terminal step any added, removed or changed file fails the release. */
 export function releaseRecheck(outDir, terminal) {
+  admitStartup();
   sameInventory(terminal, walkDist(outDir), `${outDir} after verification`);
 }
 
@@ -228,7 +237,9 @@ function writeEvidence(record, terminal, report, provenance, fontSlice) {
 }
 
 // Builds with the real config, then verifies dist on disk; nothing may change after that.
-export async function releaseBuild(inline = {}, { ceiling = limits } = {}) {
+export async function releaseBuild(inline, options) {
+  admitStartup();
+  const { ceiling = limits } = options ?? {};
   takeInventory();
   await build({
     root: web,

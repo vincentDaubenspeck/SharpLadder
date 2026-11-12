@@ -17,6 +17,7 @@ import {
   type Face,
   type Role,
 } from "./fonts.ts";
+import { resize } from "./indicators.ts";
 import {
   applyEnvironment,
   differing,
@@ -409,12 +410,19 @@ for (const env of environments(platform)) {
       text: witness[role],
     }));
     await measure(page, targets);
-    // Recorded before any reference or uncovered glyph, so only the covered render's requests count.
-    const requested = await served();
     const wanted = roleNames
       .filter((role) => env.expect[role].kind === "shipped")
       .map((role) => faceOf(env.expect[role].family).distPath)
       .sort();
+    // Recorded before any reference or uncovered glyph, so only the covered render's requests count.
+    // A response can still be arriving once the render has settled, so the set is polled.
+    let requested: Awaited<ReturnType<typeof served>> = [];
+    await expect
+      .poll(async () => {
+        requested = await served();
+        return requested.map((entry) => entry.path);
+      }, "the covered render's font responses")
+      .toEqual(wanted);
     const systemHash = roleNames.some(
       (role) => env.expect[role].kind === "system",
     )
@@ -479,7 +487,7 @@ for (const env of environments(platform)) {
     });
     const glyphs = await glyphImages(page, glyphProbes);
 
-    await page.setViewportSize({ width: 390, height: 844 });
+    await resize(page, { width: 390, height: 844 });
     const reflow = await page.evaluate(() => {
       document.querySelector("[data-font-probes]")?.remove();
       const box = document.createElement("div");
@@ -569,6 +577,8 @@ for (const env of environments(platform)) {
     expect(requested.map((entry) => entry.path)).toEqual(wanted);
     for (const entry of record.served)
       expect(entry.sha256, entry.path).toBe(entry.record);
+    // A viewport still at its old width would let the reflow comparison pass without testing 390.
+    expect(reflow.clientWidth, "the viewport is 390 wide").toBe(390);
     expect(reflow.scrollWidth, "reflow at 390").toBeLessThanOrEqual(
       reflow.clientWidth,
     );
@@ -740,7 +750,14 @@ test("served fonts are exactly the recorded build faces", async ({
       }),
     ),
   );
-  const got = await served();
+  // A response can still be arriving once the faces have loaded, so the set is polled.
+  let got: Awaited<ReturnType<typeof served>> = [];
+  await expect
+    .poll(async () => {
+      got = await served();
+      return got.map((entry) => entry.path);
+    }, "the served font responses")
+    .toEqual(faces.map((face) => face.distPath).sort());
   const record = {
     project: info.project.name,
     engine: engineOf(info),
@@ -772,7 +789,7 @@ test("served fonts are exactly the recorded build faces", async ({
 const loading: Record<string, { failed: string; delayed: string }> = {
   chromium: { failed: "error", delayed: "loading" },
   firefox: { failed: "error", delayed: "loading" },
-  // WebKit reports a held request as an error at once, yet still swaps the face in once it arrives.
+  // WebKit eventually reports a held request as an error, yet still swaps the face in once it arrives.
   webkit: { failed: "error", delayed: "error" },
 };
 
@@ -831,9 +848,20 @@ for (const mode of ["failed", "delayed"] as const)
             (face) => `${face.family.replace(/^"|"$/g, "")}:${face.status}`,
           ).sort(),
         );
-      if (mode === "failed")
-        await page.evaluate(async () => document.fonts.ready);
-      const before = await status();
+      const want = loading[engineOf(info)]?.[mode] ?? "unrecorded engine";
+      let before: string[] = [];
+      if (mode === "failed") {
+        await settle(page);
+        before = await status();
+      } else {
+        // The held face's status can lag its request, so it is sampled until it shows the held state.
+        await expect
+          .poll(async () => {
+            before = await status();
+            return before;
+          }, `${held.family} while held`)
+          .toContain(`${held.family}:${want}`);
+      }
       const pending =
         mode === "failed"
           ? await measure(page, targets)
@@ -888,7 +916,6 @@ for (const mode of ["failed", "delayed"] as const)
         contentType: "application/json",
       });
 
-      const want = loading[engineOf(info)]?.[mode] ?? "unrecorded engine";
       expect(before, held.family).toContain(`${held.family}:${want}`);
       if (mode === "failed")
         for (const face of faces.filter((face) => face !== held))
@@ -1044,7 +1071,6 @@ test("control: unauthenticated, broken, circular and absent references are refus
   await expect(
     register(page, [{ alias: first.family, face: first, data: base64(bytes) }]),
   ).rejects.toThrow(/independent alias/);
-  await page.evaluate(async () => document.fonts.ready);
   await register(page, [
     { alias: "sl-ref-once", face: first, data: base64(bytes) },
   ]);
