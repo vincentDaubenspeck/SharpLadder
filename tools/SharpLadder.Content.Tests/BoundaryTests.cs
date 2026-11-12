@@ -160,7 +160,7 @@ public sealed class BoundaryTests
         if (state is "missing" or "empty")
         {
             Assert.Equal(0, code);
-            Assert.Equal(11, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(20, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -185,7 +185,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(11, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(20, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
     }
 
     // The link is the last component of each argument, which is still above the root it reaches.
@@ -204,7 +204,7 @@ public sealed class BoundaryTests
 
         Assert.Equal(0, code);
         Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-        Assert.Equal(11, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(20, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
     }
 
     [Fact]
@@ -440,7 +440,7 @@ public sealed class BoundaryTests
         var (code, text) = Run(Repository.SchemaFolder, content, Path.Combine(work.Path, "out"));
 
         Assert.Equal(1, code);
-        Assert.Contains($"{entry}: the content root holds only chapters/, schema/, aliases.yml and patterns.yml", text, StringComparison.Ordinal);
+        Assert.Contains($"{entry}: the content root holds only chapters/, errors/, glossary/, schema/, aliases.yml and patterns.yml", text, StringComparison.Ordinal);
         Assert.DoesNotContain("hard links", text, StringComparison.Ordinal);
         Assert.DoesNotContain(LinkRefused, text, StringComparison.Ordinal);
         Assert.False(Directory.Exists(Path.Combine(work.Path, "out")));
@@ -597,7 +597,7 @@ public sealed class BoundaryTests
         {
             Assert.Equal(0, code);
             Assert.Contains(GoldenLine(), text, StringComparison.Ordinal);
-            Assert.Equal(11, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
+            Assert.Equal(20, Directory.EnumerateFiles(Path.Combine(real, "out"), "*", SearchOption.AllDirectories).Count());
             return;
         }
 
@@ -622,7 +622,7 @@ public sealed class BoundaryTests
         return to;
     }
 
-    private static string GoldenLine() => $"11 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
+    private static string GoldenLine() => $"20 files, output digest sha256:{File.ReadAllText(Repository.GoldenFile).Trim()}\n";
 
     // The entries a stray folder could appear among: the temporary folder, the working folder and
     // the root of their drives.

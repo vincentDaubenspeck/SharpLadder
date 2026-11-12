@@ -7,22 +7,68 @@ import { createHash } from "node:crypto";
 // Each renderer module, keyed by its path under src, with exactly the bindings it exports.
 export const rendererModules = new Map([
   ["content/assertNever.ts", ["assertNever"]],
-  ["content/href.ts", ["internalHref", "buildSlugMap", "type SlugMap"]],
+  [
+    "content/href.ts",
+    ["internalHref", "termHref", "buildSlugMap", "type SlugMap"],
+  ],
   ["content/ContentLink.tsx", ["ContentLink"]],
   ["content/Spans.tsx", ["Spans", "LinkContent"]],
   ["content/Blocks.tsx", ["Blocks"]],
+  ["content/Entries.tsx", ["GlossaryEntryView", "ErrorEntryView"]],
+  ["content/Cards.tsx", ["CardsSectionView"]],
+  ["content/Drill.tsx", ["DrillSectionView"]],
+  [
+    "content/approach.ts",
+    [
+      "projectBuild",
+      "checkedBuildView",
+      "staticDoc",
+      "type ApproachOption",
+      "type SelectedApproach",
+      "type ChoiceSection",
+      "type BuildViewSection",
+      "type BuildView",
+      "type ApproachSelection",
+      "type ApproachChange",
+      "type StaticDoc",
+      "type StaticPart",
+    ],
+  ],
+  [
+    "content/hints.ts",
+    [
+      "selectHints",
+      "checkedHintsView",
+      "type HintOption",
+      "type SelectedCue",
+      "type HintsView",
+      "type HintChange",
+    ],
+  ],
+  ["content/ApproachPicker.tsx", ["ApproachPicker", "HintPicker"]],
+  ["content/Term.tsx", ["Term"]],
+  ["content/Build.tsx", ["BuildPartView"]],
+  ["content/Hints.tsx", ["HintsPartView"]],
   ["content/ContentView.tsx", ["ContentView"]],
 ]);
 
 // The reviewed helpers the JSX modules trust, each pinned to the SHA-256 of its exact text.
 export const helperPins = new Map([
   [
+    "content/approach.ts",
+    "a4e3ccae7fa087dd9d0d38ea23e9cb88d4fee72e9fb6e814bcbf7685b7efa441",
+  ],
+  [
     "content/assertNever.ts",
     "c0ec0b0d9ed46a593853aea55684d37376b81ecb821a66b685d41a958a8e5c23",
   ],
   [
+    "content/hints.ts",
+    "50fc2db30b8fa7f7dffe27806f3f084bfff2a5ba9ab6c1468550252e41ea0a89",
+  ],
+  [
     "content/href.ts",
-    "277784cb68dddd5d86588e51dbc868cd161cdcc2934ea9551c32a8a8735f8643",
+    "4592231be603d2db39cdb0e283e688613ee0d9c3ba6c368cffa9765d64b48d88",
   ],
 ]);
 
@@ -56,6 +102,9 @@ function helperPinFindings(unit, text, hasBOM = false) {
 export const rendererTests = new Set([
   "content/round-trip.test.tsx",
   "content/provided.d.ts",
+  "content-tests/approach.test.tsx",
+  "content-tests/hints-view.ts",
+  "content-tests/hints.test.tsx",
   "content-tests/href.test.ts",
   "content-tests/renderer.test.tsx",
 ]);
@@ -86,14 +135,28 @@ const blockHook = "data-block-id";
 const sectionHook = "data-section-id";
 const intrinsics = new Map([
   ["section", [sectionHook]],
-  ["div", ["id", blockHook]],
-  ["span", ["id"]],
+  ["div", ["id", blockHook, "role", "aria-label"]],
+  [
+    "button",
+    ["type", "aria-pressed", "onClick", "popoverTarget", "popoverTargetAction"],
+  ],
+  ["span", ["id", "popover"]],
   ["h2", ["id"]],
   ["h3", ["id"]],
+  ["h4", ["id"]],
+  ["dl", []],
+  ["dt", []],
+  ["dd", []],
   ["p", [blockHook]],
   ["ul", [blockHook]],
   ["ol", ["start", blockHook]],
   ["li", [blockHook]],
+  ["table", [blockHook]],
+  ["thead", []],
+  ["tbody", []],
+  ["tr", []],
+  ["th", ["scope"]],
+  ["td", []],
   ["pre", ["aria-labelledby"]],
   ["code", []],
   ["em", []],
@@ -114,10 +177,60 @@ const componentBanned = new Set([
   "xlinkhref",
   "style",
   "classname",
+  "popover",
+  "popovertarget",
+  "popovertargetaction",
 ]);
 
 const hrefModule = "content/ContentLink.tsx";
+// The one module whose h2 carries an entry's own id.
+const entryModule = "content/Entries.tsx";
+// The one module that writes a card: its heading level and its description list live nowhere else.
+const cardsModule = "content/Cards.tsx";
+const cardElements = new Set(["dl", "dt", "dd"]);
+// The one module that shows a build part, and the one that writes its approach heading.
+const buildModule = "content/Build.tsx";
+// The picker module: its one private list writes every pressed button and the single handler, and
+// each exported wrapper names its own group.
+const pickerModule = "content/ApproachPicker.tsx";
+const pickerButton = ["type", "aria-pressed", "onClick"];
+const changeProp = "onApproachChange";
+const chooseProp = "onChoose";
+const groupLabels = new Map([
+  ["ApproachPicker", "Build approaches"],
+  ["HintPicker", "Hint approaches"],
+]);
+// The one module that shows hints, and the handler it hands down unchanged.
+const hintsModule = "content/Hints.tsx";
+const hintProp = "onHintChange";
+// Types that can hold what a hints view hides; only the reviewed helper that excludes them names them.
+const approachModule = "content/approach.ts";
+const wholeRecordTypes = new Set([
+  "ContentDoc",
+  "PartFile",
+  "HintsPart",
+  "Ladder",
+  "Rung",
+]);
+// The one module that writes a native popover: a button and its definition, and no handler.
+const termModule = "content/Term.tsx";
+const termButton = ["type", "popoverTarget", "popoverTargetAction"];
 const badCall = "this call is not admitted in a JSX renderer module";
+// React reads a capitalised JSX name as a component and a lower-case one as an element.
+const isComponentName = (name) => /^[A-Z]/u.test(name);
+const plainTypes = new Set([
+  "TSStringKeyword",
+  "TSNumberKeyword",
+  "TSBooleanKeyword",
+  "TSNullKeyword",
+  "TSUndefinedKeyword",
+  "TSLiteralType",
+]);
+// A declared type of plain values alone, so no alias or wrapper can hide an element in it.
+const isPlainType = (type) =>
+  type.type === "TSUnionType"
+    ? type.types.every(isPlainType)
+    : plainTypes.has(type.type);
 
 const reserved = ["content", "content-tests", "generated"];
 const folderOf = (unit) =>
@@ -355,17 +468,35 @@ export function rendererFindings(
     );
   };
 
+  // Why a reviewed callee may not be called, or null: a call would hand a component props its
+  // tag's rules never saw, and a local helper that may return elements is a component.
+  const componentProblem = (callee) => {
+    if (isComponentName(callee.name))
+      return "a component renders only through its tag";
+    const def = onlyDef(variableOf(callee));
+    if (def?.type !== "FunctionName") return null;
+    const returned = def.node.returnType?.typeAnnotation;
+    return returned !== undefined && isPlainType(returned)
+      ? null
+      : "a called helper must declare a return type of plain values";
+  };
+
   const checkCall = (call) => {
+    const problem = isRendererBinding(call.callee)
+      ? componentProblem(call.callee)
+      : null;
     if (
       call.optional ||
       call.typeArguments ||
       call.arguments.some((a) => a.type === "SpreadElement")
     )
       report(call, "an optional, generic or spread call is not admitted");
+    else if (problem !== null) report(call, `${badCall}: ${problem}`);
     else if (
       !isRendererBinding(call.callee) &&
       !isReactUseId(call.callee) &&
-      !isMapCall(call)
+      !isMapCall(call) &&
+      !changeCalls.has(call)
     )
       report(
         call,
@@ -381,34 +512,92 @@ export function rendererFindings(
       ? attribute.value.expression
       : null;
 
-  const isHrefCall = (expression) => {
+  // A plain call, with this many arguments, of the named function imported from href.ts.
+  const isHrefHelperCall = (expression, name, count) => {
     if (
       expression?.type !== "CallExpression" ||
       expression.optional ||
       expression.typeArguments ||
-      expression.arguments.length !== 2
+      expression.arguments.length !== count
     )
       return false;
     const { callee } = expression;
-    if (callee.type !== "Identifier" || callee.name !== "internalHref")
-      return false;
+    if (callee.type !== "Identifier" || callee.name !== name) return false;
     const def = onlyDef(variableOf(callee));
-    if (
-      def?.type !== "ImportBinding" ||
-      def.node.type !== "ImportSpecifier" ||
-      importedName(def.node) !== "internalHref" ||
-      isTypeImport(def.node) ||
-      def.parent.source.value !== "./href.ts"
-    )
-      return false;
-    const isContentLink = (fn) =>
-      fn.id?.name === "ContentLink" &&
-      fn.parent.type === "ExportNamedDeclaration";
+    return (
+      def?.type === "ImportBinding" &&
+      def.node.type === "ImportSpecifier" &&
+      importedName(def.node) === name &&
+      !isTypeImport(def.node) &&
+      def.parent.source.value === "./href.ts"
+    );
+  };
+
+  const isExported = (name) => (fn) =>
+    fn.id?.name === name && fn.parent.type === "ExportNamedDeclaration";
+
+  const isHrefCall = (expression) => {
+    if (!isHrefHelperCall(expression, "internalHref", 2)) return false;
     const [first, second] = expression.arguments;
     return (
-      isPropParameter(first, "link", isContentLink) &&
-      isPropParameter(second, "slugs", isContentLink)
+      isPropParameter(first, "link", isExported("ContentLink")) &&
+      isPropParameter(second, "slugs", isExported("ContentLink"))
     );
+  };
+
+  const isTermHrefCall = (expression) =>
+    isHrefHelperCall(expression, "termHref", 1) &&
+    isPropParameter(expression.arguments[0], "term", isExported("Term"));
+
+  const attributeOf = (opening, name) =>
+    opening.attributes.find(
+      (a) =>
+        a.type === "JSXAttribute" &&
+        a.name.type === "JSXIdentifier" &&
+        a.name.name === name,
+    );
+
+  const elementSiblings = (element) => {
+    const parent = element.parent;
+    return parent.type === "JSXElement" || parent.type === "JSXFragment"
+      ? parent.children.filter((c) => c.type === "JSXElement")
+      : [];
+  };
+
+  const isTag = (element, tag) =>
+    element.openingElement.name.type === "JSXIdentifier" &&
+    element.openingElement.name.name === tag;
+
+  // A Term's button and its definition sit side by side and name one useId binding, so a button
+  // can only ever open its own definition.
+  const isTermPair = (button, definition) => {
+    const target = attributeOf(button.openingElement, "popoverTarget");
+    const id = attributeOf(definition.openingElement, "id");
+    const mode = attributeOf(definition.openingElement, "popover");
+    const variable = target ? useIdVariable(expressionOf(target)) : null;
+    return (
+      isTag(button, "button") &&
+      isTag(definition, "span") &&
+      variable !== null &&
+      id !== undefined &&
+      mode !== undefined &&
+      useIdVariable(expressionOf(id)) === variable &&
+      literalValue(mode) === "auto"
+    );
+  };
+
+  const pairedAfter = (element) => {
+    const siblings = elementSiblings(element);
+    const at = siblings.indexOf(element);
+    return at >= 0 && at + 1 < siblings.length
+      ? isTermPair(element, siblings[at + 1])
+      : false;
+  };
+
+  const pairedBefore = (element) => {
+    const siblings = elementSiblings(element);
+    const at = siblings.indexOf(element);
+    return at > 0 ? isTermPair(siblings[at - 1], element) : false;
   };
 
   // The span carrying the label must come before its pre among the same parent's children.
@@ -434,11 +623,117 @@ export function rendererFindings(
     return false;
   };
 
+  const literalValue = (attribute) =>
+    attribute.value?.type === "Literal" ? attribute.value.value : null;
+
+  // The private list of the picker module: a top-level function that is never exported.
+  const isChoices = (fn) =>
+    unit === pickerModule &&
+    fn.id?.name === "Choices" &&
+    fn.parent.type === "Program";
+
+  const isWrapper = (name) => (fn) =>
+    unit === pickerModule && isExported(name)(fn);
+
+  const plainCall = (call, count) =>
+    call?.type === "CallExpression" &&
+    !call.optional &&
+    !call.typeArguments &&
+    call.arguments.length === count;
+
+  // The one call a button's handler makes: the list's chooser with this option's id.
+  const isChooseCall = (call) =>
+    plainCall(call, 1) &&
+    isPropParameter(call.callee, chooseProp, isChoices) &&
+    isMapElementMember(call.arguments[0], "id");
+
+  // An inline arrow with these parameters whose body is one call statement, or null.
+  const soleCallOf = (expression, params) =>
+    expression?.type === "ArrowFunctionExpression" &&
+    !expression.async &&
+    expression.params.length === params &&
+    expression.params.every((p) => p.type === "Identifier") &&
+    expression.body.type === "BlockStatement" &&
+    expression.body.body.length === 1 &&
+    expression.body.body[0].type === "ExpressionStatement"
+      ? expression.body.body[0].expression
+      : null;
+
+  // A handler is an inline arrow that takes nothing and does nothing but that one call.
+  const changeCallOf = (expression) => {
+    const call = soleCallOf(expression, 0);
+    return isChooseCall(call) ? call : null;
+  };
+
+  // The build wrapper's chooser: the caller's own function with this section and the chosen id.
+  const approachCallOf = (expression) => {
+    const call = soleCallOf(expression, 1);
+    if (!plainCall(call, 2)) return null;
+    const [first, second] = call.arguments;
+    const def =
+      second.type === "Identifier" ? onlyDef(variableOf(second)) : null;
+    return isPropParameter(
+      call.callee,
+      changeProp,
+      isWrapper("ApproachPicker"),
+    ) &&
+      isPropParameter(first, "sectionId", isWrapper("ApproachPicker")) &&
+      def?.type === "Parameter" &&
+      def.node === expression &&
+      def.name === expression.params[0]
+      ? call
+      : null;
+  };
+
+  // What a wrapper hands the list as its chooser: the build call above, or the hint handler as is.
+  const chooserCallOf = (expression) =>
+    approachCallOf(expression) ??
+    (isPropParameter(expression, hintProp, isWrapper("HintPicker"))
+      ? expression
+      : null);
+
+  const isChoicesTag = (opening) =>
+    opening.name.type === "JSXIdentifier" &&
+    onlyDef(variableOf(opening.name))?.type === "FunctionName" &&
+    isChoices(onlyDef(variableOf(opening.name)).node);
+
+  const isPressed = (expression) =>
+    expression?.type === "BinaryExpression" &&
+    expression.operator === "===" &&
+    isMapElementMember(expression.left, "id") &&
+    isPropParameter(expression.right, "pressed", isChoices);
+
+  const enclosingFunction = (node) => {
+    let at = node;
+    while (at !== null && at !== undefined && !isTopLevelFunction(at))
+      at = at.parent;
+    return at ?? null;
+  };
+
+  // Each wrapper's group carries its own fixed label and no other.
+  const isGroupLabel = (opening, attribute) => {
+    const fn = enclosingFunction(opening);
+    return (
+      unit === pickerModule &&
+      fn !== null &&
+      fn.parent.type === "ExportNamedDeclaration" &&
+      groupLabels.get(fn.id?.name) === literalValue(attribute)
+    );
+  };
+
+  const changeCalls = new Set();
+  let handlerCount = 0;
   let hrefCount = 0;
+  let popoverCount = 0;
 
   const checkIntrinsic = (opening, tag) => {
     const allowed = intrinsics.get(tag);
-    if (allowed === undefined) {
+    if (
+      allowed === undefined ||
+      (cardElements.has(tag) && unit !== cardsModule) ||
+      (tag === "h4" && unit !== cardsModule && unit !== buildModule) ||
+      (tag === "button" && unit !== pickerModule && unit !== termModule)
+    ) {
       report(opening.name, `element <${tag}> is not admitted in the renderer`);
       return;
     }
@@ -467,7 +762,32 @@ export function rendererFindings(
             : isParamMember(expression, "block", "blockId");
       else if (name === sectionHook)
         ok = isParamMember(expression, "section", "id");
-      else if (tag === "div") ok = isParamMember(expression, "block", "id");
+      else if (name === "role")
+        ok = unit === pickerModule && literalValue(attribute) === "group";
+      else if (name === "aria-label") ok = isGroupLabel(opening, attribute);
+      else if (name === "type") ok = literalValue(attribute) === "button";
+      else if (name === "popoverTarget")
+        ok = unit === termModule && pairedAfter(opening.parent);
+      else if (name === "popoverTargetAction")
+        ok = unit === termModule && literalValue(attribute) === "toggle";
+      else if (name === "popover") {
+        popoverCount++;
+        ok = unit === termModule && pairedBefore(opening.parent);
+      } else if (name === "aria-pressed") ok = isPressed(expression);
+      else if (name === "scope") ok = literalValue(attribute) === "col";
+      else if (name === "onClick") {
+        handlerCount++;
+        const call = changeCallOf(expression);
+        if (call !== null) changeCalls.add(call);
+        ok = call !== null;
+      } else if (tag === "div") ok = isParamMember(expression, "block", "id");
+      else if (tag === "h2" && unit === entryModule)
+        ok = isParamMember(expression, "entry", "id");
+      else if (tag === "h4")
+        ok =
+          unit === buildModule
+            ? isParamMember(expression, "approach", "id")
+            : isParamMember(expression, "card", "id");
       else if (tag === "h2" || tag === "h3")
         ok = isParamMember(expression, "section", "id");
       else if (tag === "ol") ok = isParamMember(expression, "block", "start");
@@ -477,7 +797,9 @@ export function rendererFindings(
         ok = variable !== null && hasLabelSibling(opening.parent, variable);
       } else {
         hrefCount++;
-        ok = unit === hrefModule && isHrefCall(expression);
+        ok =
+          (unit === hrefModule && isHrefCall(expression)) ||
+          (unit === termModule && isTermHrefCall(expression));
       }
       if (!ok)
         report(
@@ -485,6 +807,12 @@ export function rendererFindings(
           `${name} on <${tag}> is not from its admitted source`,
         );
     }
+    // A button with no type submits a form; a picker button needs its state and handler, and a
+    // Term button its own definition.
+    if (tag === "button")
+      for (const name of unit === termModule ? termButton : pickerButton)
+        if (!seen.has(name))
+          report(opening.name, `<button> must carry ${name}`);
   };
 
   const checkComponent = (opening) => {
@@ -509,6 +837,23 @@ export function rendererFindings(
         continue;
       }
       const lower = attribute.name.name.toLowerCase();
+      // The caller's handler is handed down unchanged, and only by the build view; likewise the
+      // hint handler, only by the hints view.
+      if (
+        (attribute.name.name === changeProp &&
+          unit === buildModule &&
+          isPropParameter(expressionOf(attribute), changeProp)) ||
+        (attribute.name.name === hintProp &&
+          unit === hintsModule &&
+          isPropParameter(expressionOf(attribute), hintProp))
+      )
+        continue;
+      // A wrapper hands its list one chooser, and no other component takes one.
+      if (attribute.name.name === chooseProp && isChoicesTag(opening)) {
+        const call = chooserCallOf(expressionOf(attribute));
+        if (call?.type === "CallExpression") changeCalls.add(call);
+        if (call !== null) continue;
+      }
       if (componentBanned.has(lower) || lower.startsWith("on"))
         report(attribute, `prop ${attribute.name.name} is not admitted`);
     }
@@ -538,7 +883,10 @@ export function rendererFindings(
       let ok;
       if (source === "react")
         ok = type ? reactTypes.has(name) : reactValues.has(name);
-      else if (generatedTypes.has(source)) ok = node.importKind === "type";
+      else if (generatedTypes.has(source))
+        ok =
+          node.importKind === "type" &&
+          (unit === approachModule || !wholeRecordTypes.has(name));
       else {
         const target = relativeUnit(source);
         const exported = rendererModules.get(target);
@@ -748,13 +1096,23 @@ export function rendererFindings(
         report(program, `export ${name} is missing from the module`);
     }
   }
-  if (unit === hrefModule) {
-    if (hrefCount !== 1)
-      report(program, `${hrefModule} must write exactly one href`);
+  if (unit === pickerModule && handlerCount !== 1)
+    report(program, `${pickerModule} must write exactly one handler`);
+  // Each href module names its binding sources once and never writes them, so a lookalike cannot
+  // stand in for one.
+  const bound =
+    unit === hrefModule
+      ? ["internalHref", "link", "slugs"]
+      : unit === termModule
+        ? ["termHref", "term", "definition", "useId"]
+        : null;
+  if (unit === termModule && popoverCount !== 1)
+    report(program, `${termModule} must write exactly one definition`);
+  if (bound !== null) {
+    if (hrefCount !== 1) report(program, `${unit} must write exactly one href`);
     for (const scope of scopeManager.scopes) {
       for (const variable of scope.variables) {
-        if (!["internalHref", "link", "slugs"].includes(variable.name))
-          continue;
+        if (!bound.includes(variable.name)) continue;
         const declared = scopeManager.scopes
           .flatMap((s) => s.variables)
           .filter((v) => v.name === variable.name);

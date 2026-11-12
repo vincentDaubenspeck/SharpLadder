@@ -1,4 +1,4 @@
-// SharpLadder.Content type emitter output, grammar 1. Do not edit.
+// SharpLadder.Content type emitter output, grammar 2. Do not edit.
 
 export type Id = string;
 
@@ -34,7 +34,8 @@ export type Speech = {
 
 export type Body = Block[];
 
-export type Block = ParagraphBlock | ListBlock | CodeBlock | TextBlock;
+export type Block =
+  ParagraphBlock | ListBlock | CodeBlock | TextBlock | TableBlock;
 
 export type ParagraphBlock = {
   type: "paragraph";
@@ -54,6 +55,17 @@ export type ListItem = {
   blockId: ItemId;
   content: Spans;
 };
+
+export type TableBlock = {
+  type: "table";
+  blockId: BlockId;
+  headers: TableRow;
+  rows: [TableRow, ...TableRow[]];
+};
+
+export type TableRow = [TableCell, ...TableCell[]];
+
+export type TableCell = Span[];
 
 export type CodeBlock =
   | {
@@ -102,9 +114,19 @@ export type TextBlock = {
   source: string;
 };
 
+export type AnchoredTextBlock = {
+  type: "text";
+  blockId: BlockId;
+  id: Id;
+  label?: string;
+  spoken: Spoken;
+  source: string;
+};
+
 export type Spans = [Span, ...Span[]];
 
-export type Span = TextSpan | CodeSpan | EmSpan | StrongSpan | LinkSpan;
+export type Span =
+  TextSpan | CodeSpan | EmSpan | StrongSpan | LinkSpan | TermSpan;
 
 export type TextSpan = {
   type: "text";
@@ -128,12 +150,33 @@ export type StrongSpan = {
 
 export type ChapterRef = Id;
 
-export type LinkSpan = {
+export type LinkSpan = AnchorLinkSpan | ErrorLinkSpan;
+
+export type AnchorLinkSpan = {
   type: "link";
+  kind: "anchor";
   id: Id;
   chapter?: ChapterRef;
   content: LinkContent;
 };
+
+export type ErrorLinkSpan = {
+  type: "link";
+  kind: "error";
+  id: ErrorId;
+  content: LinkContent;
+};
+
+export type ErrorId = Id;
+
+export type TermSpan = {
+  type: "term";
+  id: TermRef;
+  short: string;
+  content: LinkContent;
+};
+
+export type TermRef = Id;
 
 export type LinkContent = [LinkContentSpan, ...LinkContentSpan[]];
 

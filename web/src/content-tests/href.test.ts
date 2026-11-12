@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
-import type { LinkSpan } from "../generated/body.ts";
+import type { AnchorLinkSpan, LinkSpan, TermSpan } from "../generated/body.ts";
 import type { ChapterFile } from "../generated/content.ts";
 import { witness as basics } from "../generated/witness/chapters/fixture-basics/chapter.ts";
 import { witness as syntax } from "../generated/witness/chapters/fixture-basics/syntax.ts";
 import { witness as second } from "../generated/witness/chapters/fixture-second/chapter.ts";
-import { buildSlugMap, internalHref } from "../content/href.ts";
+import { buildSlugMap, internalHref, termHref } from "../content/href.ts";
 
 const slugs = buildSlugMap([basics, second]);
 
 function linkTo(id: string, chapter?: string): LinkSpan {
   const content: LinkSpan["content"] = [{ type: "text", text: "x" }];
   return chapter === undefined
-    ? { type: "link", id, content }
-    : { type: "link", id, chapter, content };
+    ? { type: "link", kind: "anchor", id, content }
+    : { type: "link", kind: "anchor", id, chapter, content };
 }
 
 function chapterWith(id: string, slug: string): ChapterFile {
   return { ...second, id, slug };
 }
 
-// Every link span anywhere below a value, in document order.
-function linksIn(value: unknown): LinkSpan[] {
+// Every anchor link span anywhere below a value, in document order.
+function linksIn(value: unknown): AnchorLinkSpan[] {
   if (Array.isArray(value)) {
     return value.flatMap(linksIn);
   }
@@ -28,11 +28,120 @@ function linksIn(value: unknown): LinkSpan[] {
     return [];
   }
   const record = Object.fromEntries(Object.entries(value));
-  const own = record["type"] === "link" ? [value as LinkSpan] : [];
+  const own =
+    record["type"] === "link" && record["kind"] === "anchor"
+      ? [value as AnchorLinkSpan]
+      : [];
   return [...own, ...Object.values(record).flatMap(linksIn)];
 }
 
+// Every link span of any kind below a value, in document order.
+function linksOf(value: unknown): LinkSpan[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(linksOf);
+  }
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+  const record = Object.fromEntries(Object.entries(value));
+  const own = record["type"] === "link" ? [value as LinkSpan] : [];
+  return [...own, ...Object.values(record).flatMap(linksOf)];
+}
+
+// Every Term span below a value, in document order.
+function termsOf(value: unknown): TermSpan[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(termsOf);
+  }
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+  const record = Object.fromEntries(Object.entries(value));
+  const own = record["type"] === "term" ? [value as TermSpan] : [];
+  return [...own, ...Object.values(record).flatMap(termsOf)];
+}
+
+describe("termHref", () => {
+  const content: TermSpan["content"] = [{ type: "text", text: "x" }];
+
+  it("sends a Term to its entry on the glossary page whatever page holds it", () => {
+    const term: TermSpan = { type: "term", id: "term-a", short: "s", content };
+    expect(termHref(term)).toBe("/glossary#term-a");
+    const compiled = termsOf(syntax);
+    expect(compiled).toHaveLength(3);
+    for (const span of compiled)
+      expect(termHref(span)).toBe("/glossary#term-fixture-loop");
+  });
+
+  it.each([
+    ["a chapter beside it", { id: "term-a", chapter: "ch-fixture" }],
+    ["a chapter set to undefined", { id: "term-a", chapter: undefined }],
+    ["an id that is no glossary id", { id: "fix-parts" }],
+    ["an error entry id", { id: "err-a" }],
+    ["the bare prefix", { id: "term-" }],
+    ["a trailing line feed", { id: "term-a\n" }],
+    ["an id that is not a string", { id: ["term-a"] }],
+    ["no id", {}],
+  ])("throws on an untyped Term with %s", (_name, fields) => {
+    const term: unknown = { type: "term", short: "s", content, ...fields };
+    expect(() => termHref(term as TermSpan)).toThrow(/Malformed Term target/u);
+  });
+});
+
 describe("internalHref", () => {
+  const content: LinkSpan["content"] = [{ type: "text", text: "x" }];
+
+  it("sends an error entry to the error page whatever page holds the link", () => {
+    const link: LinkSpan = {
+      type: "link",
+      kind: "error",
+      id: "err-a",
+      content,
+    };
+    expect(internalHref(link, slugs)).toBe("/errors#err-a");
+    const compiled = linksOf(syntax).find((span) => span.kind === "error");
+    expect(compiled && internalHref(compiled, slugs)).toBe(
+      "/errors#err-fixture-cs0165",
+    );
+  });
+
+  it.each([
+    [
+      "an error entry beside a chapter",
+      { kind: "error", id: "err-a", chapter: "ch-fixture" },
+      /Malformed error entry target/u,
+    ],
+    [
+      "an error entry with a chapter set to undefined",
+      { kind: "error", id: "err-a", chapter: undefined },
+      /Malformed error entry target/u,
+    ],
+    [
+      "an error entry whose id is no error id",
+      { kind: "error", id: "fix-parts" },
+      /Malformed error entry target/u,
+    ],
+    [
+      "an error entry whose id is the bare prefix",
+      { kind: "error", id: "err" },
+      /Malformed error entry target/u,
+    ],
+    [
+      "a kind the compiler never writes",
+      { kind: "term", id: "term-a" },
+      /Unknown link kind/u,
+    ],
+    ["no kind", { id: "fix-parts" }, /Unknown link kind/u],
+    [
+      "a kind that only looks like one",
+      { kind: ["error"], id: "err-a" },
+      /Unknown link kind/u,
+    ],
+  ])("throws on an untyped link with %s", (_name, fields, message) => {
+    const link: unknown = { type: "link", content, ...fields };
+    expect(() => internalHref(link as LinkSpan, slugs)).toThrow(message);
+  });
+
   it("renders a bare target as a fragment", () => {
     expect(internalHref(linkTo("fix-parts"), slugs)).toBe("#fix-parts");
   });
@@ -121,9 +230,15 @@ describe("internalHref", () => {
   });
 
   it("throws on untyped values a pattern would coerce", () => {
-    const arrayId: unknown = { type: "link", id: ["fix-parts"], content: [] };
+    const arrayId: unknown = {
+      type: "link",
+      kind: "anchor",
+      id: ["fix-parts"],
+      content: [],
+    };
     const nullChapter: unknown = {
       type: "link",
+      kind: "anchor",
       id: "fix-parts",
       chapter: null,
       content: [],

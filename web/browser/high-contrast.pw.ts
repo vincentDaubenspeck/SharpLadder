@@ -36,7 +36,7 @@ import {
   type Verdict,
 } from "./high-contrast.ts";
 import { indicators, judge, resize, setTheme } from "./indicators.ts";
-import { shot } from "./probe.ts";
+import { settle, shot } from "./probe.ts";
 
 /** The engine's resolved system colours, recorded as its own forced-colours palette. */
 const palette = (page: Page) =>
@@ -66,19 +66,25 @@ const palette = (page: Page) =>
 /** The rendered colour of a page-background swatch, read from the engine's own screenshot. */
 async function swatch(page: Page): Promise<[number, number, number]> {
   // Test-only swatch; under forced colours its background is the system Canvas colour.
-  const corner = await page.evaluate(() => {
+  await page.evaluate(() => {
     const box = document.createElement("div");
     box.setAttribute("data-hc-swatch", "");
     box.style.cssText =
       "position:fixed;right:0;bottom:0;width:16px;height:16px;background-color:var(--bg)";
     document.body.append(box);
-    // Client size, so a classic scrollbar is never the sampled pixel.
-    const root = document.documentElement;
-    return { x: root.clientWidth - 8, y: root.clientHeight - 8 };
   });
+  let measurementFailed = false;
+  let measurementError: unknown;
+  let colour: [number, number, number] = [-1, -1, -1];
   try {
+    await settle(page);
+    // Client size, so a classic scrollbar is never the sampled pixel.
+    const corner = await page.evaluate(() => {
+      const root = document.documentElement;
+      return { x: root.clientWidth - 8, y: root.clientHeight - 8 };
+    });
     const bytes = await shot(page, { ...corner, width: 1, height: 1 });
-    return await page.evaluate(async (data) => {
+    colour = await page.evaluate(async (data) => {
       const blob = await (await fetch(`data:image/png;base64,${data}`)).blob();
       const image = await createImageBitmap(blob);
       const canvas = document.createElement("canvas");
@@ -90,12 +96,26 @@ async function swatch(page: Page): Promise<[number, number, number]> {
       const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
       return [r ?? -1, g ?? -1, b ?? -1] as [number, number, number];
     }, base64(bytes));
-  } finally {
-    // Removed so the swatch never covers a specimen the next cell measures.
+  } catch (error: unknown) {
+    measurementFailed = true;
+    measurementError = error;
+  }
+  // Removed so the swatch never covers a specimen the next cell measures.
+  try {
     await page.evaluate(() => {
       document.querySelector("[data-hc-swatch]")?.remove();
     });
+    await settle(page);
+  } catch (cleanupError: unknown) {
+    if (!measurementFailed) throw cleanupError;
+    throw new AggregateError(
+      [measurementError, cleanupError],
+      "the swatch measurement and its cleanup both failed",
+      { cause: cleanupError },
+    );
   }
+  if (measurementFailed) throw measurementError;
+  return colour;
 }
 
 interface CellRow {

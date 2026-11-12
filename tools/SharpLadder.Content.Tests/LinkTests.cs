@@ -190,7 +190,9 @@ public sealed class LinkTests
 
         var all = files.Values.SelectMany(Links).ToList();
         Assert.All(all, l => Assert.Empty(LinkSpans(l["content"]!.AsArray())));
-        Assert.All(all, l => Assert.Empty(l.Select(p => p.Key).Except(["type", "id", "chapter", "content"], StringComparer.Ordinal)));
+        Assert.All(all, l => Assert.Empty(l.Select(p => p.Key).Except(["type", "kind", "id", "chapter", "content"], StringComparer.Ordinal)));
+        Assert.All(chapterLinks, l => Assert.Equal("anchor", (string?)l["kind"]));
+        Assert.Contains(partLinks, l => Is(l["id"], "err-fixture-cs0165") && Is(l["kind"], "error") && l["chapter"] is null);
     }
 
     [Fact]

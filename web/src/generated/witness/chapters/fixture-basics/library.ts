@@ -98,6 +98,7 @@ export const witness = {
                 },
                 {
                   type: "link",
+                  kind: "anchor",
                   id: "lib-fix-one",
                   content: [
                     {

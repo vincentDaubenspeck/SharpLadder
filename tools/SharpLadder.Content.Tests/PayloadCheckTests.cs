@@ -38,19 +38,22 @@ public sealed class PayloadCheckTests
 
         Assert.NotEqual(0xEF, bytes[0]);
         Assert.DoesNotContain('\r', text);
-        Assert.Equal(["{", "  \"version\": 2,", "  \"files\": ["], lines[..3]);
+        Assert.Equal(["{", "  \"version\": 3,", "  \"files\": ["], lines[..3]);
         Assert.Equal(["  ]", "}", string.Empty], lines[^3..]);
         var paths = lines[3..^3].Select(l => JsonDocument.Parse(l.TrimEnd(',')).RootElement.GetProperty("path").GetString()!).ToList();
         Assert.Equal(paths.Order(StringComparer.Ordinal), paths, StringComparer.Ordinal);
-        Assert.Equal(22, paths.Count);
+        Assert.Equal(39, paths.Count);
         Assert.DoesNotContain("compiled/manifest.json", paths, StringComparer.Ordinal);
         Assert.Matches("^    \\{ \"path\": \"compiled/aliases.json\", \"kind\": \"aliases\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[3]);
-        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/build.json\", \"kind\": \"part\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[4]);
-        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/chapter.json\", \"kind\": \"chapter\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[5]);
+        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/build.json\", \"kind\": \"part\", \"part\": \"build\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[4]);
+        Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/chapter.json\", \"kind\": \"chapter\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[6]);
         Assert.Contains(lines, l => l.StartsWith("    { \"path\": \"compiled/patterns.json\", \"kind\": \"patterns\", ", StringComparison.Ordinal));
 
         // Only a compiled record states a kind.
         Assert.All(lines[3..^3], l => Assert.Equal(l.Contains("\"compiled/", StringComparison.Ordinal), l.Contains("\"kind\"", StringComparison.Ordinal)));
+
+        // Only a part states a part kind.
+        Assert.All(lines[3..^3], l => Assert.Equal(l.Contains("\"kind\": \"part\"", StringComparison.Ordinal), l.Contains("\"part\": ", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -62,9 +65,21 @@ public sealed class PayloadCheckTests
     [InlineData("no-file", "compiled/zz.json: listed but no such file")]
     [InlineData("wrong-hash", "sha256 does not match the file")]
     [InlineData("upper-hash", "sha256 must be 64 lower-case hex digits")]
-    [InlineData("version", "must hold exactly \"version\": 2 and a \"files\" array")]
-    [InlineData("extra-key", "must hold exactly \"version\": 2 and a \"files\" array")]
-    [InlineData("entry-key", "each entry must hold exactly a string \"path\", a string \"sha256\" and, for a compiled record, a \"kind\"")]
+    [InlineData("version", "must hold exactly \"version\": 3 and a \"files\" array")]
+    [InlineData("extra-key", "must hold exactly \"version\": 3 and a \"files\" array")]
+    [InlineData("entry-key", "each entry must hold exactly a string \"path\", a string \"sha256\", for a compiled record a \"kind\" and, for a part, a \"part\"")]
+    [InlineData("part-first", ManifestDrift)]
+    [InlineData("part-on-aliases", "compiled/aliases.json: only a part record has a part kind")]
+    [InlineData("part-on-chapter", "compiled/chapters/fixture-basics/chapter.json: only a part record has a part kind")]
+    [InlineData("part-on-patterns", "compiled/patterns.json: only a part record has a part kind")]
+    [InlineData("part-on-glossary", "compiled/glossary/term-fixture-loop.json: only a part record has a part kind")]
+    [InlineData("part-on-error", "compiled/errors/err-fixture-cs0165.json: only a part record has a part kind")]
+    [InlineData("part-on-generated", "each entry must hold exactly a string \"path\", a string \"sha256\", for a compiled record a \"kind\" and, for a part, a \"part\"")]
+    [InlineData("no-part", "compiled/chapters/fixture-basics/build.json: part must be one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("unknown-part", "compiled/chapters/fixture-basics/build.json: part must be one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("part-in-capitals", "compiled/chapters/fixture-basics/build.json: part must be one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("part-not-text", "compiled/chapters/fixture-basics/build.json: part must be one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("relabelled-part", ManifestDrift)]
     [InlineData("no-kind", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
     [InlineData("unknown-kind", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
     [InlineData("kind-in-capitals", "compiled/aliases.json: kind must be one of chapter, part, aliases, patterns")]
@@ -161,16 +176,21 @@ public sealed class PayloadCheckTests
         Assert.Empty(result.Error);
         var records = ParseEnvelope(result.Stdout);
         Assert.Equal(
-            ["compiled/aliases.json", "compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter, "compiled/patterns.json"],
+            ["compiled/aliases.json", "compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/cards.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/drill.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/hints.catalogue.json", "compiled/chapters/fixture-basics/hints.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter, "compiled/errors/err-fixture-cs0165.json", "compiled/errors/err-fixture-null.json", "compiled/errors/err-fixture-off-by-one.json", "compiled/glossary/term-fixture-loop.json", "compiled/glossary/term-fixture-set.json", "compiled/patterns.json"],
             records.Select(r => r.Path),
             StringComparer.Ordinal);
         Assert.All(records, r => Assert.Equal(File.ReadAllText(Path.Combine(work.Web, r.Path)), r.Text));
 
         // Each record carries the kind the manifest states for it.
         Assert.Equal(
-            ["aliases", "part", "chapter", "part", "part", "part", "part", "chapter", "chapter", "chapter", "patterns"],
+            ["aliases", "part", "part", "chapter", "part", "part", "hints-catalogue", "part", "part", "part", "part", "chapter", "chapter", "chapter", "error", "error", "error", "glossary", "glossary", "patterns"],
             JsonNode.Parse(Strict.GetString(result.Stdout))!["records"]!.AsArray().Select(r => r!["kind"]!.GetValue<string>()),
             StringComparer.Ordinal);
+
+        // A part also carries its part kind, which is the one its own payload states.
+        var parts = JsonNode.Parse(Strict.GetString(result.Stdout))!["records"]!.AsArray().Where(r => r!["part"] is not null).ToList();
+        Assert.Equal(["build", "cards", "drill", "gotchas", "hints", "idioms", "library", "syntax"], parts.Select(r => r!["part"]!.GetValue<string>()), StringComparer.Ordinal);
+        Assert.All(parts, r => Assert.Equal(r!["part"]!.GetValue<string>(), JsonNode.Parse(r["text"]!.GetValue<string>())!["kind"]!.GetValue<string>()));
     }
 
     [Fact]
@@ -238,12 +258,28 @@ public sealed class PayloadCheckTests
         // A broken manifest states no kind at all.
         committed["compiled/manifest.json"] = kind is null
             ? [0xFF]
-            : Payload.BuildManifest([new OutputFile("compiled/a.json", bytes, Enum.Parse<RecordKind>(kind, ignoreCase: true))]);
+            : Payload.BuildManifest([new OutputFile("compiled/a.json", bytes, Enum.Parse<RecordKind>(kind, ignoreCase: true), string.Equals(kind, "part", StringComparison.Ordinal) ? "syntax" : null)]);
 
         var (envelope, problems) = TestRecords.Build(committed, Repository.Schema);
 
         Assert.Null(envelope);
         Assert.StartsWith("compiled/a.json: " + expected, Assert.Single(problems), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("build", true)]
+    [InlineData("syntax", false)]
+    [InlineData("gotchas", false)]
+    public void APartIsCertifiedOnlyUnderItsOwnPartKind(string stated, bool accepted)
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(Repository.Root, "web", "compiled", "chapters", "fixture-basics", "build.json"));
+        var committed = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["compiled/a.json"] = bytes };
+        committed["compiled/manifest.json"] = Payload.BuildManifest([new OutputFile("compiled/a.json", bytes, RecordKind.Part, stated)]);
+
+        var (envelope, problems) = TestRecords.Build(committed, Repository.Schema);
+
+        Assert.Equal(accepted, envelope is not null);
+        Assert.Equal(accepted ? [] : [$"compiled/a.json: the manifest states the part kind {stated}, and the record holds another"], problems);
     }
 
     [Fact]
@@ -308,13 +344,13 @@ public sealed class PayloadCheckTests
             case "duplicate": lines.Insert(3, first); break;
             case "back-slash": lines[3] = first.Replace("compiled/", "compiled\\\\", StringComparison.Ordinal); break;
             case "dot-segment": lines[3] = first.Replace("compiled/", "compiled/./", StringComparison.Ordinal); break;
-            case "no-file": lines.Insert(src, $"    {{ \"path\": \"compiled/zz.json\", \"kind\": \"part\", \"sha256\": \"{zeros}\" }},"); break;
+            case "no-file": lines.Insert(src, $"    {{ \"path\": \"compiled/zz.json\", \"kind\": \"part\", \"part\": \"syntax\", \"sha256\": \"{zeros}\" }},"); break;
             case "wrong-hash": lines[3] = first[..^68] + zeros + "\" },"; break;
             case "upper-hash": lines[3] = first[..^68] + first[^68..^4].ToUpperInvariant() + "\" },"; break;
             case "version": lines[1] = "  \"version\": 1,"; break;
             case "extra-key": lines.Insert(1, "  \"extra\": 1,"); break;
             case "entry-key": lines[3] = first.Replace(" },", ", \"size\": 1 },", StringComparison.Ordinal); break;
-            case "duplicate-name": lines.Insert(1, "  \"version\": 2,"); break;
+            case "duplicate-name": lines.Insert(1, "  \"version\": 3,"); break;
             case "bom": return [0xEF, 0xBB, 0xBF, .. Strict.GetBytes(text)];
             default: lines[^2] = "} "; break;
         }
@@ -335,12 +371,29 @@ public sealed class PayloadCheckTests
             case "kind-in-capitals": lines[3] = first.Replace(Stated, "\"kind\": \"Aliases\"", StringComparison.Ordinal); break;
             case "kind-not-text": lines[3] = first.Replace(Stated, "\"kind\": 2", StringComparison.Ordinal); break;
             case "kind-on-generated": lines[src] = lines[src].Replace(", \"sha256\"", ", \"kind\": \"part\", \"sha256\"", StringComparison.Ordinal); break;
-            case "relabelled": lines[5] = lines[5].Replace("\"kind\": \"chapter\"", Stated, StringComparison.Ordinal); break;
+            case "relabelled": lines[6] = lines[6].Replace("\"kind\": \"chapter\"", Stated, StringComparison.Ordinal); break;
+            case "part-first": lines[4] = lines[4].Replace("\"kind\": \"part\", \"part\": \"build\"", "\"part\": \"build\", \"kind\": \"part\"", StringComparison.Ordinal); break;
+            case "part-on-aliases": lines[3] = first.Replace(Stated, Stated + ", \"part\": \"syntax\"", StringComparison.Ordinal); break;
+            case "part-on-chapter" or "part-on-glossary" or "part-on-error": PartOn(lines, $"\"kind\": \"{change[8..]}\""); break;
+            case "part-on-patterns": lines[src - 1] = lines[src - 1].Replace("\"kind\": \"patterns\"", "\"kind\": \"patterns\", \"part\": \"syntax\"", StringComparison.Ordinal); break;
+            case "part-on-generated": lines[src] = lines[src].Replace(", \"sha256\"", ", \"part\": \"syntax\", \"sha256\"", StringComparison.Ordinal); break;
+            case "no-part": lines[4] = lines[4].Replace(" \"part\": \"build\",", string.Empty, StringComparison.Ordinal); break;
+            case "unknown-part": lines[4] = lines[4].Replace("\"part\": \"build\"", "\"part\": \"quiz\"", StringComparison.Ordinal); break;
+            case "part-in-capitals": lines[4] = lines[4].Replace("\"part\": \"build\"", "\"part\": \"Build\"", StringComparison.Ordinal); break;
+            case "part-not-text": lines[4] = lines[4].Replace("\"part\": \"build\"", "\"part\": 2", StringComparison.Ordinal); break;
+            case "relabelled-part": lines[4] = lines[4].Replace("\"part\": \"build\"", "\"part\": \"syntax\"", StringComparison.Ordinal); break;
             default: return false;
         }
 
         Assert.NotEqual(before, string.Join('\n', lines), StringComparer.Ordinal);
         return true;
+    }
+
+    // States a part kind on the first entry of the kind named.
+    private static void PartOn(List<string> lines, string stated)
+    {
+        var at = lines.FindIndex(l => l.Contains(stated, StringComparison.Ordinal));
+        lines[at] = lines[at].Replace(stated, stated + ", \"part\": \"syntax\"", StringComparison.Ordinal);
     }
 
     private static List<(string Path, string Text)> ParseEnvelope(byte[] stdout)
@@ -349,12 +402,13 @@ public sealed class PayloadCheckTests
         using var envelope = JsonDocument.Parse(Strict.GetString(stdout));
         var root = envelope.RootElement;
         Assert.Equal(["version", "records"], Names(root), StringComparer.Ordinal);
-        Assert.Equal(2, root.GetProperty("version").GetInt32());
+        Assert.Equal(3, root.GetProperty("version").GetInt32());
         var records = new List<(string Path, string Text)>();
         using var items = root.GetProperty("records").EnumerateArray();
         foreach (var item in items)
         {
-            Assert.Equal(["path", "kind", "text"], Names(item), StringComparer.Ordinal);
+            var isPart = string.Equals(item.GetProperty("kind").GetString(), "part", StringComparison.Ordinal);
+            Assert.Equal(isPart ? ["path", "kind", "part", "text"] : ["path", "kind", "text"], Names(item), StringComparer.Ordinal);
             records.Add((item.GetProperty("path").GetString()!, item.GetProperty("text").GetString()!));
         }
 

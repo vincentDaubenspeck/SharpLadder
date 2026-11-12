@@ -21,6 +21,9 @@ internal static class Payload
         (RecordKind.Part, "part"),
         (RecordKind.Aliases, "aliases"),
         (RecordKind.Patterns, "patterns"),
+        (RecordKind.Glossary, "glossary"),
+        (RecordKind.Error, "error"),
+        (RecordKind.HintsCatalogue, "hints-catalogue"),
     ];
 
     private static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -47,7 +50,10 @@ internal static class Payload
         }
 
         var witnesses = new List<OutputFile>();
-        foreach (var file in result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part))
+
+        // A hints part holds what its view never shows, so only its catalogue reaches typed source.
+        foreach (var file in result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part or RecordKind.Glossary or RecordKind.Error or RecordKind.HintsCatalogue
+            && !string.Equals(f.Part, PartKinds.Hints, StringComparison.Ordinal)))
         {
             // The witness is emitted only from bytes the schema accepts, the same bytes compiled/ receives.
             var invalid = schema.Validate(Strict.GetString(file.Bytes), file.Kind!.Value);
@@ -61,7 +67,7 @@ internal static class Payload
         }
 
         var files = result.Files
-            .Select(f => new OutputFile($"{CompiledFolder}/{f.RelativePath}", f.Bytes, f.Kind))
+            .Select(f => new OutputFile($"{CompiledFolder}/{f.RelativePath}", f.Bytes, f.Kind, f.Part))
             .Concat(modules.Select(m => new OutputFile($"{GeneratedFolder}/{m.Key}", Strict.GetBytes(m.Value))))
             .Concat(witnesses)
             .ToList();
@@ -74,19 +80,19 @@ internal static class Payload
         var entries = files
             .Where(f => !string.Equals(f.RelativePath, ManifestPath, StringComparison.Ordinal))
             .OrderBy(f => f.RelativePath, StringComparer.Ordinal)
-            .Select(f => $"    {{ \"path\": {JsonSerializer.Serialize(f.RelativePath)},{(f.Kind is { } kind ? $" \"kind\": \"{KindName(kind)}\"," : string.Empty)} \"sha256\": \"{Convert.ToHexStringLower(SHA256.HashData(f.Bytes))}\" }}")
+            .Select(f => $"    {{ \"path\": {JsonSerializer.Serialize(f.RelativePath)},{(f.Kind is { } kind ? $" \"kind\": \"{KindName(kind)}\"," : string.Empty)}{(f.Part is { } part ? $" \"part\": \"{part}\"," : string.Empty)} \"sha256\": \"{Convert.ToHexStringLower(SHA256.HashData(f.Bytes))}\" }}")
             .ToList();
         var list = entries.Count == 0 ? "[]" : "[\n" + string.Join(",\n", entries) + "\n  ]";
-        return Strict.GetBytes($"{{\n  \"version\": 2,\n  \"files\": {list}\n}}\n");
+        return Strict.GetBytes($"{{\n  \"version\": 3,\n  \"files\": {list}\n}}\n");
     }
 
     public static string KindName(RecordKind kind) => KindNames.First(k => k.Kind == kind).Name;
 
-    // The kind the committed manifest states for each compiled record. A manifest that fails
-    // CheckManifest states none, so every record then goes without a kind and is refused.
-    public static Dictionary<string, RecordKind> Kinds(IReadOnlyDictionary<string, byte[]> committed)
+    // The kind, and for a part the part kind, the committed manifest states for each compiled
+    // record. A manifest that fails CheckManifest states none, so every record is then refused.
+    public static Dictionary<string, (RecordKind Kind, string? Part)> Kinds(IReadOnlyDictionary<string, byte[]> committed)
     {
-        var kinds = new Dictionary<string, RecordKind>(StringComparer.Ordinal);
+        var kinds = new Dictionary<string, (RecordKind Kind, string? Part)>(StringComparer.Ordinal);
         if (CheckManifest(committed).Count > 0 || StrictJson.Parse(Strict.GetString(committed[ManifestPath])) is not JsonObject manifest)
         {
             return kinds;
@@ -96,7 +102,7 @@ internal static class Payload
         {
             if (entry["kind"] is JsonValue value && KindOf(value.GetValue<string>()) is { } kind)
             {
-                kinds.Add(entry["path"]!.GetValue<string>(), kind);
+                kinds.Add(entry["path"]!.GetValue<string>(), (kind, entry["part"]?.GetValue<string>()));
             }
         }
 
@@ -169,10 +175,10 @@ internal static class Payload
 
         if (root is not JsonObject manifest || !Keys(manifest, "version", "files")
             || manifest["version"] is not JsonValue version || version.GetValueKind() != JsonValueKind.Number
-            || !string.Equals(version.ToJsonString(), "2", StringComparison.Ordinal)
+            || !string.Equals(version.ToJsonString(), "3", StringComparison.Ordinal)
             || manifest["files"] is not JsonArray entries)
         {
-            return [$"{ManifestPath}: must hold exactly \"version\": 2 and a \"files\" array"];
+            return [$"{ManifestPath}: must hold exactly \"version\": 3 and a \"files\" array"];
         }
 
         var problems = new List<string>();
@@ -203,11 +209,11 @@ internal static class Payload
     // Path is null when the entry names no well-formed path; Problem is null when the entry holds.
     private static (string? Path, string? Problem) Entry(JsonNode? item, IReadOnlyDictionary<string, byte[]> committed, string? previous)
     {
-        if (item is not JsonObject entry || !(Keys(entry, "path", "sha256") || Keys(entry, "path", "kind", "sha256"))
+        if (item is not JsonObject entry || !(Keys(entry, "path", "sha256") || Keys(entry, "path", "kind", "sha256") || Keys(entry, "path", "kind", "part", "sha256"))
             || entry["path"] is not JsonValue pathValue || !pathValue.TryGetValue<string>(out var path)
             || entry["sha256"] is not JsonValue hashValue || !hashValue.TryGetValue<string>(out var hash))
         {
-            return (null, "each entry must hold exactly a string \"path\", a string \"sha256\" and, for a compiled record, a \"kind\"");
+            return (null, "each entry must hold exactly a string \"path\", a string \"sha256\", for a compiled record a \"kind\" and, for a part, a \"part\"");
         }
 
         if (PathProblem(path) is { } problem)
@@ -223,6 +229,16 @@ internal static class Payload
             return (path, compiled
                 ? $"{path}: kind must be one of {string.Join(", ", KindNames.Select(k => k.Name))}"
                 : $"{path}: only a compiled record has a kind");
+        }
+
+        // A part states its part kind, and no other record may.
+        var isPart = compiled && string.Equals(entry["kind"]!.GetValue<string>(), KindName(RecordKind.Part), StringComparison.Ordinal);
+        var partNamed = entry["part"] is JsonValue partValue && partValue.TryGetValue<string>(out var partName) && PartKinds.IsAdmitted(partName);
+        if (isPart != entry.ContainsKey("part") || (isPart && !partNamed))
+        {
+            return (path, isPart
+                ? $"{path}: part must be one of {PartKinds.Listed()}"
+                : $"{path}: only a part record has a part kind");
         }
 
         if (previous is not null && string.CompareOrdinal(previous, path) >= 0)

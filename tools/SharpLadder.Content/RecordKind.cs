@@ -14,4 +14,13 @@ internal enum RecordKind
 
     /// <summary>The pattern list, whose ids share the site-wide id table; one per content root.</summary>
     Patterns,
+
+    /// <summary>One glossary term: its short text and a body with no headings or speech.</summary>
+    Glossary,
+
+    /// <summary>One error entry: what was written, what came back, a cause and a hint.</summary>
+    Error,
+
+    /// <summary>The public cues of one hints part, each with its speech; never a rung or a technique.</summary>
+    HintsCatalogue,
 }

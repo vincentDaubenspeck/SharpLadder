@@ -11,6 +11,9 @@ internal static partial class ContentIds
     // Chapter IDs carry this prefix, so a link target names its chapter unambiguously.
     public const string ChapterPrefix = "ch-";
 
+    // Card IDs carry this prefix and nothing else may, so the prefix alone tells what an id names.
+    public const string CardPrefix = "card-";
+
     public const int MaxSpokenLength = 200;
 
     public const string FormatRule = "is not lowercase letters, digits and hyphens starting with a letter, at most 48 characters";

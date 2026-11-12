@@ -1,0 +1,272 @@
+{
+  "type": "part",
+  "kind": "drill",
+  "chapter": "ch-fixture",
+  "order": 8,
+  "sections": [
+    {
+      "id": "ramp-fix-start",
+      "number": "8.1",
+      "title": [
+        {
+          "type": "text",
+          "text": "Start with the language"
+        }
+      ],
+      "rung": "foundations",
+      "body": [
+        {
+          "type": "paragraph",
+          "blockId": "ramp-fix-start/b1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Each drill here practises one feature of the language, such as a "
+            },
+            {
+              "type": "term",
+              "id": "term-fixture-loop",
+              "short": "Code that runs the same statements again while a condition holds.",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "loop"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ", and no algorithm."
+            }
+          ]
+        }
+      ],
+      "drills": {
+        "blockId": "ramp-fix-start/b2",
+        "items": [
+          {
+            "blockId": "ramp-fix-start/b2.i1",
+            "id": "drill-fix-stop-word",
+            "label": "Read words until a stop word"
+          }
+        ]
+      },
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-start/b1"
+            },
+            "text": "Each drill here practises one feature of the language, such as a loop, and no algorithm."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-start/b2.i1"
+            },
+            "text": "Read words until a stop word"
+          }
+        ],
+        "audio": "sha256:2931d8e4b98ce411df06c6039a21bb2df665a031423cdc5e3c763f9cb14a8c2a"
+      }
+    },
+    {
+      "id": "ramp-fix-warm",
+      "number": "8.2",
+      "title": [
+        {
+          "type": "text",
+          "text": "One idea at a time"
+        }
+      ],
+      "rung": "warm-up",
+      "body": [
+        {
+          "type": "paragraph",
+          "blockId": "ramp-fix-warm/b1",
+          "content": [
+            {
+              "type": "text",
+              "text": "These drills each use one idea from the chapter."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "blockId": "ramp-fix-warm/b2",
+          "content": [
+            {
+              "type": "text",
+              "text": "A second paragraph keeps its own place, with "
+            },
+            {
+              "type": "code",
+              "text": "code"
+            },
+            {
+              "type": "text",
+              "text": " in it and a "
+            },
+            {
+              "type": "term",
+              "id": "term-fixture-set",
+              "short": "A collection of unique values with fast \u0022is it here?\u0022 checks.",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "set"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " of words."
+            }
+          ]
+        }
+      ],
+      "drills": {
+        "blockId": "ramp-fix-warm/b3",
+        "items": [
+          {
+            "blockId": "ramp-fix-warm/b3.i1",
+            "id": "drill-fix-count-letters",
+            "label": "Count the letters of a word"
+          },
+          {
+            "blockId": "ramp-fix-warm/b3.i2",
+            "id": "drill-fix-largest",
+            "label": "Keep the largest of three"
+          }
+        ]
+      },
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-warm/b1"
+            },
+            "text": "These drills each use one idea from the chapter."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-warm/b2"
+            },
+            "text": "A second paragraph keeps its own place, with code in it and a set of words."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-warm/b3.i1"
+            },
+            "text": "Count the letters of a word"
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-warm/b3.i2"
+            },
+            "text": "Keep the largest of three"
+          }
+        ],
+        "audio": "sha256:9694c3ff6cb36b91eca8293bfe5dcc99ab56f0c5d2f377e36642b17a72423119"
+      }
+    },
+    {
+      "id": "ramp-fix-easy",
+      "number": "8.3",
+      "title": [
+        {
+          "type": "text",
+          "text": "Two ideas together"
+        }
+      ],
+      "rung": "easy",
+      "body": [
+        {
+          "type": "paragraph",
+          "blockId": "ramp-fix-easy/b1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Each drill here joins two ideas."
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "blockId": "ramp-fix-easy/b2",
+          "headers": [
+            [
+              {
+                "type": "text",
+                "text": "Idea"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Joined with"
+              }
+            ]
+          ],
+          "rows": [
+            [
+              [
+                {
+                  "type": "text",
+                  "text": "count"
+                }
+              ],
+              [
+                {
+                  "type": "text",
+                  "text": "compare"
+                }
+              ]
+            ]
+          ]
+        }
+      ],
+      "drills": {
+        "blockId": "ramp-fix-easy/b3",
+        "items": [
+          {
+            "blockId": "ramp-fix-easy/b3.i1",
+            "id": "drill-fix-pair-scores",
+            "label": "Pair each name with its score"
+          }
+        ]
+      },
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-easy/b1"
+            },
+            "text": "Each drill here joins two ideas."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-easy/b2"
+            },
+            "text": "Columns: Idea, Joined with. Row 1. Idea: count; Joined with: compare."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "ramp-fix-easy/b3.i1"
+            },
+            "text": "Pair each name with its score"
+          }
+        ],
+        "audio": "sha256:ada37a3fa9dd8150decda2e8db0c75dfdf970939de5afd0bcfcf352b31032615"
+      }
+    }
+  ]
+}

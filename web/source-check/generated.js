@@ -3,7 +3,7 @@ import ts from "typescript";
 import { shown } from "./paths.js";
 
 const typesHeader =
-  "// SharpLadder.Content type emitter output, grammar 1. Do not edit.";
+  "// SharpLadder.Content type emitter output, grammar 2. Do not edit.";
 const witnessHeader =
   "// SharpLadder.Content witness emitter output, grammar 1. Do not edit.";
 const typeModules = new Set(["body.ts", "content.ts"]);
@@ -227,6 +227,32 @@ function sameType(a, b) {
   return xs.length === ys.length && xs.every((c, i) => sameType(c, ys[i]));
 }
 
+const maxBound = 16;
+const isBounded = (node) =>
+  ts.isTupleTypeNode(node) && !node.elements.some((e) => ts.isRestTypeNode(e));
+
+// A bounded array is one tuple of a single alias per length, from zero or one item upwards.
+function boundedProblem(file, tuples) {
+  const start = tuples[0].elements.length;
+  if (
+    start > 1 ||
+    tuples.some((t, i) => t.elements.length !== start + i) ||
+    tuples.at(-1).elements.length > maxBound
+  )
+    return "bounded tuples are not one per length from zero or one item";
+  const item = tuples.at(-1).elements[0];
+  const plain = tuples.every((t) =>
+    t.elements.every(
+      (e) =>
+        ts.isTypeReferenceNode(e) &&
+        e.typeArguments === undefined &&
+        plainName(file, e.typeName, aliasName) &&
+        sameType(e, item),
+    ),
+  );
+  return plain ? undefined : "bounded tuple items are not one plain alias";
+}
+
 // The place says where the emitter can put a node: never only as an optional property's type,
 // and parentheses only around a union that is an array or tuple element.
 function typeNodeProblems(file, node, at, problems, place = "alias") {
@@ -267,6 +293,8 @@ function typeNodeProblems(file, node, at, problems, place = "alias") {
         l.operand.getText(file) !== "0"
       ) {
         // A negative safe integer literal type.
+      } else if (l.kind === K.TrueKeyword || l.kind === K.FalseKeyword) {
+        // A boolean literal type.
       } else problems.push(`${at}: literal type is not admitted`);
       return;
     }
@@ -297,6 +325,13 @@ function typeNodeProblems(file, node, at, problems, place = "alias") {
     case K.UnionType:
       if (node.types.length < 2)
         problems.push(`${at}: union has fewer than two members`);
+      if (node.types.some(isBounded)) {
+        const p = node.types.every(isBounded)
+          ? boundedProblem(file, node.types)
+          : "bounded tuples share a union with another type";
+        if (p) problems.push(`${at}: ${p}`);
+        return;
+      }
       node.types.forEach((t, i) => {
         if (ts.isUnionTypeNode(t) || ts.isParenthesizedTypeNode(t))
           problems.push(
@@ -311,16 +346,28 @@ function typeNodeProblems(file, node, at, problems, place = "alias") {
       recurse(node.elementType, "element");
       return;
     case K.TupleType: {
-      const [head, last] = node.elements;
+      if (node.elements.length === 1 && isBounded(node)) {
+        const p = boundedProblem(file, [node]);
+        if (p) problems.push(`${at}: ${p}`);
+        return;
+      }
+      // Two or more items repeat the first type once before the rest.
+      const pair = node.elements.length === 3;
+      const [head] = node.elements;
+      const last = node.elements.at(-1);
+      if (pair && !sameType(head, node.elements[1])) {
+        problems.push(`${at}: tuple is not [T, ...T[]] or [T, T, ...T[]]`);
+        return;
+      }
       if (
-        node.elements.length !== 2 ||
+        (node.elements.length !== 2 && !pair) ||
         ts.isNamedTupleMember(head) ||
         ts.isRestTypeNode(head) ||
         ts.isOptionalTypeNode(head) ||
         !ts.isRestTypeNode(last) ||
         !ts.isArrayTypeNode(last.type)
       )
-        problems.push(`${at}: tuple is not [T, ...T[]]`);
+        problems.push(`${at}: tuple is not [T, ...T[]] or [T, T, ...T[]]`);
       else if (!sameType(head, last.type.elementType))
         problems.push(`${at}: tuple rest does not repeat the first item type`);
       else {

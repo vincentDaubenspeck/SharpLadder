@@ -6,8 +6,8 @@ order: 1
 
 ## Sum with `foreach` {#syn-fix-sum}
 
-To add up the readings, visit each one in turn and keep a
-**running total**.
+To add up the readings, visit each one in turn with a [*loop*](#term-fixture-loop)
+and keep a **running total**.
 
 ```csharp {#syn-fix-sum1 group=fix-sum label="Over an array" spoken="Sums it"}
 int[] temps = { 18, 25, 31 };
@@ -25,6 +25,22 @@ Console.WriteLine(sum);
 ```
 
 1. Start the total at zero.
-2. Add each reading in turn.
+2. Add each reading on each turn of the [loop](#term-fixture-loop).
 
 Back to [the first sum](ch-fixture#syn-fix-sum1) or [this section](#syn-fix-sum).
+
+## Sizes in a table {#syn-fix-sizes}
+
+Each type takes a fixed number of bytes.
+
+| Type   | Size    |
+| ------ | ------- |
+| `int`  | 4 bytes |
+| `long` |         |
+
+|          | Meaning                      |
+| -------- | ---------------------------- |
+| a \| b   | *either* one                 |
+| repeat   | a [loop](#term-fixture-loop) |
+
+Reading a variable before it has a value gives [an unassigned variable error](#err-fixture-cs0165).

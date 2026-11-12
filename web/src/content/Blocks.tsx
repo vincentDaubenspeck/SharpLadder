@@ -4,6 +4,7 @@ import type {
   Block,
   CodeBlock,
   ListBlock,
+  TableBlock,
   TextBlock,
 } from "../generated/body.ts";
 import { assertNever } from "./assertNever.ts";
@@ -45,6 +46,8 @@ function BlockNode({
     case "code":
     case "text":
       return <SourceBlock block={block} />;
+    case "table":
+      return <TableNode block={block} slugs={slugs} />;
     default:
       return assertNever(block);
   }
@@ -68,6 +71,40 @@ function ListNode({
     </ol>
   ) : (
     <ul data-block-id={block.blockId}>{items}</ul>
+  );
+}
+
+// A table is static, so a position is a stable key. An empty cell stays an empty cell.
+function TableNode({
+  block,
+  slugs,
+}: {
+  block: TableBlock;
+  slugs: SlugMap;
+}): ReactElement {
+  return (
+    <table data-block-id={block.blockId}>
+      <thead>
+        <tr>
+          {block.headers.map((cell, column) => (
+            <th key={column} scope="col">
+              <Spans spans={cell} slugs={slugs} />
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {block.rows.map((row, index) => (
+          <tr key={index}>
+            {row.map((cell, column) => (
+              <td key={column}>
+                <Spans spans={cell} slugs={slugs} />
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

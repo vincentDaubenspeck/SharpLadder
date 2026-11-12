@@ -133,7 +133,7 @@
       "json": "json/row07.json",
       "typescript": {
         "code": 2322,
-        "text": "Type '\"table\"' is not assignable"
+        "text": "Type '\"figure\"' is not assignable"
       },
       "validator": "refused",
       "repair": {
@@ -200,8 +200,8 @@
       "module": "rejected.ts",
       "json": "json/row11.json",
       "typescript": {
-        "code": 1360,
-        "text": "Types of property 'sections' are incompatible"
+        "code": 2322,
+        "text": "Type '[]' is not assignable to type '[PartSection, ...PartSection[]]'"
       },
       "validator": "refused",
       "repair": {

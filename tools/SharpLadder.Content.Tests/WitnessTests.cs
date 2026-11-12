@@ -64,7 +64,7 @@ public sealed partial class WitnessTests
         Assert.NotEmpty(result.Files);
 
         // A registry record has no witness: no browser code reads one yet.
-        var content = result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part).ToList();
+        var content = result.Files.Where(f => f.Kind is not (RecordKind.Aliases or RecordKind.Patterns)).ToList();
         Assert.Equal(result.Files.Count - 2, content.Count);
         foreach (var file in content)
         {

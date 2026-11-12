@@ -15,8 +15,12 @@ import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   acceptRun,
+  caseKey,
+  caseKeys,
   caseLists,
   evidenceProblems,
+  hintsFile,
+  judges,
   recordSetProblems,
   registryFile,
   roundTripCases,
@@ -25,8 +29,8 @@ import {
   runnerEnv,
   speechFile,
 } from "./acceptance.ts";
-import type { CaseList, ExpectedRecord } from "./acceptance.ts";
-import { acceptEnvelope, recordKinds } from "./envelope.ts";
+import type { CaseKey, CaseList, ExpectedRecord } from "./acceptance.ts";
+import { acceptEnvelope } from "./envelope.ts";
 import type { RecordKind } from "./envelope.ts";
 import { recordInventory } from "./inventory.ts";
 import { runTestRecords } from "./records.ts";
@@ -38,8 +42,10 @@ const all: readonly ExpectedRecord[] = acceptEnvelope(
   certified.stdout,
   certified.exit,
   recordInventory(join(web, "compiled")),
-).map(({ path, kind }) => ({ path, kind }));
-const expected = all.filter((r) => r.kind === "chapter" || r.kind === "part");
+).map(({ path, kind, part }) => ({ path, kind, part }));
+const expected = all.filter(
+  (r) => r.kind !== "aliases" && r.kind !== "patterns",
+);
 const scratch = join(web, ".cache");
 mkdirSync(scratch, { recursive: true });
 const temp = mkdtempSync(join(scratch, "acceptance-test-"));
@@ -61,7 +67,7 @@ const listOf = (file: string): CaseList => {
   if (list === undefined) throw new Error(`no case list for ${file}`);
   return list;
 };
-const listFor = (kind: RecordKind): CaseList => {
+const listFor = (kind: CaseKey): CaseList => {
   const lists = caseLists.filter((l) => l.kinds.includes(kind));
   const [list] = lists;
   if (list === undefined || lists.length !== 1)
@@ -70,6 +76,7 @@ const listFor = (kind: RecordKind): CaseList => {
 };
 const roundTrip = listOf(roundTripFile);
 const speech = listOf(speechFile);
+const hintLists = caseLists.filter((l) => l.file === hintsFile);
 const aliases = listFor("aliases");
 const patterns = listFor("patterns");
 
@@ -79,7 +86,7 @@ const cases = (
   list: CaseList = roundTrip,
 ): Case[] =>
   records
-    .filter((r) => list.kinds.includes(r.kind))
+    .filter((r) => judges(list, r))
     .flatMap(({ path }) =>
       list.cases.map((title) => ({
         ancestorTitles: [list.suite + path],
@@ -93,24 +100,36 @@ const registryCases = (records: readonly ExpectedRecord[] = all): Case[] => [
   ...cases(records, patterns),
 ];
 
-// The speech and registry files' results are complete unless a test replaces them.
+const hintCases = (records: readonly ExpectedRecord[] = expected): Case[] =>
+  hintLists.flatMap((list) => cases(records, list));
+
+// The speech, hints and registry files' results are complete unless a test replaces them.
 const report = (
   assertionResults: unknown,
   name = join(web, roundTripFile),
   spoken: unknown = cases(expected, speech),
   registry: unknown = registryCases(),
+  hinted: unknown = hintCases(),
 ) => ({
   success: true,
   testResults: [
     { name: join(web, "src", "App.test.tsx"), assertionResults: [] },
     { name, assertionResults },
     { name: join(web, speechFile), assertionResults: spoken },
+    { name: join(web, hintsFile), assertionResults: hinted },
     { name: join(web, registryFile), assertionResults: registry },
   ],
 });
 
 const judged = (value: unknown, records: readonly ExpectedRecord[] = all) =>
   evidenceProblems(value, web, records);
+
+// Every rendered record makes the round trip, only those with audio slots have a speech case,
+// and hints records have their own cases.
+const renderedBacked =
+  expected.filter((r) => judges(roundTrip, r)).length * roundTripCases.length +
+  expected.filter((r) => judges(speech, r)).length * speech.cases.length;
+const recordBacked = renderedBacked + hintCases().length;
 
 const first = expected[0]?.path ?? "";
 const firstCase = roundTripCases[0] ?? "";
@@ -147,8 +166,9 @@ describe("the round-trip evidence in a Vitest report", () => {
     const other = rootIn("i̇");
     const named = (root: string) => report(cases(), join(root, roundTripFile));
     const only = [roundTrip];
-    expect(evidenceProblems(named(one), one, expected, only)).toEqual([]);
-    expect(evidenceProblems(named(other), one, expected, only)).toEqual([
+    const rendered = expected.filter((r) => judges(roundTrip, r));
+    expect(evidenceProblems(named(one), one, rendered, only)).toEqual([]);
+    expect(evidenceProblems(named(other), one, rendered, only)).toEqual([
       `${roundTripFile} has 0 results in the Vitest report`,
     ]);
   });
@@ -257,9 +277,7 @@ describe("the round-trip evidence in a Vitest report", () => {
       join(web, roundTripFile),
       cases(),
     );
-    expect(judged(swapped)).toHaveLength(
-      expected.length * (roundTripCases.length + speech.cases.length),
-    );
+    expect(judged(swapped)).toHaveLength(renderedBacked);
   });
 
   it("refuses an empty list of case lists and a list without cases", () => {
@@ -270,12 +288,19 @@ describe("the round-trip evidence in a Vitest report", () => {
       { ...roundTrip, cases: [] },
     ]);
     expect(empty).toEqual(
-      expected.map((r) => `${r.path}: no case list judges the kind ${r.kind}`),
+      expected.map(
+        (r) =>
+          `${r.path}: no case list judges the kind ${r.kind}${r.part === null ? "" : ` with the part kind ${r.part}`}`,
+      ),
     );
   });
 
   it("refuses a record whose kind no list judges", () => {
-    const stray = { path: "compiled/zz.json", kind: "registry" as RecordKind };
+    const stray = {
+      path: "compiled/zz.json",
+      kind: "registry" as RecordKind,
+      part: null,
+    };
     expect(judged(report(cases()), [...all, stray])).toEqual([
       "compiled/zz.json: no case list judges the kind registry",
     ]);
@@ -283,8 +308,11 @@ describe("the round-trip evidence in a Vitest report", () => {
       evidenceProblems(report(cases()), web, all, [roundTrip, speech]),
     ).toEqual(
       all
-        .filter((r) => r.kind === "aliases" || r.kind === "patterns")
-        .map((r) => `${r.path}: no case list judges the kind ${r.kind}`),
+        .filter((r) => !judges(roundTrip, r) && !judges(speech, r))
+        .map(
+          (r) =>
+            `${r.path}: no case list judges the kind ${r.kind}${r.part === null ? "" : ` with the part kind ${r.part}`}`,
+        ),
     );
   });
 
@@ -292,7 +320,7 @@ describe("the round-trip evidence in a Vitest report", () => {
     // A chapter record stated as an alias registry owes the alias cases, and its round-trip
     // results no longer count for anything.
     const relabelled = all.map((r) =>
-      r.path === first ? { ...r, kind: "aliases" as const } : r,
+      r.path === first ? { ...r, kind: "aliases" as const, part: null } : r,
     );
     const problems = judged(report(cases()), relabelled);
     for (const title of aliases.cases)
@@ -351,7 +379,7 @@ describe("the round-trip evidence in a Vitest report", () => {
     const without = (kind: RecordKind) => all.filter((r) => r.kind !== kind);
     const twice = (kind: RecordKind) => [
       ...all,
-      { path: "compiled/zz.json", kind },
+      { path: "compiled/zz.json", kind, part: null },
     ];
     expect(recordSetProblems(all)).toEqual([]);
     expect(recordSetProblems(without("aliases"))).toEqual([
@@ -362,6 +390,57 @@ describe("the round-trip evidence in a Vitest report", () => {
     ]);
     expect(recordSetProblems(expected)).toHaveLength(2);
     expect(recordSetProblems([])).toHaveLength(2);
+  });
+
+  it("refuses a part without a part kind and any other record with one", () => {
+    const part = all.find((r) => r.kind === "part")?.path ?? "";
+    const bare = all.map((r) => (r.path === part ? { ...r, part: null } : r));
+    expect(judged(report(cases()), bare)).toEqual([
+      `${part}: no case list judges the kind part`,
+    ]);
+    for (const kind of ["chapter", "aliases", "patterns"] as const) {
+      const path = all.find((r) => r.kind === kind)?.path ?? "";
+      const tagged = all.map((r) =>
+        r.path === path ? { ...r, part: "syntax" as const } : r,
+      );
+      expect(judged(report(cases()), tagged)).toEqual([
+        `${path}: no case list judges the kind ${kind} with the part kind syntax`,
+      ]);
+    }
+  });
+
+  it("refuses a list keyed on the record kind alone for parts", () => {
+    const loose = { ...roundTrip, kinds: ["chapter", "part"] as never };
+    expect(
+      evidenceProblems(report(cases()), web, expected, [loose, speech]),
+    ).toEqual([
+      `${roundTripFile}: a list is keyed on part, which is no record identity`,
+    ]);
+  });
+
+  it("holds each part kind to the lists keyed on it", () => {
+    const rendered = expected.filter((r) => judges(roundTrip, r));
+    const build = all.find((r) => r.part === "build")?.path ?? "";
+    const own: CaseList = {
+      file: roundTripFile,
+      suite: "the build cases of ",
+      kinds: ["part:build"],
+      cases: ["a case only a build part owes"],
+    };
+    const problems = evidenceProblems(report(cases()), web, rendered, [
+      roundTrip,
+      own,
+    ]);
+    expect(problems).toEqual([
+      `${build}: "a case only a build part owes" must pass exactly once, found []`,
+    ]);
+    // Stated as a syntax part, the same record owes none of the build cases.
+    const relabelled = rendered.map((r) =>
+      r.path === build ? { ...r, part: "syntax" as const } : r,
+    );
+    expect(
+      evidenceProblems(report(cases()), web, relabelled, [roundTrip, own]),
+    ).toEqual([]);
   });
 
   it("refuses an empty expected set whatever the report holds", () => {
@@ -382,11 +461,44 @@ describe("the record-backed case lists", () => {
     expect([...new Set(caseLists.map((l) => l.file))]).toEqual([
       roundTripFile,
       speechFile,
+      hintsFile,
       registryFile,
     ]);
   });
 
-  it.each(recordKinds)(
+  it("carry a key for every record kind and every part kind, never part alone", () => {
+    expect(caseKeys).toEqual([
+      "chapter",
+      "aliases",
+      "patterns",
+      "glossary",
+      "error",
+      "hints-catalogue",
+      "part:syntax",
+      "part:build",
+      "part:idioms",
+      "part:gotchas",
+      "part:library",
+      "part:cards",
+      "part:drill",
+      "part:hints",
+    ]);
+    expect(caseKeys).not.toContain("part");
+  });
+
+  it("key a record only when its kind and part kind belong together", () => {
+    expect(caseKey({ kind: "chapter", part: null })).toBe("chapter");
+    expect(caseKey({ kind: "part", part: "build" })).toBe("part:build");
+    expect(caseKey({ kind: "part", part: null })).toBeNull();
+    expect(caseKey({ kind: "part", part: "hints" })).toBe("part:hints");
+    expect(caseKey({ kind: "part", part: "quiz" as never })).toBeNull();
+    expect(caseKey({ kind: "hints-catalogue", part: "hints" })).toBeNull();
+    for (const kind of ["chapter", "aliases", "patterns"] as const)
+      expect(caseKey({ kind, part: "syntax" })).toBeNull();
+    expect(caseKey({ kind: "registry" as never, part: null })).toBeNull();
+  });
+
+  it.each(caseKeys)(
     "judge the kind %s with a list of its own cases",
     (kind) => {
       const lists = caseLists.filter((l) => l.kinds.includes(kind));
@@ -653,6 +765,7 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
     const { exit, lines } = run([
       roundTripFile,
       speechFile,
+      hintsFile,
       registryFile,
       "-t",
       "strict binding",
@@ -660,9 +773,7 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
     expect(exit).toBe(1);
     expect(lines).toContain(`acceptance evidence: ${gap("skipped")}`);
     expect(lines).toHaveLength(
-      expected.length * (roundTripCases.length + speech.cases.length) +
-        aliases.cases.length +
-        patterns.cases.length,
+      recordBacked + aliases.cases.length + patterns.cases.length,
     );
   });
 
@@ -672,13 +783,15 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
     expect(lines).toEqual([
       `acceptance evidence: ${roundTripFile} has 0 results in the Vitest report`,
       `acceptance evidence: ${speechFile} has 0 results in the Vitest report`,
+      `acceptance evidence: ${hintsFile} has 0 results in the Vitest report`,
       `acceptance evidence: ${registryFile} has 0 results in the Vitest report`,
     ]);
   });
 
   it.each([
-    [speechFile, [roundTripFile, registryFile]],
-    [registryFile, [roundTripFile, speechFile]],
+    [speechFile, [roundTripFile, hintsFile, registryFile]],
+    [hintsFile, [roundTripFile, speechFile, registryFile]],
+    [registryFile, [roundTripFile, speechFile, hintsFile]],
   ])("fails when %s is not part of the run", (missing, files) => {
     const { exit, lines } = run(files);
     expect(exit).toBe(1);
@@ -708,7 +821,7 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
     const { exit } = withVariable(
       "NODE_OPTIONS",
       `--require ${JSON.stringify(preload)}`,
-      () => run([roundTripFile, speechFile, registryFile]),
+      () => run([roundTripFile, speechFile, hintsFile, registryFile]),
     );
     expect(existsSync(marker)).toBe(false);
     expect(exit).toBe(0);
@@ -731,7 +844,14 @@ describe("the acceptance run", { timeout: 300_000 }, () => {
       ].join("\n"),
     );
     const { exit } = withVariable("NODE_ENV", "production", () =>
-      run([roundTripFile, speechFile, registryFile, "--config", config]),
+      run([
+        roundTripFile,
+        speechFile,
+        hintsFile,
+        registryFile,
+        "--config",
+        config,
+      ]),
     );
     expect(readFileSync(seen, "utf8")).toBe("test");
     expect(exit).toBe(0);

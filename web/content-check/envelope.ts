@@ -1,16 +1,56 @@
 import ts from "typescript";
 
 /** Every kind a compiled record can be, as the compiler's manifest names it. */
-export const recordKinds = ["chapter", "part", "aliases", "patterns"] as const;
+export const recordKinds = [
+  "chapter",
+  "part",
+  "aliases",
+  "patterns",
+  "glossary",
+  "error",
+  "hints-catalogue",
+] as const;
 export type RecordKind = (typeof recordKinds)[number];
 
 const isKind = (value: unknown): value is RecordKind =>
   recordKinds.some((kind) => kind === value);
 
-export interface ContentRecord {
-  readonly path: string;
+/** Every kind a part can be; the compiler states it beside the record kind. */
+export const partKinds = [
+  "syntax",
+  "build",
+  "idioms",
+  "gotchas",
+  "library",
+  "cards",
+  "drill",
+  "hints",
+] as const;
+export type PartKind = (typeof partKinds)[number];
+
+const isPartKind = (value: unknown): value is PartKind =>
+  partKinds.some((kind) => kind === value);
+
+/** A record's identity: its kind and, for a part alone, its part kind. */
+export interface RecordIdentity {
   readonly kind: RecordKind;
+  readonly part: PartKind | null;
+}
+
+export interface ContentRecord extends RecordIdentity {
+  readonly path: string;
   readonly text: string;
+}
+
+// The part kind a payload states for itself, or null when it is no object stating one.
+function statedPartKind(payload: string): unknown {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  return isObject(parsed) ? parsed["kind"] : null;
 }
 
 declare module "vitest" {
@@ -92,14 +132,22 @@ export function acceptEnvelope(
   if (!isObject(parsed) || !hasExactKeys(parsed, ["version", "records"]))
     return fail("the envelope must hold exactly version and records");
   const { version, records } = parsed;
-  if (version !== 2) fail("the envelope version must be 2");
+  if (version !== 3) fail("the envelope version must be 3");
   if (!Array.isArray(records) || records.length === 0)
     return fail("records must be a non-empty array");
   const accepted: ContentRecord[] = [];
   for (const record of records) {
-    if (!isObject(record) || !hasExactKeys(record, ["path", "kind", "text"]))
-      return fail("each record must hold exactly path, kind and text");
+    // Only a part states a part kind, so a part kind on any other record is an extra key.
+    const keys =
+      isObject(record) && record["kind"] === "part"
+        ? ["path", "kind", "part", "text"]
+        : ["path", "kind", "text"];
+    if (!isObject(record) || !hasExactKeys(record, keys))
+      return fail(
+        "each record must hold exactly path, kind and text, and a part its part kind after kind",
+      );
     const { path, kind, text: payload } = record;
+    const part = record["part"];
     if (typeof path !== "string" || typeof payload !== "string")
       return fail("path and text must be strings");
     if (!isKind(kind))
@@ -117,7 +165,15 @@ export function acceptEnvelope(
           ? `record path ${path} is repeated`
           : `record path ${path} is out of ordinal order`,
       );
-    accepted.push({ path, kind, text: payload });
+    if (kind !== "part") {
+      accepted.push({ path, kind, part: null, text: payload });
+      continue;
+    }
+    if (!isPartKind(part))
+      return fail(`part kind ${JSON.stringify(part)} is not a known kind`);
+    if (statedPartKind(payload) !== part)
+      fail(`${path} is certified as a ${part} part and states another kind`);
+    accepted.push({ path, kind, part, text: payload });
   }
   const wanted = [...expected].sort();
   if (

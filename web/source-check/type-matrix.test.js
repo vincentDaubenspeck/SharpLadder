@@ -342,12 +342,12 @@ describe("__proto__ in a satisfies literal", () => {
     [
       "identifier key at the top",
       `__proto__: { extra: 1 }, ${body.replace("PLACE", "")}`,
-      "'__proto__' does not exist in type 'PartFile'",
+      "'__proto__' does not exist in type 'SyntaxPart'",
     ],
     [
       "string key at the top",
       `"__proto__": { extra: 1 }, ${body.replace("PLACE", "")}`,
-      "'\"__proto__\"' does not exist in type 'PartFile'",
+      "'\"__proto__\"' does not exist in type 'SyntaxPart'",
     ],
     [
       "identifier key in a span",

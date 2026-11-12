@@ -54,25 +54,45 @@ const control = "sl-control-absent-family";
 async function inEnvironment(page: Page, env: Environment) {
   await page.goto(specimenUrl);
   await expect(spec(page, "dst")).toBeVisible();
+  await settle(page);
   await applyEnvironment(page, env);
   await settle(page);
   const roles = [
     { tag: "span", want: env.expect.ui },
     { tag: "code", want: env.expect.code },
   ];
-  const proof = await page.evaluate(
-    ({ roles, control }) =>
-      roles.map(({ tag, want }) => {
-        const width = (family: string | null) => {
+  await page.evaluate(
+    ({ roles, control }) => {
+      roles.forEach(({ tag, want }, i) => {
+        const kinds = [
+          { kind: "stack", family: null },
+          { kind: "alone", family: `"${want.family}"` },
+          { kind: "control", family: `"${control}"` },
+        ];
+        for (const { kind, family } of kinds) {
           const element = document.createElement(tag);
+          element.dataset["envProbe"] = `${String(i)}-${kind}`;
           element.style.cssText =
             "position:absolute;left:0;top:0;white-space:pre;font-size:100px;";
           if (family !== null) element.style.fontFamily = family;
           element.textContent = "Grow Marvel 0137@&?";
           document.body.append(element);
-          const value = element.getBoundingClientRect().width;
-          element.remove();
-          return value;
+        }
+      });
+    },
+    { roles, control },
+  );
+  await settle(page);
+  const proof = await page.evaluate(
+    (roles) =>
+      roles.map(({ want }, i) => {
+        const width = (kind: string) => {
+          const element = document.querySelector(
+            `[data-env-probe="${String(i)}-${kind}"]`,
+          );
+          if (element === null)
+            throw new Error(`probe ${String(i)}-${kind} missing`);
+          return element.getBoundingClientRect().width;
         };
         const face = Array.from(document.fonts).find(
           (font) => font.family.replace(/^"|"$/g, "") === want.family,
@@ -80,13 +100,19 @@ async function inEnvironment(page: Page, env: Environment) {
         return {
           family: want.family,
           status: want.kind === "shipped" ? (face?.status ?? "absent") : null,
-          stack: width(null),
-          alone: width(`"${want.family}"`),
-          control: width(`"${control}"`),
+          stack: width("stack"),
+          alone: width("alone"),
+          control: width("control"),
         };
       }),
-    { roles, control },
+    roles,
   );
+  await page.evaluate(() => {
+    document.querySelectorAll("[data-env-probe]").forEach((element) => {
+      element.remove();
+    });
+  });
+  await settle(page);
   for (const row of proof) {
     const where = `${env.name} ${row.family}`;
     if (row.status !== null) expect(row.status, where).toBe("loaded");
@@ -100,6 +126,7 @@ async function inEnvironment(page: Page, env: Environment) {
 test.beforeEach(async ({ page }) => {
   await page.goto(specimenUrl);
   await expect(spec(page, "dst")).toBeVisible();
+  await settle(page);
 });
 
 test("the engine is the pinned build", ({ browser }, info) => {
@@ -125,6 +152,7 @@ test("TH3 two modules with the same local class render distinct styles", async (
   await page.setContent(
     "<style>.box{color:#286773}.box{color:#95533f}</style><div class=box id=a>A</div><div class=box id=b>B</div>",
   );
+  await settle(page);
   const same = await page.evaluate(() =>
     ["a", "b"].map(
       (id) =>
@@ -158,6 +186,7 @@ test("TH3 layer precedence holds with the imports reversed", async ({
     probe.remove();
     return value;
   });
+  await settle(page);
   expect(
     await spec(page, "order").evaluate((el) => getComputedStyle(el).fontFamily),
   ).toBe(want);
@@ -168,17 +197,20 @@ test("control: an unlayered rule, a lower-layer !important and no layer statemen
   page,
 }) => {
   await page.addStyleTag({ content: "code { font-family: serif; }" });
+  await settle(page);
   expect(await layeredWins(page)).toBe(false);
   await page.reload();
   await expect(spec(page, "dst")).toBeVisible();
   await page.addStyleTag({
     content: "@layer base { code { font-family: serif !important; } }",
   });
+  await settle(page);
   expect(await layeredWins(page)).toBe(false);
   await page.setContent(
     `<style>@layer components{.c{font-family:serif}}@layer base{code{font-family:monospace}}</style>
 <code data-spec="order" class="c">x</code><code data-spec="plain">y</code>`,
   );
+  await settle(page);
   expect(await layeredWins(page)).toBe(false);
 });
 
@@ -308,6 +340,7 @@ for (const env of envs)
       wide.style.setProperty("inline-size", "30rem");
       document.body.append(wide);
     });
+    await settle(page);
     expect(await overflow(page)).not.toEqual([]);
   });
 
@@ -318,6 +351,7 @@ for (const env of envs)
 async function forcedMatrix(page: Page, info: TestInfo) {
   const engine = engineOf(info);
   await page.emulateMedia({ forcedColors: "active" });
+  await settle(page);
   const active = await page.evaluate(
     () => matchMedia("(forced-colors: active)").matches,
   );
@@ -445,6 +479,7 @@ test("control: under forced colours a shadow-only state and a hue-only state van
   page,
 }, info) => {
   await page.emulateMedia({ forcedColors: "active" });
+  await settle(page);
   if (
     !(await page.evaluate(() => matchMedia("(forced-colors: active)").matches))
   ) {
@@ -459,6 +494,7 @@ test("control: under forced colours a shadow-only state and a hue-only state van
   await page.addStyleTag({
     content: '@layer overrides { [data-spec="rung"] { outline: none; } }',
   });
+  await settle(page);
   const shadowOn = { "box-shadow": "0 0 0 4px #286773" };
   // WebKit matches the emulated query but repaints nothing, so its cells are unsupported.
   if (!forcedRemap[engineOf(info)]) {
@@ -476,6 +512,7 @@ test("control: under forced colours a shadow-only state and a hue-only state van
   expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBe(0);
   // The same two changes are visible without forced colours, so the zero is the mode's doing.
   await page.emulateMedia({ forcedColors: "none" });
+  await settle(page);
   expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBeGreaterThan(0);
   expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBeGreaterThan(0);
 });

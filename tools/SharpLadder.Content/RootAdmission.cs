@@ -4,7 +4,7 @@ namespace SharpLadder.Content;
 // refused, never admitted. Semantic collection of chapters/ stays separate from this check.
 internal static class RootAdmission
 {
-    private static readonly string[] Folders = ["chapters", "schema"];
+    private static readonly string[] Folders = ["chapters", "errors", "glossary", "schema"];
     private static readonly string[] Files = ["aliases.yml", "patterns.yml"];
 
     public static bool Admits(string name) =>
@@ -38,12 +38,12 @@ internal static class RootAdmission
             }
             else
             {
-                diagnostics.Add(new Diagnostic(entry.Display, null, "the content root holds only chapters/, schema/, aliases.yml and patterns.yml"));
+                diagnostics.Add(new Diagnostic(entry.Display, null, "the content root holds only chapters/, errors/, glossary/, schema/, aliases.yml and patterns.yml"));
             }
         }
     }
 
-    // chapters/ is read by the collector; schema/ holds files only.
+    // chapters/, errors/ and glossary/ are read by the collector; schema/ holds files only.
     private static void CheckFolder(InputTree tree, InputEntry folder, List<Diagnostic> diagnostics)
     {
         if (!string.Equals(folder.Name, "schema", StringComparison.Ordinal))

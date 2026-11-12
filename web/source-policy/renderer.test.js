@@ -50,7 +50,9 @@ const read = (unit) => readFileSync(join(web, "src", unit), "utf8");
 // A negative is a real module with one exact edit, so every other line stays a passing form.
 const mutate = (unit, from, to) => {
   const code = read(unit);
-  if (!code.includes(from)) throw new Error(`no anchor ${from} in ${unit}`);
+  const present =
+    typeof from === "string" ? code.includes(from) : from.test(code);
+  if (!present) throw new Error(`no anchor ${String(from)} in ${unit}`);
   return code.replace(from, to);
 };
 
@@ -66,6 +68,29 @@ const blocks = "content/Blocks.tsx";
 const link = "content/ContentLink.tsx";
 const spans = "content/Spans.tsx";
 const view = "content/ContentView.tsx";
+const entries = "content/Entries.tsx";
+const cards = "content/Cards.tsx";
+const picker = "content/ApproachPicker.tsx";
+const buildView = "content/Build.tsx";
+const approach = "content/approach.ts";
+const pickerType = '          type="button"\n';
+const pickerPressed = "aria-pressed={choice.id === pressed}";
+const pickerHandler = "onClick={() => {";
+const pickerCall = "onChoose(choice.id);";
+const pickerGroup = '<div role="group" aria-label="Build approaches">';
+const handedDown = "onApproachChange={onApproachChange}";
+const hintsView = "content/Hints.tsx";
+const hintsHelper = "content/hints.ts";
+const hintHandedDown = "onHintChange={onHintChange}";
+const approachChooser = "onApproachChange(sectionId, id);";
+const term = "content/Term.tsx";
+const termId = "const definition = useId();";
+const termTarget = "popoverTarget={definition}";
+const termAction = 'popoverTargetAction="toggle"';
+const termMode = 'popover="auto"';
+const termLink = "<a href={termHref(term)}>Definition</a>";
+const notSource = (name, tag) =>
+  `${name} on <${tag}> is not from its admitted source`;
 const never = "content/assertNever.ts";
 const href = "content/href.ts";
 // A row that edits a pinned helper also expects this finding, so no row is exempt from the pin.
@@ -88,6 +113,8 @@ const optional = "an optional, generic or spread call is not admitted";
 const accessor = "an accessor or method is not admitted";
 const asyncFn = "an async or generator function is not admitted";
 const helperDeclaration = `${badCall}: a helper must be a top-level function declaration`;
+const componentCall = `${badCall}: a component renders only through its tag`;
+const plainHelper = `${badCall}: a called helper must declare a return type of plain values`;
 
 // Each case is [name, unit, source, a text the finding must contain].
 const refused = [
@@ -546,14 +573,25 @@ const refused = [
     mutate(blocks, listCall, "return <script>{block.type}</script>;"),
     "element <script> is not admitted",
   ],
-  ...["iframe", "svg", "aside", "article", "img", "form", "h1", "button"].map(
-    (tag) => [
-      `an unlisted ${tag} element`,
-      blocks,
-      mutate(blocks, listCall, `return <${tag} />;`),
-      `element <${tag}> is not admitted`,
-    ],
-  ),
+  ...[
+    "iframe",
+    "svg",
+    "aside",
+    "article",
+    "img",
+    "form",
+    "h1",
+    "button",
+    "caption",
+    "col",
+    "colgroup",
+    "tfoot",
+  ].map((tag) => [
+    `an unlisted ${tag} element`,
+    blocks,
+    mutate(blocks, listCall, `return <${tag} />;`),
+    `element <${tag}> is not admitted`,
+  ]),
   ...[
     ["className", "p"],
     ["title", "p"],
@@ -568,6 +606,196 @@ const refused = [
     blocks,
     mutate(blocks, para, `<${tag} ${attribute}="x">\n          <Spans`),
     `attribute ${attribute} is not admitted on <${tag}>`,
+  ]),
+  ...[
+    [
+      "<table data-block-id={block.blockId}>",
+      '<table data-block-id={block.blockId} border="1">',
+      "attribute border is not admitted on <table>",
+    ],
+    [
+      "<table data-block-id={block.blockId}>",
+      "<table data-block-id={block.blockId} id={block.blockId}>",
+      "attribute id is not admitted on <table>",
+    ],
+    [
+      "<table data-block-id={block.blockId}>",
+      "<table data-block-id={block.headers}>",
+      "data-block-id on <table> is not from",
+    ],
+    [
+      "<table data-block-id={block.blockId}>",
+      '<table data-block-id="syn-a/b1">',
+      "data-block-id on <table> is not from",
+    ],
+    [
+      "<thead>",
+      '<thead className="x">',
+      "attribute className is not admitted on <thead>",
+    ],
+    ["<tbody>", '<tbody id="x">', "attribute id is not admitted on <tbody>"],
+    [
+      "<tr key={index}>",
+      "<tr key={index} data-block-id={block.blockId}>",
+      "attribute data-block-id is not admitted on <tr>",
+    ],
+    [
+      '<th key={column} scope="col">',
+      "<th key={column} scope={column}>",
+      "scope on <th> is not from its admitted source",
+    ],
+    [
+      '<th key={column} scope="col">',
+      '<th key={column} scope="col" onClick={() => undefined}>',
+      "attribute onClick is not admitted on <th>",
+    ],
+    [
+      "<td key={column}>",
+      "<td key={column} colSpan={2}>",
+      "attribute colSpan is not admitted on <td>",
+    ],
+    [
+      "<td key={column}>",
+      '<td key={column} style={{ color: "red" }}>',
+      "attribute style is not admitted on <td>",
+    ],
+  ].map(([from, to, problem]) => [
+    `a table element written as ${to}`,
+    blocks,
+    mutate(blocks, from, to),
+    problem,
+  ]),
+  ...[
+    [
+      entries,
+      "<h2 id={entry.id}>{entry.term}</h2>",
+      "<h2 id={entry.term}>{entry.term}</h2>",
+      "id on <h2> is not from its admitted source",
+    ],
+    [
+      entries,
+      "<h2 id={entry.id}>{entry.term}</h2>",
+      '<h2 id="term-fixture-set">{entry.term}</h2>',
+      "id on <h2> is not from its admitted source",
+    ],
+    [
+      entries,
+      "<h2 id={entry.id}>{errorTitle(entry)}</h2>",
+      "<h2 id={errorTitle(entry)}>{errorTitle(entry)}</h2>",
+      "id on <h2> is not from its admitted source",
+    ],
+    [
+      entries,
+      "<h3>Cause</h3>",
+      "<h3 id={entry.id}>Cause</h3>",
+      "id on <h3> is not from its admitted source",
+    ],
+    [
+      entries,
+      "<p>{entry.short}</p>",
+      "<p data-section-id={entry.id}>{entry.short}</p>",
+      "attribute data-section-id is not admitted on <p>",
+    ],
+    [
+      entries,
+      "<h3>Hint</h3>",
+      "<section data-section-id={entry.id}><h3>Hint</h3></section>",
+      "data-section-id on <section> is not from its admitted source",
+    ],
+    [
+      entries,
+      "<p>{entry.short}</p>",
+      "<p data-block-id={entry.id}>{entry.short}</p>",
+      "data-block-id on <p> is not from its admitted source",
+    ],
+    [
+      view,
+      "<h2 id={section.id}>",
+      "<h2 id={chapter.id}>",
+      "id on <h2> is not from its admitted source",
+    ],
+  ].map(([unit, from, to, problem]) => [
+    `an entry heading or hook written as ${to}`,
+    unit,
+    mutate(unit, from, to),
+    problem,
+  ]),
+  ...[
+    [
+      cards,
+      "<h4 id={card.id}>",
+      "<h4 id={card.title}>",
+      "id on <h4> is not from its admitted source",
+    ],
+    [
+      cards,
+      "<h4 id={card.id}>",
+      '<h4 id="card-fix-tally">',
+      "id on <h4> is not from its admitted source",
+    ],
+    [
+      cards,
+      "<h4 id={card.id}>",
+      "<h4 id={card.id} data-section-id={card.id}>",
+      "attribute data-section-id is not admitted on <h4>",
+    ],
+    [
+      cards,
+      "<h3 id={section.id}>",
+      "<h3 id={section.number}>",
+      "id on <h3> is not from its admitted source",
+    ],
+    [
+      cards,
+      "<dl>",
+      "<dl data-block-id={card.id}>",
+      "attribute data-block-id is not admitted on <dl>",
+    ],
+    [
+      cards,
+      "<dt>Reach for</dt>",
+      "<dt id={card.id}>Reach for</dt>",
+      "attribute id is not admitted on <dt>",
+    ],
+    [
+      cards,
+      "<dt>Why</dt>",
+      "<h5>Why</h5>",
+      "element <h5> is not admitted in the renderer",
+    ],
+    [
+      cards,
+      "<dt>Build</dt>",
+      '<dt className="label">Build</dt>',
+      "attribute className is not admitted on <dt>",
+    ],
+    [
+      view,
+      "<h2>{partLabel(part.kind)}</h2>",
+      "<h4>{partLabel(part.kind)}</h4>",
+      "element <h4> is not admitted in the renderer",
+    ],
+    [
+      entries,
+      "<h3>Hint</h3>",
+      "<h4>Hint</h4>",
+      "element <h4> is not admitted in the renderer",
+    ],
+    [
+      entries,
+      "<h3>Cause</h3>",
+      "<dl><dt>Cause</dt><dd>Text</dd></dl>",
+      [
+        "element <dl> is not admitted in the renderer",
+        "element <dt> is not admitted in the renderer",
+        "element <dd> is not admitted in the renderer",
+      ],
+    ],
+  ].map(([unit, from, to, problem]) => [
+    `a card element written as ${to}`,
+    unit,
+    mutate(unit, from, to),
+    problem,
   ]),
   [
     "an inline style",
@@ -1012,8 +1240,8 @@ const refused = [
     href,
     mutate(
       href,
-      "const { id, chapter } = link;",
-      "link.content.sort();\n  const { id, chapter } = link;",
+      "const { id, kind } = link;",
+      "link.content.sort();\n  const { id, kind } = link;",
     ),
     pinChanged(href),
   ],
@@ -1022,8 +1250,8 @@ const refused = [
     href,
     mutate(
       href,
-      "const { id, chapter } = link;",
-      'Object.assign(link, { id: "intro" });\n  const { id, chapter } = link;',
+      "const { id, kind } = link;",
+      'Object.assign(link, { id: "intro" });\n  const { id, kind } = link;',
     ),
     pinChanged(href),
   ],
@@ -1042,7 +1270,7 @@ const refused = [
     href,
     mutate(
       href,
-      "const { id, chapter } = link;",
+      "const { id, kind } = link;",
       "const { id, chapter }  = link;",
     ),
     pinChanged(href),
@@ -1058,6 +1286,541 @@ const refused = [
     never,
     mutate(never, "Unknown content variant", "Unknown content varianT"),
     pinChanged(never),
+  ],
+  // The approach picker and the build view.
+  [
+    "a picker button with no type",
+    picker,
+    mutate(picker, pickerType, ""),
+    "<button> must carry type",
+  ],
+  [
+    "a picker button that submits",
+    picker,
+    mutate(picker, 'type="button"', 'type="submit"'),
+    notSource("type", "button"),
+  ],
+  [
+    "a picker button with a form action",
+    picker,
+    mutate(picker, 'type="button"', 'type="button"\n          formAction="/x"'),
+    "attribute formAction is not admitted on <button>",
+  ],
+  [
+    "a picker button with a ref",
+    picker,
+    mutate(picker, 'type="button"', 'type="button"\n          ref={null}'),
+    "attribute ref is not admitted on <button>",
+  ],
+  [
+    "a picker button with a popover target",
+    picker,
+    mutate(
+      picker,
+      'type="button"',
+      'type="button"\n          popoverTarget="x"',
+    ),
+    notSource("popoverTarget", "button"),
+  ],
+  [
+    "a popover definition inside the picker",
+    picker,
+    mutate(picker, "{choice.label}", '{choice.label}<span popover="auto" />'),
+    notSource("popover", "span"),
+  ],
+  [
+    "a picker button with spread attributes",
+    picker,
+    mutate(picker, 'type="button"', 'type="button"\n          {...choice}'),
+    "JSX spread is not admitted",
+  ],
+  [
+    "a picker button with no pressed state",
+    picker,
+    mutate(picker, `          ${pickerPressed}\n`, ""),
+    "<button> must carry aria-pressed",
+  ],
+  [
+    "a pressed state that is a constant",
+    picker,
+    mutate(picker, pickerPressed, "aria-pressed={true}"),
+    notSource("aria-pressed", "button"),
+  ],
+  [
+    "a pressed state read from the label",
+    picker,
+    mutate(picker, pickerPressed, "aria-pressed={choice.label === pressed}"),
+    notSource("aria-pressed", "button"),
+  ],
+  [
+    "a handler that takes the event",
+    picker,
+    mutate(picker, pickerHandler, "onClick={(event) => {"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "an async handler",
+    picker,
+    mutate(picker, pickerHandler, "onClick={async () => {"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a handler that calls twice",
+    picker,
+    mutate(picker, pickerCall, `${pickerCall}\n            ${pickerCall}`),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a handler that passes the label",
+    picker,
+    mutate(picker, pickerCall, "onChoose(choice.label);"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a handler that passes a third argument",
+    picker,
+    mutate(picker, pickerCall, "onChoose(choice.id, choices);"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a handler that calls something else",
+    picker,
+    mutate(picker, pickerCall, "choices.map((o) => o.id);"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a handler that is the caller's function itself",
+    picker,
+    mutate(picker, /onClick=\{\(\) => \{[\s\S]*?\}\}/u, "onClick={onChoose}"),
+    notSource("onClick", "button"),
+  ],
+  [
+    "the change call outside a handler",
+    picker,
+    mutate(
+      picker,
+      "  return (\n    <div",
+      '  onApproachChange(sectionId, "x");\n  return (\n    <div',
+    ),
+    badCall,
+  ],
+  [
+    "a handler on the picker's group",
+    picker,
+    mutate(picker, pickerGroup, `<div onClick={() => {}} role="group">`),
+    "attribute onClick is not admitted on <div>",
+  ],
+  [
+    "a second handler site in the picker",
+    picker,
+    mutate(
+      picker,
+      "{choice.label}",
+      `{choice.label}
+          <button
+            type="button"
+            aria-pressed={choice.id === pressed}
+            onClick={() => {
+              onChoose(choice.id);
+            }}
+          />`,
+    ),
+    "must write exactly one handler",
+  ],
+  [
+    "a picker group with another label",
+    picker,
+    mutate(picker, 'aria-label="Build approaches"', "aria-label={sectionId}"),
+    notSource("aria-label", "div"),
+  ],
+  [
+    "a picker group with another role",
+    picker,
+    mutate(picker, 'role="group"', 'role="tablist"'),
+    notSource("role", "div"),
+  ],
+  [
+    "state inside the picker",
+    picker,
+    mutate(
+      picker,
+      'import type { ReactElement } from "react";',
+      'import { useState } from "react";\nimport type { ReactElement } from "react";',
+    ),
+    "import useState from react is not admitted",
+  ],
+  [
+    "a build group with the hint label",
+    picker,
+    mutate(
+      picker,
+      'aria-label="Build approaches"',
+      'aria-label="Hint approaches"',
+    ),
+    notSource("aria-label", "div"),
+  ],
+  [
+    "a hint group with the build label",
+    picker,
+    mutate(
+      picker,
+      'aria-label="Hint approaches"',
+      'aria-label="Build approaches"',
+    ),
+    notSource("aria-label", "div"),
+  ],
+  [
+    "a build chooser that passes the section as the choice",
+    picker,
+    mutate(picker, approachChooser, "onApproachChange(sectionId, sectionId);"),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "a build chooser that ignores the choice",
+    picker,
+    mutate(picker, approachChooser, 'onApproachChange(sectionId, "x");'),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "a build chooser with a second parameter",
+    picker,
+    mutate(picker, "onChoose={(id) => {", "onChoose={(id, other) => {"),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "a hint chooser made up in the picker",
+    picker,
+    mutate(picker, "onChoose={onHintChange}", "onChoose={() => undefined}"),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "the build handler handed to the hint list",
+    picker,
+    mutate(picker, "onChoose={onHintChange}", "onChoose={onApproachChange}"),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "a chooser given to another component",
+    hintsView,
+    mutate(
+      hintsView,
+      "<CueView block={section} />",
+      "<CueView block={section} onChoose={section} />",
+    ),
+    "prop onChoose is not admitted",
+  ],
+  [
+    "a local component called as a function",
+    hintsView,
+    mutate(
+      hintsView,
+      "<CueView block={section} />",
+      "{CueView({ block: section })}",
+    ),
+    componentCall,
+  ],
+  [
+    "a lower-case local component called as a function",
+    hintsView,
+    mutate(
+      hintsView,
+      "<CueView block={section} />",
+      "{cueView({ block: section })}",
+    ).replace("function CueView(", "function cueView("),
+    plainHelper,
+  ],
+  [
+    "a called helper that declares no return type",
+    view,
+    mutate(
+      view,
+      'function partLabel(kind: StaticPart["kind"]): string {',
+      'function partLabel(kind: StaticPart["kind"]) {',
+    ),
+    plainHelper,
+  ],
+  [
+    "an imported component called as a function",
+    view,
+    mutate(
+      view,
+      "<Blocks blocks={chapter.intro} slugs={slugs} />",
+      "{Blocks({ blocks: chapter.intro, slugs })}",
+    ),
+    componentCall,
+  ],
+  [
+    "a picker called with a handler from the static view",
+    view,
+    `${mutate(
+      view,
+      "<Blocks blocks={chapter.intro} slugs={slugs} />",
+      '{ApproachPicker({ sectionId: "s", options: [], selectedApproachId: null, onApproachChange: click })}',
+    ).replace(
+      'import { Blocks } from "./Blocks.tsx";',
+      'import { ApproachPicker } from "./ApproachPicker.tsx";\nimport { Blocks } from "./Blocks.tsx";',
+    )}\nfunction click(): void {\n  click();\n}\n`,
+    componentCall,
+  ],
+  [
+    "a header cell scoped to its row",
+    blocks,
+    mutate(blocks, 'scope="col"', 'scope="row"'),
+    notSource("scope", "th"),
+  ],
+  [
+    "a scope on a data cell",
+    blocks,
+    mutate(blocks, "<td key={column}>", '<td key={column} scope="col">'),
+    "attribute scope is not admitted on <td>",
+  ],
+  [
+    "a hint handler made up in the hints view",
+    hintsView,
+    mutate(hintsView, hintHandedDown, "onHintChange={() => undefined}"),
+    "prop onHintChange is not admitted",
+  ],
+  [
+    "a hint handler handed down by a static module",
+    view,
+    mutate(
+      view,
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} onHintChange={slugs} />",
+    ),
+    "prop onHintChange is not admitted",
+  ],
+  [
+    "a cue hook from another source",
+    hintsView,
+    mutate(
+      hintsView,
+      "<p data-block-id={block.blockId}>",
+      "<p data-block-id={block.cue}>",
+    ),
+    notSource("data-block-id", "p"),
+  ],
+  [
+    "a ladder hook from another source",
+    hintsView,
+    mutate(
+      hintsView,
+      "<section data-section-id={section.id}>",
+      "<section data-section-id={section.blockId}>",
+    ),
+    notSource("data-section-id", "section"),
+  ],
+  ...["HintsPart", "Ladder", "Rung", "ContentDoc", "PartFile"].map((type) => [
+    `the whole-record type ${type} in the hints view`,
+    hintsView,
+    mutate(
+      hintsView,
+      'import type { ReactElement } from "react";',
+      `import type { ReactElement } from "react";\nimport type { ${type} } from "../generated/content.ts";`,
+    ),
+    `import ${type} from ../generated/content.ts is not admitted`,
+  ]),
+  [
+    "a rung type in a static module",
+    view,
+    mutate(view, "  ChapterSection,\n", "  ChapterSection,\n  Rung,\n"),
+    "import Rung from ../generated/content.ts is not admitted",
+  ],
+  [
+    "an edited hints selector",
+    hintsHelper,
+    mutate(hintsHelper, "references.indexOf(selected)", "0"),
+    pinChanged(hintsHelper),
+  ],
+  [
+    "a button outside the picker",
+    blocks,
+    `${read(blocks)}\nfunction Press(): ReactElement {\n  return <button type="button" />;\n}\n`,
+    "element <button> is not admitted",
+  ],
+  [
+    "a group role outside the picker",
+    blocks,
+    mutate(blocks, divId, '<div role="group" id={block.id}>'),
+    notSource("role", "div"),
+  ],
+  [
+    "an approach heading outside the build view",
+    blocks,
+    `${read(blocks)}\nfunction Head(): ReactElement {\n  return <h4 />;\n}\n`,
+    "element <h4> is not admitted",
+  ],
+  [
+    "an approach heading id from another source",
+    buildView,
+    mutate(buildView, "<h4 id={approach.id}>", "<h4 id={approach.title}>"),
+    notSource("id", "h4"),
+  ],
+  [
+    "a handler made up in the build view",
+    buildView,
+    mutate(buildView, handedDown, "onApproachChange={() => undefined}"),
+    "prop onApproachChange is not admitted",
+  ],
+  [
+    "a handler handed down by a static module",
+    view,
+    mutate(
+      view,
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} onApproachChange={slugs} />",
+    ),
+    "prop onApproachChange is not admitted",
+  ],
+  [
+    "another event prop in the build view",
+    buildView,
+    mutate(buildView, handedDown, "onClick={onApproachChange}"),
+    "prop onClick is not admitted",
+  ],
+  [
+    "an edited projection helper",
+    approach,
+    mutate(
+      approach,
+      "selection.get(section.id) ?? null",
+      "selection.get(section.id) ?? first.id",
+    ),
+    pinChanged(approach),
+  ],
+  // Term: its button and its definition, bound to one useId, with no handler of its own.
+  [
+    "a popover outside Term",
+    blocks,
+    mutate(blocks, labelSpan, '<span id={labelId} popover="auto">'),
+    notSource("popover", "span"),
+  ],
+  [
+    "a manual popover",
+    term,
+    mutate(term, termMode, 'popover="manual"'),
+    notSource("popover", "span"),
+  ],
+  [
+    "a hint popover",
+    term,
+    mutate(term, termMode, 'popover="hint"'),
+    notSource("popover", "span"),
+  ],
+  [
+    "a popover with no value",
+    term,
+    mutate(term, ` ${termMode}`, " popover"),
+    notSource("popover", "span"),
+  ],
+  [
+    "a target action that only shows",
+    term,
+    mutate(term, termAction, 'popoverTargetAction="show"'),
+    notSource("popoverTargetAction", "button"),
+  ],
+  [
+    "a literal popover target",
+    term,
+    mutate(term, termTarget, 'popoverTarget="x"'),
+    notSource("popoverTarget", "button"),
+  ],
+  [
+    "a target from a second useId",
+    term,
+    mutate(term, termTarget, "popoverTarget={other}").replace(
+      termId,
+      () => `${termId}\n  const other = useId();`,
+    ),
+    notSource("popoverTarget", "button"),
+  ],
+  [
+    "a definition whose id is the entry's",
+    term,
+    mutate(term, "<span id={definition}", "<span id={term.id}"),
+    notSource("popoverTarget", "button"),
+  ],
+  [
+    "a definition not beside its button",
+    term,
+    mutate(
+      term,
+      /(<span id=\{definition\} popover="auto">[\s\S]*?<\/span>)/u,
+      "<em>$1</em>",
+    ),
+    notSource("popoverTarget", "button"),
+  ],
+  [
+    "a second definition in Term",
+    term,
+    mutate(
+      term,
+      "</span>\n",
+      '</span>\n      <span id={definition} popover="auto" />\n',
+    ),
+    "must write exactly one definition",
+  ],
+  [
+    "a second link in Term",
+    term,
+    mutate(
+      term,
+      termLink,
+      `${termLink}\n        <a href={termHref(term)}>Again</a>`,
+    ),
+    "must write exactly one href",
+  ],
+  [
+    "a Term link built from the entry id",
+    term,
+    mutate(term, "href={termHref(term)}", "href={`/glossary#${term.id}`}"),
+    notSource("href", "a"),
+  ],
+  [
+    "a lookalike termHref",
+    term,
+    mutate(
+      term,
+      'import { termHref } from "./href.ts";',
+      "function termHref(t: TermSpan): string {\n  return t.id;\n}",
+    ),
+    notSource("href", "a"),
+  ],
+  [
+    "a handler on the Term button",
+    term,
+    mutate(term, termAction, `${termAction}\n        onClick={() => {}}`),
+    notSource("onClick", "button"),
+  ],
+  [
+    "a pressed state on the Term button",
+    term,
+    mutate(term, termAction, `${termAction}\n        aria-pressed={true}`),
+    notSource("aria-pressed", "button"),
+  ],
+  [
+    "a ref on the Term button",
+    term,
+    mutate(term, termAction, `${termAction}\n        ref={null}`),
+    "attribute ref is not admitted on <button>",
+  ],
+  [
+    "spread attributes on the Term button",
+    term,
+    mutate(term, termAction, `${termAction}\n        {...term}`),
+    "JSX spread is not admitted",
+  ],
+  [
+    "a Term button with no target",
+    term,
+    mutate(term, `\n        ${termTarget}`, ""),
+    "<button> must carry popoverTarget",
+  ],
+  [
+    "state inside Term",
+    term,
+    mutate(term, "import { useId,", "import { useId, useState,"),
+    "import useState from react is not admitted",
   ],
 ];
 
@@ -1202,8 +1965,8 @@ function Inline(): ReactNode {
 }
 `;
 
-// Blocks.tsx with every admitted call form: a top-level function, a renderer import, useId,
-// and map over a prop, a prop member and a map callback's parameter.
+// Blocks.tsx with every admitted call form: a top-level helper of plain values, a renderer
+// import, useId, and map over a prop, a prop member and a map callback's parameter.
 const callForms = `${read(blocks)}
 function Probe({
   rows,
@@ -1215,7 +1978,7 @@ function Probe({
   const id = useId();
   return (
     <span id={id}>
-      {rows.map((row) => row.cells.map((cell) => Shown({ block: cell })))}
+      {rows.map((row) => row.cells.map((cell) => startOf({ block: cell })))}
       {block.items.map((item) => (
         <li key={item.blockId}>{assertNever(item)}</li>
       ))}
@@ -1223,8 +1986,8 @@ function Probe({
   );
 }
 
-function Shown({ block }: { block: ListBlock }): ReactElement {
-  return <ol start={block.start}>{Probe({ rows: [], block })}</ol>;
+function startOf({ block }: { block: ListBlock }): number | undefined {
+  return block.start;
 }
 `;
 

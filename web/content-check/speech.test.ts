@@ -5,20 +5,34 @@ import { slotProblems } from "./slots.ts";
 
 // Records come only from the compiler-backed global setup; without them this file fails to
 // load, so no record is skipped into a pass.
+// A hints part holds no speech; its catalogue speaks each ladder's cue.
 const records = inject("contentRecords").filter(
-  (r) => r.kind === "chapter" || r.kind === "part",
+  (r) => r.kind === "chapter" || (r.kind === "part" && r.part !== "hints"),
 );
-if (records.length === 0)
+const catalogues = inject("contentRecords").filter(
+  (r) => r.kind === "hints-catalogue",
+);
+if (records.length === 0 || catalogues.length === 0)
   throw new Error("the global setup provided no content records");
 
-describe.each(records.map((r) => [r.path, r.text] as const))(
-  "the speech of %s",
-  (_, text) => {
-    it("recomputes every audio slot from its segment texts", () => {
-      expect(slotProblems(JSON.parse(text))).toEqual([]);
-    });
-  },
-);
+// A catalogue's ladders are checked exactly as a record's sections are.
+const spokenParts = (kind: string, text: string): unknown => {
+  const doc: unknown = JSON.parse(text);
+  return kind === "hints-catalogue" &&
+    typeof doc === "object" &&
+    doc !== null &&
+    "ladders" in doc
+    ? { sections: doc.ladders }
+    : doc;
+};
+
+describe.each(
+  [...records, ...catalogues].map((r) => [r.path, r.kind, r.text] as const),
+)("the speech of %s", (_, kind, text) => {
+  it("recomputes every audio slot from its segment texts", () => {
+    expect(slotProblems(spokenParts(kind, text))).toEqual([]);
+  });
+});
 
 describe("the slot check", () => {
   const empty = slotOf([]);

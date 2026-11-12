@@ -86,13 +86,13 @@ public sealed class EmitterTests
 
         foreach (var text in modules.Values)
         {
-            Assert.StartsWith("// SharpLadder.Content type emitter output, grammar 1. Do not edit.\n", text, StringComparison.Ordinal);
+            Assert.StartsWith("// SharpLadder.Content type emitter output, grammar 2. Do not edit.\n", text, StringComparison.Ordinal);
             AssertNoEmptyObject(text);
             Assert.DoesNotContain("\r", text, StringComparison.Ordinal);
             Assert.EndsWith(";\n", text, StringComparison.Ordinal);
         }
 
-        Assert.Contains("import type { Body, Id, SectionId, Spans, Speech } from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
+        Assert.Contains("import type {\n  AnchoredTextBlock,\n  Block,\n  BlockId,\n  Body,\n  CodeBlock,\n  ErrorId,\n  Id,\n  ItemId,\n  LinkContent,\n  ListItem,\n  ParagraphBlock,\n  SectionId,\n  Spans,\n  Speech,\n} from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
         Assert.DoesNotContain("import", modules["body.ts"], StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(modules["content.ts"], "export type ContentDoc ="));
     }
@@ -230,7 +230,7 @@ public sealed class EmitterTests
     [InlineData("""{"anyOf":[{"type":"string"},{"type":"integer"}]}""", "matches no supported form")]
     [InlineData("""{"type":"array","items":[{"type":"string"}]}""", "tuples are not supported")]
     [InlineData("""{"type":"array","items":{"type":"string"},"additionalItems":false}""", "unsupported keyword \"additionalItems\"")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"maxItems":3}""", "unsupported keyword \"maxItems\"")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"maxItems":3}""", "maxItems needs items that are a $ref")]
     [InlineData("""{"type":"boolean","const":true}""", "unsupported keyword \"type\"")]
     [InlineData("""{"type":"integer","maximum":3}""", "unsupported keyword \"maximum\"")]
     public void UnsupportedConstructsAreRefused(string node, string problem) => RefusedNode(node, problem);
@@ -254,7 +254,6 @@ public sealed class EmitterTests
     [InlineData("""{"const":-0}""")]
     [InlineData("""{"const":9007199254740992}""")]
     [InlineData("""{"const":-9007199254740992}""")]
-    [InlineData("""{"const":true}""")]
     [InlineData("""{"type":"integer","minimum":1.5}""")]
     [InlineData("""{"type":"integer","minimum":1e2}""")]
     [InlineData("""{"type":"integer","minimum":-0}""")]
@@ -269,10 +268,12 @@ public sealed class EmitterTests
     [Theory]
     [InlineData("""{"type":"string","minLength":-1}""", "minLength must not be negative")]
     [InlineData("""{"type":"string","pattern":1}""", "pattern must be a string")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":0}""", "minItems must be absent or exactly 1")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":2}""", "minItems must be absent or exactly 1")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":1.0}""", "minItems must be absent or exactly 1")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":"1"}""", "minItems must be absent or exactly 1")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":0}""", "minItems must be absent, 1 or 2")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":2}""", "minItems 2 needs items that are a $ref and no maxItems")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":3}""", "minItems must be absent, 1 or 2")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":2.0}""", "minItems must be absent, 1 or 2")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":1.0}""", "minItems must be absent, 1 or 2")]
+    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":"1"}""", "minItems must be absent, 1 or 2")]
     [InlineData("""{"type":"object","additionalProperties":false,"properties":{}}""", "properties must hold at least one property")]
     [InlineData("""{"type":"object","additionalProperties":false,"properties":{"a":{"type":"string"}},"required":[]}""", "required must be a non-empty array")]
     [InlineData("""{"type":"object","additionalProperties":false,"properties":{"a":{"type":"string"}},"required":["b"]}""", "\"b\" is not a declared property")]
@@ -348,6 +349,80 @@ public sealed class EmitterTests
 
         Assert.Contains("export type X = M1 | M2;\n", body, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k2"}]}""", "export type X = K1 | K2;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/m1"}]}""", "export type X = Kinds | M1;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/k3"}]}""", "export type X = Kinds | K3;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k3"}]}""", "export type X = K1 | K3;")]
+    public void UnionsToldApartByKindAreAccepted(string node, string expected)
+    {
+        var body = Accepted(KindDocument(node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected + "\n", body, StringComparison.Ordinal);
+        Assert.Contains("export type Kinds = K1 | K2;\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k1again"}]}""", "discriminator \"one\" is repeated")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/bare"}]}""", "union member bare shares type \"part\" and needs a required string const property named kind")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/bare"},{"$ref":"#/definitions/k1"}]}""", "union member bare shares type \"part\" and needs a required string const property named kind")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/k1"}]}""", "union member kinds shares type \"part\" and needs a required string const property named kind")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/bare"}]}""", "discriminator \"part\" is repeated")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/kinds"}]}""", "discriminator \"part\" is repeated")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k2"},{"$ref":"#/definitions/k3"}]}""", "discriminator \"part\" is repeated")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/split"},{"$ref":"#/definitions/m1"}]}""", "union member split is a union whose members are not told apart by kind under one shared type", ""","split":{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k3"}]}""")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/halfKinds"},{"$ref":"#/definitions/m1"}]}""", "definitions/halfKinds/oneOf/1: union member bare shares type \"part\" and needs a required string const property named kind", ""","halfKinds":{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/bare"}]}""")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/nested"},{"$ref":"#/definitions/m1"}]}""", "union member kinds is not an Object", ""","nested":{"oneOf":[{"$ref":"#/definitions/kinds"},{"$ref":"#/definitions/k3"}]}""")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/inline"},{"$ref":"#/definitions/m1"}]}""", "definitions/inline/oneOf/1: a union member must be a $ref to an Object definition", ""","inline":{"oneOf":[{"$ref":"#/definitions/k1"},{"type":"string"}]}""")]
+    public void UnionsNotToldApartByOneTagAreRefused(string node, string problem, string extra = "") =>
+        Refused(KindDocument(node, extra), ContentDocument(), problem);
+
+    [Theory]
+    [InlineData("""{"type":"array","maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "export type X = [] | [Id] | [Id, Id];")]
+    [InlineData("""{"type":"array","minItems":1,"maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "export type X = [Id] | [Id, Id];")]
+    [InlineData("""{"type":"array","minItems":1,"maxItems":1,"items":{"$ref":"#/definitions/id"}}""", "export type X = [Id];")]
+    [InlineData("""{"type":"array","minItems":2,"items":{"$ref":"#/definitions/id"}}""", "export type X = [Id, Id, ...Id[]];")]
+    [InlineData("""{"type":"object","additionalProperties":false,"required":["two"],"properties":{"two":{"type":"array","minItems":2,"items":{"$ref":"#/definitions/id"}}}}""", "export type X = {\n  two: [Id, Id, ...Id[]];\n};")]
+    [InlineData("""{"type":"array","items":{"type":"array","maxItems":1,"items":{"$ref":"#/definitions/id"}}}""", "export type X = ([] | [Id])[];")]
+    [InlineData("""{"type":"object","additionalProperties":false,"properties":{"traps":{"type":"array","maxItems":2,"items":{"$ref":"#/definitions/id"}}}}""", "export type X = {\n  traps?: [] | [Id] | [Id, Id];\n};")]
+    public void BoundedArraysEmitOneTuplePerLength(string node, string expected)
+    {
+        var body = Accepted(BodyDocument(IdDefinition + ",\"x\":" + node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected + "\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"const":false}""", "export type X = false;")]
+    [InlineData("""{"const":true}""", "export type X = true;")]
+    [InlineData("""{"type":"object","additionalProperties":false,"required":["ordered"],"properties":{"ordered":{"const":false}}}""", "export type X = {\n  ordered: false;\n};")]
+    public void ABooleanConstEmitsItsLiteralType(string node, string expected)
+    {
+        var body = Accepted(BodyDocument(IdDefinition + ",\"x\":" + node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected + "\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"const":null}""")]
+    [InlineData("""{"const":[false]}""")]
+    [InlineData("""{"const":{"a":false}}""")]
+    public void AConstOfAnotherKindIsRefused(string node) => RefusedNode(node, "const must be an integer token");
+
+    [Theory]
+    [InlineData("""{"type":"array","maxItems":0,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
+    [InlineData("""{"type":"array","maxItems":17,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
+    [InlineData("""{"type":"array","maxItems":-1,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
+    [InlineData("""{"type":"array","maxItems":2.0,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be an integer token")]
+    [InlineData("""{"type":"array","maxItems":"2","items":{"$ref":"#/definitions/id"}}""", "maxItems must be an integer token")]
+    [InlineData("""{"type":"array","minItems":2,"maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "minItems 2 needs items that are a $ref and no maxItems")]
+    [InlineData("""{"type":"array","minItems":2,"maxItems":3,"items":{"$ref":"#/definitions/id"}}""", "minItems 2 needs items that are a $ref and no maxItems")]
+    [InlineData("""{"type":"array","maxItems":2,"items":{"type":"string"}}""", "maxItems needs items that are a $ref")]
+    [InlineData("""{"type":"array","maxItems":2,"items":{"enum":["a","b"]}}""", "maxItems needs items that are a $ref")]
+    [InlineData("""{"type":"array","maxItems":2,"items":{"allOf":[{"$ref":"#/definitions/id"},{"pattern":"^a"}]}}""", "maxItems needs items that are a $ref")]
+    [InlineData("""{"type":"array","maxItems":16,"items":{"$ref":"#/definitions/id"}}""", "maxItems gives a tuple longer than 60 characters")]
+    public void BoundedArraysOutsideTheFormAreRefused(string node, string problem) => RefusedNode(node, problem);
 
     [Theory]
     [InlineData("__proto__")]
@@ -542,7 +617,7 @@ public sealed class EmitterTests
     [InlineData("body.schema.json", "unsupported keyword \"patternProperties\"", "\"required\": [\"blockId\", \"content\"],", "\"required\": [\"blockId\", \"content\"],\n      \"patternProperties\": { \"^x\": { \"type\": \"string\" } },")]
     [InlineData("body.schema.json", "tuples are not supported", "\"items\": { \"$ref\": \"#/definitions/listItem\" }", "\"items\": [{ \"$ref\": \"#/definitions/listItem\" }]")]
     [InlineData("content.schema.json", "needs a required string const property named type", "\"type\": { \"const\": \"part\" },", "", "\"required\": [\"type\", \"kind\",", "\"required\": [\"kind\",")]
-    [InlineData("content.schema.json", "discriminator \"chapter\" is repeated", "\"type\": { \"const\": \"part\" },", "\"type\": { \"const\": \"chapter\" },")]
+    [InlineData("content.schema.json", "definitions/partFile/oneOf/2: discriminator \"part\" is repeated", "\"type\": { \"const\": \"part\" },", "\"type\": { \"const\": \"chapter\" },")]
     [InlineData("body.schema.json", "$schema must be", "draft-07", "draft-04")]
     [InlineData("body.schema.json", "$id must be", "/schema/body.schema.json", "/schema/other.schema.json")]
     [InlineData("body.schema.json", "\"extra\" is not a declared property", "\"required\": [\"blockId\", \"content\"],", "\"required\": [\"blockId\", \"content\", \"extra\"],")]
@@ -574,6 +649,19 @@ public sealed class EmitterTests
 
     private static string BodyDocument(string definitions, string extra = "") =>
         "{" + Draft + BodyId + extra + "\"definitions\":{" + definitions + "}}";
+
+    private static string KindDocument(string node, string extra = "")
+    {
+        const string Kinds = """
+            "k1":{"type":"object","additionalProperties":false,"required":["type","kind"],"properties":{"type":{"const":"part"},"kind":{"const":"one"}}},
+            "k2":{"type":"object","additionalProperties":false,"required":["type","kind"],"properties":{"type":{"const":"part"},"kind":{"const":"two"}}},
+            "k1again":{"type":"object","additionalProperties":false,"required":["type","kind"],"properties":{"type":{"const":"part"},"kind":{"const":"one"}}},
+            "k3":{"type":"object","additionalProperties":false,"required":["type","kind"],"properties":{"type":{"const":"other"},"kind":{"const":"three"}}},
+            "bare":{"type":"object","additionalProperties":false,"required":["type"],"properties":{"type":{"const":"part"}}},
+            "kinds":{"oneOf":[{"$ref":"#/definitions/k1"},{"$ref":"#/definitions/k2"}]}
+            """;
+        return BodyDocument(IdDefinition + "," + Members + "," + Kinds + extra + ",\"x\":" + node);
+    }
 
     private static string ContentDocument(string root = Root) =>
         "{" + Draft + ContentId + root + "\"definitions\":{" + AFile + "," + BFile + "}}";

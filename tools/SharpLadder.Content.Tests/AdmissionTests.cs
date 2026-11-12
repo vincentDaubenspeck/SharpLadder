@@ -8,7 +8,7 @@ public sealed class AdmissionTests
 {
     private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
     private const string LinkRefused = "links and reparse points are not accepted at or below a root folder";
-    private const string RootRefusal = "the content root holds only chapters/, schema/, aliases.yml and patterns.yml";
+    private const string RootRefusal = "the content root holds only chapters/, errors/, glossary/, schema/, aliases.yml and patterns.yml";
 
     private static readonly UTF8Encoding Utf8 = new(false);
 
@@ -29,8 +29,8 @@ public sealed class AdmissionTests
     [Theory]
     [InlineData("notes.md", false)]
     [InlineData("docs", true)]
-    [InlineData("glossary", true)]
-    [InlineData("errors", true)]
+    [InlineData("Glossary", true)]
+    [InlineData("Errors", true)]
     [InlineData("Schema", true)]
     [InlineData("ALIASES.YML", false)]
     [InlineData("aliases.yaml", false)]

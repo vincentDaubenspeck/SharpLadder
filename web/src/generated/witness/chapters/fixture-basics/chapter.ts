@@ -124,6 +124,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-parts",
               content: [
                 {
@@ -138,6 +139,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-note",
               chapter: "ch-fixture",
               content: [
@@ -161,6 +163,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "second-start",
               chapter: "ch-second",
               content: [
@@ -185,6 +188,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-links",
               content: [
                 {
@@ -234,6 +238,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-parts",
               content: [
                 {
@@ -248,6 +253,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-parts",
               content: [
                 {
@@ -269,6 +275,7 @@ export const witness = {
                 },
                 {
                   type: "link",
+                  kind: "anchor",
                   id: "fix-parts",
                   content: [
                     {
@@ -285,6 +292,7 @@ export const witness = {
             },
             {
               type: "link",
+              kind: "anchor",
               id: "fix-parts",
               content: [
                 {

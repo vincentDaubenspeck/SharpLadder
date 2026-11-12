@@ -251,7 +251,7 @@ describe("witness grammar", () => {
 });
 
 const typesHead =
-  "// SharpLadder.Content type emitter output, grammar 1. Do not edit.\n\n";
+  "// SharpLadder.Content type emitter output, grammar 2. Do not edit.\n\n";
 const types = (body, head = typesHead) => `${head}${body}\n`;
 const everyKind = [
   'import type { Body, Spans } from "./body.ts";',
@@ -263,11 +263,18 @@ const everyKind = [
   "  order: 12;",
   "  low: -2;",
   "  flag?: boolean;",
+  "  never: false;",
+  "  always?: true;",
   "  count: number;",
   "  none?: never;",
   "  list: Spans[];",
   "  some: [Body, ...Body[]];",
+  "  pair: [Body, Body, ...Body[]];",
   "  mixed: (Plain | Body)[];",
+  "  capped: [] | [Body] | [Body, Body];",
+  "  filled?: [Body] | [Body, Body];",
+  "  one: [Body];",
+  "  rows: ([] | [Body])[];",
   "};",
   "",
   "export type ContentDoc = Shape | Plain;",
@@ -288,7 +295,9 @@ describe("type module grammar", () => {
     "object keyword": "export type Shape = object;",
     undefined: "export type Shape = undefined;",
     null: "export type Shape = null;",
-    "boolean literal": "export type Shape = true;",
+    "bigint literal": "export type Shape = 1n;",
+    "negative boolean literal": "export type Shape = -true;",
+    "regular expression literal": "export type Shape = /a/;",
     intersection: "export type Shape = { a: string } & { b: string };",
     function: "export type Shape = () => void;",
     conditional: "export type Shape = A extends B ? C : D;",
@@ -354,7 +363,74 @@ describe("type module grammar", () => {
       "export type Probe = {}[];",
       "object type has no members",
     ],
-    "empty tuple": ["export type Probe = [];", "tuple is not [T, ...T[]]"],
+    "empty tuple": [
+      "export type Probe = [];",
+      "tuple is not [T, ...T[]] or [T, T, ...T[]]",
+    ],
+    "three before the rest": [
+      "export type Probe = [A, A, A, ...A[]];",
+      "tuple is not [T, ...T[]] or [T, T, ...T[]]",
+    ],
+    "two different before the rest": [
+      "export type Probe = [A, B, ...A[]];",
+      "tuple is not [T, ...T[]] or [T, T, ...T[]]",
+    ],
+    "a pair whose rest differs": [
+      "export type Probe = [A, A, ...B[]];",
+      "tuple rest does not repeat the first item type",
+    ],
+    "lone pair": [
+      "export type Probe = [A, A];",
+      "tuple is not [T, ...T[]] or [T, T, ...T[]]",
+    ],
+    "bounded tuples from two": [
+      "export type Probe = [A, A] | [A, A, A];",
+      "bounded tuples are not one per length from zero or one item",
+    ],
+    "bounded tuples with a gap": [
+      "export type Probe = [] | [A, A];",
+      "bounded tuples are not one per length from zero or one item",
+    ],
+    "bounded tuples out of order": [
+      "export type Probe = [A] | [];",
+      "bounded tuples are not one per length from zero or one item",
+    ],
+    "bounded tuples past the limit": [
+      `export type Probe = ${Array.from({ length: 18 }, (_, i) => `[${Array(i).fill("A").join(", ")}]`).join(" | ")};`,
+      "bounded tuples are not one per length from zero or one item",
+    ],
+    "bounded tuples of two aliases": [
+      "export type Probe = [] | [A] | [A, B];",
+      "bounded tuple items are not one plain alias",
+    ],
+    "bounded tuples of different aliases": [
+      "export type Probe = [A] | [B, B];",
+      "bounded tuple items are not one plain alias",
+    ],
+    "bounded tuple of a keyword": [
+      "export type Probe = [] | [string];",
+      "bounded tuple items are not one plain alias",
+    ],
+    "bounded tuple of an object": [
+      "export type Probe = [{ a: string }];",
+      "bounded tuple items are not one plain alias",
+    ],
+    "bounded tuple beside an alias": [
+      "export type Probe = [] | [A] | A;",
+      "bounded tuples share a union with another type",
+    ],
+    "bounded tuple beside an open tuple": [
+      "export type Probe = [A] | [A, ...A[]];",
+      "bounded tuples share a union with another type",
+    ],
+    "optional bounded item": [
+      "export type Probe = [] | [A?];",
+      "bounded tuple items are not one plain alias",
+    ],
+    "named bounded item": [
+      "export type Probe = [] | [a: A];",
+      "bounded tuple items are not one plain alias",
+    ],
     "upper-case literal": [
       'export type Probe = "UPPER";',
       "outside the literal grammar",
@@ -443,6 +519,8 @@ describe("type module grammar", () => {
     `export type ProbeNested = (\n${variants("  ")}\n)[][];`,
     `export type ProbeTuple = [\n  (\n${variants("    ")}\n  ),\n  ...(\n${variants("    ")}\n  )[],\n];`,
     "export type ProbeRefs = [A | B, ...(A | B)[]];",
+    "export type ProbeCapped = [] | [A] | [A, A];",
+    "export type ProbeFilled = [A] | [A, A];",
   ].join("\n\n");
 
   it("passes arrays and tuples of an object union", () => {
@@ -460,6 +538,13 @@ describe("type module grammar", () => {
       "export const four: ProbeRefs = [{ type: 'a' }, { type: 'b' }];",
       '// @ts-expect-error both of an at-most-one set\nexport const bad: ProbeArray = [{ a: "x", b: "y" }];',
       "// @ts-expect-error an empty non-empty tuple\nexport const none: ProbeTuple = [];",
+      "export const least: ProbeCapped = [];",
+      "export const most: ProbeCapped = [{ type: 'a' }, { type: 'a' }];",
+      "// @ts-expect-error one item past the bound\nexport const over: ProbeCapped = [{ type: 'a' }, { type: 'a' }, { type: 'a' }];",
+      "export const single: ProbeFilled = [{ type: 'a' }];",
+      "export const pair: ProbeFilled = [{ type: 'a' }, { type: 'a' }];",
+      "// @ts-expect-error an empty bounded non-empty array\nexport const empty: ProbeFilled = [];",
+      "// @ts-expect-error one item past the bound\nexport const triple: ProbeFilled = [{ type: 'a' }, { type: 'a' }, { type: 'a' }];",
     ].join("\n");
     const options = { strict: true, noEmit: true, types: [] };
     const host = ts.createCompilerHost(options);

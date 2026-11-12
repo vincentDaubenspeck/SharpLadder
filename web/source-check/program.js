@@ -71,7 +71,12 @@ export const programs = [
     extensions: [".ts", ".tsx"],
     config: [],
     rootFiles: ["harness/content/main.tsx"],
-    admitted: ["src/content", "src/generated"],
+    // The harness validates each hints view against the closed schema the unit tests use.
+    admitted: [
+      "src/content",
+      "src/generated",
+      "src/content-tests/hints-view.ts",
+    ],
     forbiddenPackages: nodeTypePackages,
     equivalentTo: "tsconfig.json",
     parser: { projectService: false, project: "./tsconfig.harness.json" },

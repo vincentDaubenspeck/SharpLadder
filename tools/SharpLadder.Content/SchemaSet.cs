@@ -101,6 +101,9 @@ internal sealed class SchemaSet : IContentSchema
     {
         RecordKind.Chapter => Validate(json, _validator, "chapter"),
         RecordKind.Part => Validate(json, _validator, "part"),
+        RecordKind.Glossary => Validate(json, _validator, "glossary"),
+        RecordKind.Error => Validate(json, _validator, "error"),
+        RecordKind.HintsCatalogue => Validate(json, _validator, "hints-catalogue"),
         RecordKind.Aliases => Validate(json, _aliases, null),
         RecordKind.Patterns => Validate(json, _patterns, null),
         _ => "unknown record kind",

@@ -100,12 +100,38 @@ export function liveNames(sources: readonly string[]): LiveNames {
       blocks(doc["intro"], "an intro");
     } else if (doc["type"] !== "part")
       fail("a record is not a chapter or part");
+    // A ladder declares its id but is no section, so no alias may end at it.
+    const ladders = doc["type"] === "part" && doc["kind"] === "hints";
     for (const section of list(doc["sections"], "sections")) {
       if (!isObject(section)) fail("a section is not an object");
       const id = text(section["id"], "a section id");
       ids.add(id);
+      if (ladders) continue;
       sectionIds.add(id);
-      blocks(section["body"], "a section body");
+      const cards = section["cards"];
+      if (cards === undefined) {
+        blocks(section["body"], "a section body");
+        // An approach declares its own id and the ids of its blocks beside the shared lead.
+        const approaches = section["approaches"] ?? [];
+        for (const approach of list(
+          approaches,
+          "the approaches of a section",
+        )) {
+          if (!isObject(approach)) fail("an approach is not an object");
+          ids.add(text(approach["id"], "an approach id"));
+          blocks(approach["body"], "an approach body");
+        }
+        continue;
+      }
+      // A cards section declares its ids on its cards and their fields, and has no body.
+      if (section["body"] !== undefined)
+        fail("a section holds both a body and cards");
+      for (const card of list(cards, "the cards of a section")) {
+        if (!isObject(card)) fail("a card is not an object");
+        ids.add(text(card["id"], "a card id"));
+        blocks([card["reach"], card["build"]], "a card");
+        blocks(card["why"], "the why of a card");
+      }
     }
   }
   return { slugs, ids, sectionIds };

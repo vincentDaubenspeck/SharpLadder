@@ -106,10 +106,21 @@ public sealed class NegativeTests
     }
 
     [Fact]
-    public void UnsupportedPartKindIsASchemaViolation() =>
-        Assert.Contains(
-            Diagnostics(("chapters/c/chapter.md", Chapter), ("chapters/c/part.md", PartHead.Replace("syntax", "cards", StringComparison.Ordinal) + "## Good {#syn-good}\n")),
-            d => d.StartsWith("chapters/c/part.md:1: schema: ", StringComparison.Ordinal));
+    public void UnsupportedPartKindIsRefusedByTheCompiler() =>
+        Assert.Equal(
+            ["chapters/c/part.md:2: part kind \"approach\" is not admitted; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints"],
+            Diagnostics(("chapters/c/chapter.md", Chapter), ("chapters/c/part.md", PartHead.Replace("syntax", "approach", StringComparison.Ordinal) + "## Good {#syn-good}\n")));
+
+    [Theory]
+    [InlineData("kind: syntax\n", "", "chapters/c/part.md:2: front matter states no part kind; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("kind: syntax", "kind: Syntax", "chapters/c/part.md:2: part kind \"Syntax\" is not admitted; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("kind: syntax", "kind: walk-it", "chapters/c/part.md:2: part kind \"walk-it\" is not admitted; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("kind: syntax", "kind: quiz", "chapters/c/part.md:2: part kind \"quiz\" is not admitted; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    [InlineData("kind: syntax\nchapter: ch-test", "chapter: ch-test\nkind: steps", "chapters/c/part.md:3: part kind \"steps\" is not admitted; write kind as one of syntax, build, idioms, gotchas, library, cards, drill, hints")]
+    public void APartKindTheCompilerDoesNotReadIsRefused(string from, string to, string expected) =>
+        Assert.Equal(
+            [expected],
+            Diagnostics(("chapters/c/chapter.md", Chapter), ("chapters/c/part.md", PartHead.Replace(from, to, StringComparison.Ordinal) + "## Good {#syn-good}\n")));
 
     [Theory]
     [InlineData("<div>raw</div>\n", "raw HTML is not allowed")]

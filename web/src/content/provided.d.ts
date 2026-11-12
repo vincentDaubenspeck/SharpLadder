@@ -4,6 +4,7 @@ declare module "vitest" {
     contentRecords: readonly {
       readonly path: string;
       readonly kind: string;
+      readonly part: string | null;
       readonly text: string;
     }[];
   }

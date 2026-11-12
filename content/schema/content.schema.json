@@ -4,7 +4,10 @@
   "title": "Compiled content file",
   "oneOf": [
     { "$ref": "#/definitions/chapterFile" },
-    { "$ref": "#/definitions/partFile" }
+    { "$ref": "#/definitions/partFile" },
+    { "$ref": "#/definitions/glossaryEntry" },
+    { "$ref": "#/definitions/errorEntry" },
+    { "$ref": "#/definitions/hintsCatalogue" }
   ],
   "definitions": {
     "chapterId": {
@@ -16,6 +19,96 @@
     "order": {
       "type": "integer",
       "minimum": 1
+    },
+    "termId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^term-[a-z0-9-]" }
+      ]
+    },
+    "shownText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "see": {
+      "type": "array",
+      "items": { "$ref": "body.schema.json#/definitions/id" }
+    },
+    "fieldBody": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "body.schema.json#/definitions/block" }
+    },
+    "glossaryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "term", "short", "see", "body"],
+      "properties": {
+        "type": { "const": "glossary" },
+        "id": { "$ref": "#/definitions/termId" },
+        "term": { "$ref": "#/definitions/shownText" },
+        "short": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "see": { "$ref": "#/definitions/see" },
+        "body": { "$ref": "body.schema.json#/definitions/body" }
+      }
+    },
+    "errorEntry": {
+      "oneOf": [
+        { "$ref": "#/definitions/compilerError" },
+        { "$ref": "#/definitions/runtimeError" },
+        { "$ref": "#/definitions/wrongOutputError" }
+      ]
+    },
+    "compilerError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "id", "code", "wrote", "got", "see", "cause", "hint"],
+      "properties": {
+        "type": { "const": "error" },
+        "kind": { "const": "compiler" },
+        "id": { "$ref": "body.schema.json#/definitions/errorId" },
+        "code": { "$ref": "#/definitions/shownText" },
+        "wrote": { "$ref": "#/definitions/shownText" },
+        "got": { "$ref": "#/definitions/shownText" },
+        "see": { "$ref": "#/definitions/see" },
+        "cause": { "$ref": "#/definitions/fieldBody" },
+        "hint": { "$ref": "#/definitions/fieldBody" }
+      }
+    },
+    "runtimeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "id", "code", "wrote", "got", "see", "cause", "hint"],
+      "properties": {
+        "type": { "const": "error" },
+        "kind": { "const": "runtime" },
+        "id": { "$ref": "body.schema.json#/definitions/errorId" },
+        "code": { "$ref": "#/definitions/shownText" },
+        "wrote": { "$ref": "#/definitions/shownText" },
+        "got": { "$ref": "#/definitions/shownText" },
+        "see": { "$ref": "#/definitions/see" },
+        "cause": { "$ref": "#/definitions/fieldBody" },
+        "hint": { "$ref": "#/definitions/fieldBody" }
+      }
+    },
+    "wrongOutputError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "id", "wrote", "got", "see", "cause", "hint"],
+      "properties": {
+        "type": { "const": "error" },
+        "kind": { "const": "wrong-output" },
+        "id": { "$ref": "body.schema.json#/definitions/errorId" },
+        "wrote": { "$ref": "#/definitions/shownText" },
+        "got": { "$ref": "#/definitions/shownText" },
+        "see": { "$ref": "#/definitions/see" },
+        "cause": { "$ref": "#/definitions/fieldBody" },
+        "hint": { "$ref": "#/definitions/fieldBody" }
+      }
     },
     "chapterFile": {
       "type": "object",
@@ -48,18 +141,110 @@
       }
     },
     "partFile": {
+      "oneOf": [
+        { "$ref": "#/definitions/syntaxPart" },
+        { "$ref": "#/definitions/buildPart" },
+        { "$ref": "#/definitions/idiomsPart" },
+        { "$ref": "#/definitions/gotchasPart" },
+        { "$ref": "#/definitions/libraryPart" },
+        { "$ref": "#/definitions/cardsPart" },
+        { "$ref": "#/definitions/drillPart" },
+        { "$ref": "#/definitions/hintsPart" }
+      ]
+    },
+    "syntaxPart": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "kind", "chapter", "order", "sections"],
       "properties": {
         "type": { "const": "part" },
-        "kind": { "enum": ["syntax", "build", "idioms", "gotchas", "library"] },
+        "kind": { "const": "syntax" },
         "chapter": { "$ref": "#/definitions/chapterId" },
         "order": { "$ref": "#/definitions/order" },
         "sections": {
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/definitions/partSection" }
+        }
+      }
+    },
+    "buildPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "build" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/buildSection" }
+        }
+      }
+    },
+    "idiomsPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "idioms" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/partSection" }
+        }
+      }
+    },
+    "gotchasPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "gotchas" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/partSection" }
+        }
+      }
+    },
+    "libraryPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "library" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/partSection" }
+        }
+      }
+    },
+    "cardsPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "cards" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/cardsSection" }
         }
       }
     },
@@ -86,6 +271,255 @@
         },
         "title": { "$ref": "body.schema.json#/definitions/spans" },
         "body": { "$ref": "body.schema.json#/definitions/body" },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
+      }
+    },
+    "buildSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "number", "title", "body", "spoken"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/sectionId" },
+        "number": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*(?![\\s\\S])"
+        },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "body": { "$ref": "body.schema.json#/definitions/body" },
+        "approaches": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/approach" }
+        },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
+      }
+    },
+    "approach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "label", "body"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/id" },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "label": { "$ref": "#/definitions/shownText" },
+        "body": { "$ref": "#/definitions/fieldBody" }
+      }
+    },
+    "cardsSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "number", "title", "cards", "spoken"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/sectionId" },
+        "number": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*(?![\\s\\S])"
+        },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "cards": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/card" }
+        },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
+      }
+    },
+    "cardId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^card-[a-z0-9-]" }
+      ]
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "reach", "build", "why"],
+      "properties": {
+        "id": { "$ref": "#/definitions/cardId" },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "reach": { "$ref": "body.schema.json#/definitions/paragraphBlock" },
+        "build": {
+          "oneOf": [
+            { "$ref": "body.schema.json#/definitions/paragraphBlock" },
+            { "$ref": "body.schema.json#/definitions/codeBlock" },
+            { "$ref": "body.schema.json#/definitions/anchoredTextBlock" }
+          ]
+        },
+        "why": { "$ref": "#/definitions/fieldBody" },
+        "traps": { "$ref": "#/definitions/cardList" },
+        "also": { "$ref": "#/definitions/cardList" }
+      }
+    },
+    "cardList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "blockId", "ordered", "items"],
+      "properties": {
+        "type": { "const": "list" },
+        "blockId": { "$ref": "body.schema.json#/definitions/blockId" },
+        "ordered": { "const": false },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": { "$ref": "body.schema.json#/definitions/listItem" }
+        }
+      }
+    },
+    "drillPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "drill" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/drillSection" }
+        }
+      }
+    },
+    "drillSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "number", "title", "rung", "body", "drills", "spoken"],
+      "properties": {
+        "id": { "$ref": "body.schema.json#/definitions/sectionId" },
+        "number": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*\\.[1-9][0-9]*(?![\\s\\S])"
+        },
+        "title": { "$ref": "body.schema.json#/definitions/spans" },
+        "rung": { "$ref": "#/definitions/rampRung" },
+        "body": { "$ref": "body.schema.json#/definitions/body" },
+        "drills": { "$ref": "#/definitions/drillList" },
+        "spoken": { "$ref": "body.schema.json#/definitions/speech" }
+      }
+    },
+    "rampRung": {
+      "enum": ["foundations", "warm-up", "easy", "medium", "hard"]
+    },
+    "drillList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockId", "items"],
+      "properties": {
+        "blockId": { "$ref": "body.schema.json#/definitions/blockId" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/drillReference" }
+        }
+      }
+    },
+    "drillReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockId", "id", "label"],
+      "properties": {
+        "blockId": { "$ref": "body.schema.json#/definitions/itemId" },
+        "id": { "$ref": "#/definitions/drillId" },
+        "label": { "$ref": "#/definitions/shownText" }
+      }
+    },
+    "drillId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^drill-[a-z0-9-]" }
+      ]
+    },
+    "hintsPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "chapter", "order", "sections"],
+      "properties": {
+        "type": { "const": "part" },
+        "kind": { "const": "hints" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/ladder" }
+        }
+      }
+    },
+    "ladderId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^ladder-[a-z0-9-]" }
+      ]
+    },
+    "patternId": {
+      "allOf": [
+        { "$ref": "body.schema.json#/definitions/id" },
+        { "pattern": "^pat-[a-z0-9-]" }
+      ]
+    },
+    "cue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockId", "text"],
+      "properties": {
+        "blockId": { "$ref": "body.schema.json#/definitions/blockId" },
+        "text": { "$ref": "#/definitions/shownText" }
+      }
+    },
+    "ladder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "cue", "pattern", "approach", "rungs"],
+      "properties": {
+        "id": { "$ref": "#/definitions/ladderId" },
+        "title": { "$ref": "body.schema.json#/definitions/linkContent" },
+        "cue": { "$ref": "#/definitions/cue" },
+        "pattern": { "$ref": "#/definitions/patternId" },
+        "approach": { "$ref": "#/definitions/shownText" },
+        "rungs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/rung" }
+        }
+      }
+    },
+    "rung": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 48,
+          "pattern": "^r[0-9]+(?![\\s\\S])"
+        },
+        "content": { "$ref": "body.schema.json#/definitions/linkContent" }
+      }
+    },
+    "hintsCatalogue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "chapter", "order", "ladders"],
+      "properties": {
+        "type": { "const": "hints-catalogue" },
+        "chapter": { "$ref": "#/definitions/chapterId" },
+        "order": { "$ref": "#/definitions/order" },
+        "ladders": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/catalogueLadder" }
+        }
+      }
+    },
+    "catalogueLadder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "cue", "spoken"],
+      "properties": {
+        "id": { "$ref": "#/definitions/ladderId" },
+        "cue": { "$ref": "#/definitions/cue" },
         "spoken": { "$ref": "body.schema.json#/definitions/speech" }
       }
     }

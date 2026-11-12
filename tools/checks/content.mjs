@@ -67,11 +67,9 @@ export function contentProblems(root, { input = fixture, golden = goldenFile, on
   }
 }
 
-// The last commit published before the alias record existed. Only this commit may lack the
-// record; it is written out in full so no later commit can ever take its place. A branch that
-// starts from it afresh still passes here and is kept off the main branch only by the rule
-// against rewriting published history.
-export const firstBase = "280d71efd9c40acea97737ea8423edca19d0cd50";
+// The commit that first published the alias record. Every history judged here descends from
+// it, and it is written out in full so no commit that lacks the record can take its place.
+export const firstBase = "e69f0c7595c482ce73b93aaa9d4a95f0479c9a1f";
 export const aliasRecord = "web/compiled/aliases.json";
 
 // Replacement objects and the commit-graph cache are local state that could show another
@@ -131,8 +129,8 @@ function history(tree, commit, first) {
  * against every distinct record held by HEAD or any commit HEAD reaches back to first, so a
  * name retired in any of them is kept for good, whether the commits were pushed one at a time
  * or together; that includes a name added in one commit and removed in the next, and every
- * name on a merged side branch. A commit without the record passes only when it is the one
- * named by first, which must be an ancestor of HEAD; history before it is not read. The rule
+ * name on a merged side branch. No commit read may lack the record, and first, which must be
+ * HEAD or an ancestor of HEAD, is among them; history before it is not read. The rule
  * holds across any number of steps, so comparing with each record directly asks no more of an
  * honest history than comparing step by step.
  */
@@ -157,9 +155,8 @@ export function retentionProblems(root, { tree = root, first = firstBase } = {})
   const records = new Map();
   for (const base of range.commits) {
     const at = blobAt(tree, base);
-    if (at === null) {
-      if (base !== first) problems.push(`commit ${base} holds no ${aliasRecord}; only ${first} may lack it`);
-    } else if (at.problem) problems.push(at.problem);
+    if (at === null) problems.push(`commit ${base} holds no ${aliasRecord}; every commit from ${first} on holds it`);
+    else if (at.problem) problems.push(at.problem);
     else if (!records.has(at.blob)) records.set(at.blob, base);
   }
   for (const [blob, base] of records) {

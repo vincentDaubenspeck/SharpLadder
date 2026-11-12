@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace SharpLadder.Content;
 
@@ -35,11 +37,13 @@ internal static class TestRecords
             }
 
             // The manifest names the kind, and the record must be valid as exactly that kind.
-            if (!kinds.TryGetValue(path, out var kind))
+            if (!kinds.TryGetValue(path, out var stated))
             {
                 problems.Add($"{path}: the manifest states no kind for it");
                 continue;
             }
+
+            var (kind, part) = stated;
 
             if (schema.Validate(text, kind) is { } problem)
             {
@@ -47,10 +51,17 @@ internal static class TestRecords
                 continue;
             }
 
-            records.Add(new Record(path, Payload.KindName(kind), text));
+            // The part kind is the manifest's, and the accepted payload must state the same one.
+            if (part is not null && !string.Equals((JsonNode.Parse(text) as JsonObject)?["kind"]?.GetValue<string>(), part, StringComparison.Ordinal))
+            {
+                problems.Add($"{path}: the manifest states the part kind {part}, and the record holds another");
+                continue;
+            }
+
+            records.Add(new Record(path, Payload.KindName(kind), part, text));
         }
 
-        return problems.Count > 0 ? (null, problems) : (JsonSerializer.Serialize(new Envelope(2, records), Json), []);
+        return problems.Count > 0 ? (null, problems) : (JsonSerializer.Serialize(new Envelope(3, records), Json), []);
     }
 
     // The text of one payload file, or why its bytes are refused before any schema sees them.
@@ -82,5 +93,5 @@ internal static class TestRecords
 
     private sealed record Envelope(int Version, IReadOnlyList<Record> Records);
 
-    private sealed record Record(string Path, string Kind, string Text);
+    private sealed record Record(string Path, string Kind, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Part, string Text);
 }

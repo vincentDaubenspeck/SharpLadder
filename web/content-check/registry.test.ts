@@ -103,7 +103,63 @@ describe("live names", () => {
     expect([...names.sectionIds].sort()).toEqual(["start", "syn-one"]);
   });
 
+  it("collects the ids a cards section declares on its cards and their fields", () => {
+    const card = {
+      id: "card-a",
+      reach: { type: "paragraph" },
+      build: { type: "code", id: "a-code" },
+      why: [{ type: "text", id: "a-text" }, { type: "paragraph" }],
+    };
+    const cards = {
+      type: "part",
+      sections: [{ id: "cards-a", cards: [card] }],
+    };
+    const names = liveNames([written(cards)]);
+    expect([...names.ids].sort()).toEqual([
+      "a-code",
+      "a-text",
+      "card-a",
+      "cards-a",
+    ]);
+    expect([...names.sectionIds]).toEqual(["cards-a"]);
+  });
+
+  it("collects a ladder's id as an id and never as a section", () => {
+    const hints = {
+      type: "part",
+      kind: "hints",
+      sections: [{ id: "ladder-a", rungs: [{ id: "r1" }] }],
+    };
+    const names = liveNames([written(hints)]);
+    expect([...names.ids]).toEqual(["ladder-a"]);
+    expect([...names.sectionIds]).toEqual([]);
+    // Any other part kind still owes a body for each section.
+    expect(() => liveNames([written({ ...hints, kind: "syntax" })])).toThrow(
+      "live names refused: a section body is not a list",
+    );
+  });
+
   it.each([
+    [
+      "a section with a body and cards",
+      [{ type: "part", sections: [{ id: "a", body: [], cards: [] }] }],
+    ],
+    [
+      "cards that are not a list",
+      [{ type: "part", sections: [{ id: "a", cards: {} }] }],
+    ],
+    [
+      "a card that is not an object",
+      [{ type: "part", sections: [{ id: "a", cards: [1] }] }],
+    ],
+    [
+      "a card without an id",
+      [{ type: "part", sections: [{ id: "a", cards: [{ why: [] }] }] }],
+    ],
+    [
+      "a card without its required fields",
+      [{ type: "part", sections: [{ id: "a", cards: [{ id: "card-a" }] }] }],
+    ],
     ["a record that is not an object", [null]],
     ["a record of another type", [{ type: "aliases", sections: [] }]],
     ["a chapter without a slug", [{ ...chapter, slug: undefined }]],

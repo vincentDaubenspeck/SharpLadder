@@ -24,7 +24,27 @@
           "content": [
             {
               "type": "text",
-              "text": "To add up the readings, visit each one in turn and keep a "
+              "text": "To add up the readings, visit each one in turn with a "
+            },
+            {
+              "type": "term",
+              "id": "term-fixture-loop",
+              "short": "Code that runs the same statements again while a condition holds.",
+              "content": [
+                {
+                  "type": "em",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "loop"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " and keep a "
             },
             {
               "type": "strong",
@@ -87,7 +107,22 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Add each reading in turn."
+                  "text": "Add each reading on each turn of the "
+                },
+                {
+                  "type": "term",
+                  "id": "term-fixture-loop",
+                  "short": "Code that runs the same statements again while a condition holds.",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "loop"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
                 }
               ]
             }
@@ -103,6 +138,7 @@
             },
             {
               "type": "link",
+              "kind": "anchor",
               "id": "syn-fix-sum1",
               "chapter": "ch-fixture",
               "content": [
@@ -118,6 +154,7 @@
             },
             {
               "type": "link",
+              "kind": "anchor",
               "id": "syn-fix-sum",
               "content": [
                 {
@@ -140,7 +177,7 @@
               "type": "block",
               "blockId": "syn-fix-sum/b1"
             },
-            "text": "To add up the readings, visit each one in turn and keep a running total."
+            "text": "To add up the readings, visit each one in turn with a loop and keep a running total."
           },
           {
             "target": {
@@ -175,7 +212,7 @@
               "type": "block",
               "blockId": "syn-fix-sum/b5.i2"
             },
-            "text": "Add each reading in turn."
+            "text": "Add each reading on each turn of the loop."
           },
           {
             "target": {
@@ -185,7 +222,193 @@
             "text": "Back to the first sum or this section."
           }
         ],
-        "audio": "sha256:380a29fa4d76bee1ffbf5ece0277f63d62a8acdb44c761a91d665e11dd54693c"
+        "audio": "sha256:cacb520d2134710ea202f876e9edbc85cf41223c5b47bf1ff7a2347ae8d0cb83"
+      }
+    },
+    {
+      "id": "syn-fix-sizes",
+      "number": "1.2",
+      "title": [
+        {
+          "type": "text",
+          "text": "Sizes in a table"
+        }
+      ],
+      "body": [
+        {
+          "type": "paragraph",
+          "blockId": "syn-fix-sizes/b1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Each type takes a fixed number of bytes."
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "blockId": "syn-fix-sizes/b2",
+          "headers": [
+            [
+              {
+                "type": "text",
+                "text": "Type"
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Size"
+              }
+            ]
+          ],
+          "rows": [
+            [
+              [
+                {
+                  "type": "code",
+                  "text": "int"
+                }
+              ],
+              [
+                {
+                  "type": "text",
+                  "text": "4 bytes"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "type": "code",
+                  "text": "long"
+                }
+              ],
+              []
+            ]
+          ]
+        },
+        {
+          "type": "table",
+          "blockId": "syn-fix-sizes/b3",
+          "headers": [
+            [],
+            [
+              {
+                "type": "text",
+                "text": "Meaning"
+              }
+            ]
+          ],
+          "rows": [
+            [
+              [
+                {
+                  "type": "text",
+                  "text": "a | b"
+                }
+              ],
+              [
+                {
+                  "type": "em",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "either"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " one"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "type": "text",
+                  "text": "repeat"
+                }
+              ],
+              [
+                {
+                  "type": "text",
+                  "text": "a "
+                },
+                {
+                  "type": "term",
+                  "id": "term-fixture-loop",
+                  "short": "Code that runs the same statements again while a condition holds.",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "loop"
+                    }
+                  ]
+                }
+              ]
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "blockId": "syn-fix-sizes/b4",
+          "content": [
+            {
+              "type": "text",
+              "text": "Reading a variable before it has a value gives "
+            },
+            {
+              "type": "link",
+              "kind": "error",
+              "id": "err-fixture-cs0165",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "an unassigned variable error"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ],
+      "spoken": {
+        "segments": [
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sizes/b1"
+            },
+            "text": "Each type takes a fixed number of bytes."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sizes/b2"
+            },
+            "text": "Columns: Type, Size. Row 1. Type: int; Size: 4 bytes. Row 2. Type: long; Size: blank."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sizes/b3"
+            },
+            "text": "Columns: Column 1, Meaning. Row 1. Column 1: a | b; Meaning: either one. Row 2. Column 1: repeat; Meaning: a loop."
+          },
+          {
+            "target": {
+              "type": "block",
+              "blockId": "syn-fix-sizes/b4"
+            },
+            "text": "Reading a variable before it has a value gives an unassigned variable error."
+          }
+        ],
+        "audio": "sha256:3d67cbab1cc015cf994feacba56a108273c3ea41d761ab96eeae918be182211f"
       }
     }
   ]

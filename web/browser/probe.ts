@@ -18,6 +18,7 @@ export async function setState(page: Page, state: Omit<PageState, "work">) {
     if (theme === null) root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
   }, state.theme);
+  await settle(page);
 }
 
 export interface Reading {
@@ -35,7 +36,7 @@ export async function readTokens(
   probes: { name: string; property: string; expected: string }[],
   work: boolean,
 ): Promise<Reading[]> {
-  return page.evaluate(
+  const readings = await page.evaluate(
     ({ probes, work }) => {
       const host = document.createElement("div");
       if (work) host.className = "work";
@@ -55,6 +56,8 @@ export async function readTokens(
     },
     { probes, work },
   );
+  await settle(page);
+  return readings;
 }
 
 /** Computed colours of the named tokens, as the engine resolves them in that scope. */
@@ -63,7 +66,7 @@ export async function readColours(
   names: string[],
   work: boolean,
 ): Promise<Record<string, string>> {
-  return page.evaluate(
+  const colours = await page.evaluate(
     ({ names, work }) => {
       const host = document.createElement("div");
       if (work) host.className = "work";
@@ -80,6 +83,8 @@ export async function readColours(
     },
     { names, work },
   );
+  await settle(page);
+  return colours;
 }
 
 const base64 = (bytes: Uint8Array) => {
@@ -167,10 +172,12 @@ export async function paintOf(
       (el as HTMLElement).style.setProperty(k, v);
     return saved;
   }, style);
+  await settle(page);
   const after = await shot(page, clip);
   await target.evaluate((el, saved) => {
     (el as HTMLElement).style.cssText = saved;
   }, previous);
+  await settle(page);
   const scale = await page.evaluate(() => window.devicePixelRatio);
   return (await differing(page, before, after)) / (scale * scale);
 }
@@ -194,6 +201,10 @@ export async function settle(page: Page) {
     } while (document.fonts.status !== "loaded");
   });
 }
+
+// One-shot, since a retrying check would accept focus that arrives late.
+export const focused = (target: Locator): Promise<boolean> =>
+  target.evaluate((el) => el === document.activeElement);
 
 /** Every font response the page receives, with the hash of the bytes it actually got. */
 export function watchFonts(page: Page) {

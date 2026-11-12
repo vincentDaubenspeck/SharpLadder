@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Markdig;
+using Markdig.Extensions.Tables;
 using Markdig.Extensions.Yaml;
 using Markdig.Renderers.Html;
 using Markdig.Syntax;
@@ -17,9 +18,12 @@ namespace SharpLadder.Content;
 /// </summary>
 internal sealed partial class SourceFile
 {
-    // Generic attributes stay last, as Markdig requires.
+    // Generic attributes stay last, as Markdig requires. Inline positions are kept so a pipe
+    // can be placed inside or outside a code span.
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseYamlFrontMatter()
+        .UsePipeTables()
+        .UsePreciseSourceLocation()
         .UseGenericAttributes()
         .Build();
 
@@ -31,9 +35,11 @@ internal sealed partial class SourceFile
     private readonly List<Diagnostic> _diagnostics;
     private readonly string _path;
     private string[] _lines = [];
+    private int[] _lineStarts = [];
     private Section? _current;
     private List<Segment> _segments = [];
     private int _headingLine;
+    private string? _spokenPrefix;
 
     private SourceFile(string path, List<Diagnostic> diagnostics)
     {
@@ -67,6 +73,15 @@ internal sealed partial class SourceFile
         link.Descendants<LinkInline>().Any(l => !l.IsImage)
             ? new Diagnostic(path, line, "a link cannot hold another link")
             : null;
+
+    private static bool HoldsTerm(IEnumerable<Span> spans) =>
+        spans.Any(span => span switch
+        {
+            TermSpan => true,
+            EmphasisSpan emphasis => HoldsTerm(emphasis.Content),
+            StrongSpan strong => HoldsTerm(strong.Content),
+            _ => false,
+        });
 
     private static void AddText(List<Span> spans, string text)
     {
@@ -102,9 +117,21 @@ internal sealed partial class SourceFile
     [GeneratedRegex(@"^\(Line: \d+, Col: \d+, Idx: \d+\) - \(Line: \d+, Col: \d+, Idx: \d+\): ", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex YamlLocation();
 
-    private static string? HeadingProblem(HeadingBlock heading, List<AttributeGroup> groups, string? id)
+    // The source offset each line starts at, as the parser counts offsets.
+    private static int[] LineStarts(string[] lines)
     {
-        if (heading.IsSetext || heading.Level != 2)
+        var starts = new int[lines.Length];
+        for (var i = 1; i < lines.Length; i++)
+        {
+            starts[i] = starts[i - 1] + lines[i - 1].Length + 1;
+        }
+
+        return starts;
+    }
+
+    private static string? HeadingProblem(HeadingBlock heading, List<AttributeGroup> groups, string? id, int level = 2)
+    {
+        if (heading.IsSetext || heading.Level != level)
         {
             return "only ## headings are supported";
         }
@@ -237,22 +264,17 @@ internal sealed partial class SourceFile
 
     private void Compile(string text, bool isChapter)
     {
-        _lines = text.Split('\n');
-        var document = Markdown.Parse(text, Pipeline);
-        if (document.Count == 0 || document[0] is not YamlFrontMatterBlock front)
+        if (Front(text) is not var (yaml, start, blocks))
         {
-            Error(1, "file must start with YAML front matter between --- lines");
             return;
         }
 
-        var yaml = string.Join('\n', front.Lines.Lines.Take(front.Lines.Count).Select(l => l.Slice.ToString()));
         var sections = new List<Section>();
         var intro = new List<BodyBlock>();
-        var blocks = document.Skip(1).ToList();
         if (isChapter)
         {
-            var meta = FrontMatter<ChapterFrontMatter>(yaml, front.Line + 1);
-            if (meta is null || !FrontMatterId(meta.Id, "id", "chapter id", yaml, front.Line + 1))
+            var meta = FrontMatter<ChapterFrontMatter>(yaml, start);
+            if (meta is null || !FrontMatterId(meta.Id, "id", "chapter id", yaml, start))
             {
                 return;
             }
@@ -281,18 +303,54 @@ internal sealed partial class SourceFile
         }
         else
         {
-            var meta = FrontMatter<PartFrontMatter>(yaml, front.Line + 1);
-            if (meta is null || !FrontMatterId(meta.Chapter, "chapter", "chapter reference", yaml, front.Line + 1))
+            var meta = FrontMatter<PartFrontMatter>(yaml, start);
+            if (meta is null || !FrontMatterId(meta.Chapter, "chapter", "chapter reference", yaml, start))
             {
                 return;
             }
 
             ChapterId = meta.Chapter;
-            if (ReadBody(blocks, null, sections, meta.Order))
+            if (PartKind(meta.Kind, yaml, start))
             {
-                Model = new PartFile { Kind = meta.Kind, Chapter = meta.Chapter, Order = meta.Order, Sections = sections };
+                CompilePart(meta, blocks, sections);
             }
         }
+    }
+
+    private void CompilePart(PartFrontMatter meta, List<Block> blocks, List<Section> sections)
+    {
+        _build = string.Equals(meta.Kind, PartKinds.Build, StringComparison.Ordinal);
+        if (string.Equals(meta.Kind, PartKinds.Hints, StringComparison.Ordinal))
+        {
+            if (ReadHints(blocks))
+            {
+                Model = new HintsPartFile { Chapter = meta.Chapter, Order = meta.Order, Sections = [.. Ladders.Select(l => l.Ladder)] };
+                BuildCatalogue(meta.Chapter, meta.Order);
+            }
+        }
+        else if (meta.Kind switch
+        {
+            PartKinds.Cards => ReadCards(blocks, sections, meta.Order),
+            PartKinds.Drill => ReadDrill(blocks, sections, meta.Order),
+            _ => ReadBody(blocks, null, sections, meta.Order),
+        })
+        {
+            Model = new PartFile { Kind = meta.Kind, Chapter = meta.Chapter, Order = meta.Order, Sections = sections };
+        }
+    }
+
+    // The compiler dispatches on the part kind, so it names a missing or unread one itself.
+    private bool PartKind(string? kind, string yaml, int yamlStart)
+    {
+        if (PartKinds.IsAdmitted(kind))
+        {
+            return true;
+        }
+
+        var index = Array.FindIndex(yaml.Split('\n'), l => l.StartsWith("kind:", StringComparison.Ordinal));
+        var stated = kind is null ? "front matter states no part kind" : $"part kind \"{Shown(kind)}\" is not admitted";
+        Error(yamlStart + 1 + Math.Max(0, index), $"{stated}; write kind as one of {PartKinds.Listed()}");
+        return false;
     }
 
     // A missing value is left for the schema to name. A present one meets the heading id grammar,
@@ -343,10 +401,14 @@ internal sealed partial class SourceFile
             var line = block.Line + 1;
             if (block is HeadingBlock heading)
             {
-                Speak();
-                Open(Heading(heading, partOrder, sections.Count + 1), line, sections);
-                inSection = true;
-                number = 0;
+                if (!ApproachHeading(heading, inSection))
+                {
+                    CloseApproaches();
+                    Open(Heading(heading, partOrder, sections.Count + 1), line, sections);
+                    inSection = true;
+                    number = 0;
+                }
+
                 continue;
             }
 
@@ -358,13 +420,13 @@ internal sealed partial class SourceFile
                 continue;
             }
 
-            // A section whose heading failed is not compiled, so its blocks add no noise.
-            if (inSection && _current is null)
+            // A section or approach whose heading failed is not compiled, so its blocks add no noise.
+            if (inSection && (_current is null || _approachFailed))
             {
                 continue;
             }
 
-            var body = inSection ? (List<BodyBlock>)_current!.Body : intro;
+            var body = inSection ? _approachBody ?? (List<BodyBlock>)_current!.Body! : intro;
             if (body is null)
             {
                 if (!preambleReported)
@@ -385,7 +447,7 @@ internal sealed partial class SourceFile
             }
         }
 
-        Speak();
+        CloseApproaches();
         return _diagnostics.Count == before;
     }
 
@@ -427,6 +489,9 @@ internal sealed partial class SourceFile
             case TextNode text:
                 Segment(new BlockTarget { BlockId = text.BlockId }, text.Spoken, line);
                 break;
+            case TableNode table:
+                Segment(new BlockTarget { BlockId = table.BlockId }, SpokenText.Table(table), line);
+                break;
             default:
                 Error(line, "this block has no spoken form");
                 break;
@@ -450,6 +515,19 @@ internal sealed partial class SourceFile
         {
             Error(line, "spoken text is empty");
             return;
+        }
+
+        // A label is no text of its own, so it joins only a segment that already has some.
+        if (_spokenPrefix is { } prefix)
+        {
+            _spokenPrefix = null;
+            if (!AudioSlot.IsStorable(prefix))
+            {
+                Error(line, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
+                return;
+            }
+
+            text = AudioSlot.Normalise(prefix + raw);
         }
 
         _segments.Add(new Segment { Target = target, Text = text });
@@ -488,11 +566,11 @@ internal sealed partial class SourceFile
         _current = null;
     }
 
-    private Section? Heading(HeadingBlock heading, int? partOrder, int position)
+    private Section? Heading(HeadingBlock heading, int? partOrder, int position, List<Card>? cards = null)
     {
         var line = heading.Line + 1;
         var id = HeadingId(heading, line, out var skip, out var spoken);
-        var title = id is null ? null : Inlines(heading.Inline, line);
+        var title = id is null ? null : Title(heading, line);
         if (id is null || title is null)
         {
             return null;
@@ -506,7 +584,8 @@ internal sealed partial class SourceFile
             Id = id,
             Number = partOrder is int order ? string.Create(CultureInfo.InvariantCulture, $"{order}.{position}") : null,
             Title = title,
-            Body = new List<BodyBlock>(),
+            Body = cards is null ? new List<BodyBlock>() : null,
+            Cards = cards,
             Summary = skip ? spoken : null,
         };
     }
@@ -540,7 +619,7 @@ internal sealed partial class SourceFile
         switch (block)
         {
             case ParagraphBlock paragraph:
-                if (!NoAttributes(paragraph, line))
+                if (!NoAttributes(paragraph, line) || !NoReservedPipe(paragraph, line))
                 {
                     return null;
                 }
@@ -549,6 +628,8 @@ internal sealed partial class SourceFile
                 return content is null ? null : new ParagraphNode { BlockId = blockId, Content = content };
             case ListBlock list:
                 return List(list, blockId, line);
+            case Table table:
+                return Table(table, blockId, line);
             case FencedCodeBlock fence:
                 var node = FenceReader.Read(fence, _lines[fence.Line], blockId, line, Error);
                 var fenceId = node switch
@@ -557,6 +638,11 @@ internal sealed partial class SourceFile
                     TextNode text => text.Id,
                     _ => null,
                 };
+                if (node is CodeNode grouped)
+                {
+                    OwnGroup(grouped.Group, line);
+                }
+
                 if (fenceId is not null)
                 {
                     Ids.Add((fenceId, line));
@@ -592,7 +678,8 @@ internal sealed partial class SourceFile
                 continue;
             }
 
-            var content = NoAttributes(item, itemLine) && NoAttributes(paragraph, itemLine) ? Inlines(paragraph.Inline, itemLine) : null;
+            var plain = NoAttributes(item, itemLine) && NoAttributes(paragraph, itemLine) && NoReservedPipe(paragraph, paragraph.Line + 1);
+            var content = plain ? Inlines(paragraph.Inline, itemLine) : null;
             if (content is null)
             {
                 ok = false;
@@ -614,6 +701,19 @@ internal sealed partial class SourceFile
         }
 
         return new ListNode { BlockId = blockId, Ordered = list.IsOrdered, Start = start, Items = items };
+    }
+
+    // A heading is a landmark read before its definitions, so a title never opens one.
+    private List<Span>? Title(HeadingBlock heading, int line)
+    {
+        var title = Inlines(heading.Inline, line);
+        if (title is not null && HoldsTerm(title))
+        {
+            Error(line, "a heading title may not hold a Term; link the term in the text below it");
+            return null;
+        }
+
+        return title;
     }
 
     private List<Span>? Inlines(ContainerInline? container, int line)
@@ -692,8 +792,24 @@ internal sealed partial class SourceFile
             return false;
         }
 
-        Links.Add(target);
-        spans.Add(new LinkSpan { Id = target.Id, Chapter = target.Chapter, Content = content });
+        // The term- prefix is reserved for glossary entries, so it alone tells a Term from a link.
+        if (target.Id.StartsWith(TermPrefix, StringComparison.Ordinal))
+        {
+            if (target.Chapter is not null)
+            {
+                Error(line, $"link target \"{target.Target}\" names a glossary entry, which belongs to no chapter; write [text](#{target.Id})");
+                return false;
+            }
+
+            var term = new TermSpan { Id = target.Id, Content = content };
+            Links.Add(target with { Term = term });
+            spans.Add(term);
+            return true;
+        }
+
+        var span = new LinkSpan { Id = target.Id, Chapter = target.Chapter, Content = content };
+        Links.Add(target with { Span = span });
+        spans.Add(span);
         return true;
     }
 

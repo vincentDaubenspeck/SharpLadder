@@ -9,8 +9,8 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { acceptEnvelope, recordKinds } from "./envelope.ts";
-import type { RecordKind } from "./envelope.ts";
+import { acceptEnvelope, partKinds, recordKinds } from "./envelope.ts";
+import type { PartKind, RecordIdentity, RecordKind } from "./envelope.ts";
 import { recordInventory } from "./inventory.ts";
 import { runTestRecords } from "./records.ts";
 
@@ -25,10 +25,14 @@ export const roundTripCases: readonly string[] = [
   "places block ids and labels on their own elements",
   "builds every link href from its target and chapter only",
   "leaves no empty wrapper element",
+  "renders every table cell in its place",
   "starts headings at h2 and never skips a level",
   "keeps each list's kind and start",
   "names every link by its author text, never its address",
   "binds every spoken segment to one rendered hook, in order",
+  "renders every card under its own heading with its fields in order",
+  "gives a section hook to sections only",
+  "shows a picker for approaches only and mounts the selected one alone",
 ];
 
 export const speechFile = "content-check/speech.test.ts";
@@ -43,31 +47,87 @@ export const registryFile = "content-check/registry.test.ts";
 export interface CaseList {
   readonly file: string;
   readonly suite: string;
-  readonly kinds: readonly RecordKind[];
+  readonly kinds: readonly CaseKey[];
   readonly cases: readonly string[];
 }
 
-/** A compiled record as the compiler certified it: its path and its kind. */
-export interface ExpectedRecord {
+/** What a list is keyed on: a record kind, and for parts always the part kind with it. */
+export type CaseKey = Exclude<RecordKind, "part"> | `part:${PartKind}`;
+
+/** A compiled record as the compiler certified it: its path, its kind and its part kind. */
+export interface ExpectedRecord extends RecordIdentity {
   readonly path: string;
-  readonly kind: RecordKind;
 }
 
-const content: readonly RecordKind[] = ["chapter", "part"];
+const partKeys = partKinds.map((kind): CaseKey => `part:${kind}`);
+/** Every key a list may carry; the record kind part is never one of them. */
+export const caseKeys: readonly CaseKey[] = [
+  ...recordKinds.filter((kind) => kind !== "part"),
+  ...partKeys,
+];
+
+const isCaseKey = (key: string): key is CaseKey =>
+  (caseKeys as readonly string[]).includes(key);
+
+/** The key of a certified record, or null when its kind and part kind do not belong together. */
+export function caseKey({ kind, part }: RecordIdentity): CaseKey | null {
+  if (!recordKinds.includes(kind)) return null;
+  const key = kind === "part" ? `part:${String(part)}` : kind;
+  return (kind === "part") === (part !== null) && isCaseKey(key) ? key : null;
+}
+
+/** Whether a list judges a record: only by the record's whole identity. */
+export const judges = (list: CaseList, record: RecordIdentity): boolean => {
+  const key = caseKey(record);
+  return key !== null && list.kinds.includes(key);
+};
+
+export const hintsFile = "src/content-tests/hints.test.tsx";
+
+// Hints are judged apart: their full record is never rendered, and only its catalogue speaks.
+const content: readonly CaseKey[] = [
+  "chapter",
+  ...partKeys.filter((key) => key !== "part:hints"),
+];
+// An entry is rendered like a chapter or part and has no audio slot to recompute.
+const rendered: readonly CaseKey[] = [...content, "glossary", "error"];
 
 /** Every list a record of each kind must pass; a case missing from any of them fails. */
 export const caseLists: readonly CaseList[] = [
   {
     file: roundTripFile,
     suite: roundTripSuite,
-    kinds: content,
+    kinds: rendered,
     cases: roundTripCases,
   },
   {
     file: speechFile,
     suite: speechSuite,
-    kinds: content,
+    kinds: [...content, "hints-catalogue"],
     cases: ["recomputes every audio slot from its segment texts"],
+  },
+  {
+    file: hintsFile,
+    suite: "the hints view of ",
+    kinds: ["hints-catalogue"],
+    cases: [
+      "parses to its witness and passes the closed view schema in every selection",
+      "mounts no cue without a selection or with an unknown one",
+      "mounts the selected cue alone under its own hooks",
+      "labels options by position and shows a picker only for a choice",
+      "speaks the selected cue alone, bound to its rendered hook",
+      "lets nothing its ladders hide reach the page in any selection",
+      "changes the cue only through the picker's positions",
+    ],
+  },
+  {
+    file: hintsFile,
+    suite: "the hidden hints of ",
+    kinds: ["part:hints"],
+    cases: [
+      "is refused as a catalogue, as a view and by the static view",
+      "has a catalogue holding each ladder's cue and nothing it hides",
+    ],
   },
   {
     file: registryFile,
@@ -163,13 +223,22 @@ export function evidenceProblems(
 ): string[] {
   if (expected.length === 0) return ["the compiled inventory is empty"];
   if (lists.length === 0) return ["no case list is given"];
+  // A list keyed on the record kind alone would let one part kind's cases pass for another.
+  const unkeyed = lists.flatMap((l) =>
+    (l.kinds as readonly string[])
+      .filter((key) => !isCaseKey(key))
+      .map(
+        (key) =>
+          `${l.file}: a list is keyed on ${key}, which is no record identity`,
+      ),
+  );
+  if (unkeyed.length > 0) return unkeyed;
   const stray = expected
-    .filter(
+    .filter((r) => !lists.some((l) => judges(l, r) && l.cases.length > 0))
+    .map(
       (r) =>
-        !recordKinds.includes(r.kind) ||
-        !lists.some((l) => l.kinds.includes(r.kind) && l.cases.length > 0),
-    )
-    .map((r) => `${r.path}: no case list judges the kind ${r.kind}`);
+        `${r.path}: no case list judges the kind ${r.kind}${r.part === null ? "" : ` with the part kind ${r.part}`}`,
+    );
   if (stray.length > 0) return stray;
   if (!isObject(report) || !Array.isArray(report["testResults"]))
     return ["the Vitest report has no test results"];
@@ -180,7 +249,7 @@ export function evidenceProblems(
     listProblems(
       results,
       root,
-      expected.filter((r) => list.kinds.includes(r.kind)).map((r) => r.path),
+      expected.filter((r) => judges(list, r)).map((r) => r.path),
       list,
     ),
   );
@@ -281,7 +350,7 @@ export function acceptRun(
         stdout,
         exit,
         recordInventory(join(web, "compiled")),
-      ).map(({ path, kind }) => ({ path, kind }));
+      ).map(({ path, kind, part }) => ({ path, kind, part }));
       problems = [
         ...recordSetProblems(expected),
         ...evidenceProblems(

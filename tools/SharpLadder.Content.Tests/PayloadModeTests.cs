@@ -8,27 +8,44 @@ public sealed class PayloadModeTests
     [
         "compiled/aliases.json",
         "compiled/chapters/fixture-basics/build.json",
+        "compiled/chapters/fixture-basics/cards.json",
         "compiled/chapters/fixture-basics/chapter.json",
+        "compiled/chapters/fixture-basics/drill.json",
         "compiled/chapters/fixture-basics/gotchas.json",
+        "compiled/chapters/fixture-basics/hints.catalogue.json",
+        "compiled/chapters/fixture-basics/hints.json",
         "compiled/chapters/fixture-basics/idioms.json",
         "compiled/chapters/fixture-basics/library.json",
         "compiled/chapters/fixture-basics/syntax.json",
         "compiled/chapters/fixture-empty-intro/chapter.json",
         "compiled/chapters/fixture-no-sections/chapter.json",
         "compiled/chapters/fixture-second/chapter.json",
+        "compiled/errors/err-fixture-cs0165.json",
+        "compiled/errors/err-fixture-null.json",
+        "compiled/errors/err-fixture-off-by-one.json",
+        "compiled/glossary/term-fixture-loop.json",
+        "compiled/glossary/term-fixture-set.json",
         "compiled/manifest.json",
         "compiled/patterns.json",
         "src/generated/body.ts",
         "src/generated/content.ts",
         "src/generated/witness/chapters/fixture-basics/build.ts",
+        "src/generated/witness/chapters/fixture-basics/cards.ts",
         "src/generated/witness/chapters/fixture-basics/chapter.ts",
+        "src/generated/witness/chapters/fixture-basics/drill.ts",
         "src/generated/witness/chapters/fixture-basics/gotchas.ts",
+        "src/generated/witness/chapters/fixture-basics/hints.catalogue.ts",
         "src/generated/witness/chapters/fixture-basics/idioms.ts",
         "src/generated/witness/chapters/fixture-basics/library.ts",
         "src/generated/witness/chapters/fixture-basics/syntax.ts",
         "src/generated/witness/chapters/fixture-empty-intro/chapter.ts",
         "src/generated/witness/chapters/fixture-no-sections/chapter.ts",
         "src/generated/witness/chapters/fixture-second/chapter.ts",
+        "src/generated/witness/errors/err-fixture-cs0165.ts",
+        "src/generated/witness/errors/err-fixture-null.ts",
+        "src/generated/witness/errors/err-fixture-off-by-one.ts",
+        "src/generated/witness/glossary/term-fixture-loop.ts",
+        "src/generated/witness/glossary/term-fixture-set.ts",
     ];
 
     [Fact]
@@ -77,7 +94,7 @@ public sealed class PayloadModeTests
         var result = work.Run("compare");
 
         Assert.Equal(0, result.Code);
-        Assert.Equal("23 committed files equal fresh output\nPASS content compare\n", result.Output);
+        Assert.Equal("40 committed files equal fresh output\nPASS content compare\n", result.Output);
         Assert.Equal(PayloadFiles, Files(work.Web), StringComparer.Ordinal);
     }
 

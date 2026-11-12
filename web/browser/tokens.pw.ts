@@ -10,7 +10,7 @@ import {
   type PageState,
   type Pair,
 } from "./catalogue.ts";
-import { distUrl, readColours, readTokens, setState } from "./probe.ts";
+import { distUrl, readColours, readTokens, setState, settle } from "./probe.ts";
 
 const sets = contexts();
 const probes = tokenProbes();
@@ -44,6 +44,7 @@ async function mismatches(
 
 test.beforeEach(async ({ page }) => {
   await page.goto(distUrl);
+  await settle(page);
 });
 
 test("TH1 every token in every state equals the catalogue", async ({
@@ -119,6 +120,7 @@ test("control: a changed token and a dropped print block are caught", async ({
   await page.addStyleTag({
     content: "@layer overrides { :root { --accent: #000001; } }",
   });
+  await settle(page);
   const changed = await mismatches(page, {
     theme: null,
     scheme: "light",
@@ -138,6 +140,7 @@ test("control: a changed token and a dropped print block are caught", async ({
   await page.setContent(
     `<html><head><style>${cut}</style></head><body></body></html>`,
   );
+  await settle(page);
   expect(
     await mismatches(page, {
       theme: "dark",

@@ -75,6 +75,7 @@ hkcu
 HKLM
 hmtx
 hotlight
+hrefs
 hsty
 ictcp
 idat
@@ -147,6 +148,8 @@ pathspec
 pclt
 pcss
 pipefail
+popovertarget
+popovertargetaction
 prophoto
 prss
 pscustomobject

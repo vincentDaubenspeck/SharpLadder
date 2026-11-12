@@ -48,8 +48,14 @@ const record = (path: string, text = "{}", kind: unknown = "chapter") => ({
   kind,
   text,
 });
+const partRecord = (part: unknown, text = '{"kind":"syntax"}') => ({
+  path: "compiled/a.json",
+  kind: "part",
+  part,
+  text,
+});
 const envelope = (records: unknown[], extra: object = {}) =>
-  JSON.stringify({ version: 2, records, ...extra });
+  JSON.stringify({ version: 3, records, ...extra });
 const valid = envelope([
   record("compiled/chapters/a/chapter.json"),
   record("compiled/chapters/a/syntax.json"),
@@ -82,14 +88,19 @@ describe("the test-records transport", () => {
         "compiled/chapters/a/chapter.json",
       ]),
     ).toEqual([
-      { path: "compiled/chapters/a/chapter.json", kind: "chapter", text },
+      {
+        path: "compiled/chapters/a/chapter.json",
+        kind: "chapter",
+        part: null,
+        text,
+      },
     ]);
   });
 
   it("accepts escaped non-ASCII text as the same decoded value", () => {
     const run = redirected(
       utf8(
-        '{"version":2,"records":[{"path":"compiled/a.json","kind":"part","text":"caf\\u00E9"}]}',
+        '{"version":3,"records":[{"path":"compiled/a.json","kind":"chapter","text":"caf\\u00E9"}]}',
       ),
     );
     expect(
@@ -175,7 +186,7 @@ describe("the test-records transport", () => {
       utf8(
         JSON.stringify({ version: 1, records: [record("compiled/a.json")] }),
       ),
-      /version must be 2/u,
+      /version must be 3/u,
     ],
     [
       "an extra envelope key",
@@ -196,6 +207,67 @@ describe("the test-records transport", () => {
       "a record with its kind last",
       utf8(envelope([{ path: "compiled/a.json", text: "{}", kind: "part" }])),
       /exactly path, kind and text/u,
+    ],
+    [
+      "a part without a part kind",
+      utf8(envelope([record("compiled/a.json", '{"kind":"syntax"}', "part")])),
+      /exactly path, kind and text, and a part its part kind/u,
+    ],
+    [
+      "a part with its part kind before its kind",
+      utf8(
+        envelope([
+          {
+            path: "compiled/a.json",
+            part: "syntax",
+            kind: "part",
+            text: '{"kind":"syntax"}',
+          },
+        ]),
+      ),
+      /exactly path, kind and text, and a part its part kind/u,
+    ],
+    ...[
+      "chapter",
+      "aliases",
+      "patterns",
+      "glossary",
+      "error",
+      "hints-catalogue",
+    ].map((kind): [string, Uint8Array, RegExp] => [
+      `a part kind on the ${kind} record`,
+      utf8(envelope([{ ...partRecord("syntax"), kind }])),
+      /exactly path, kind and text, and a part its part kind/u,
+    ]),
+    [
+      "an unknown part kind",
+      utf8(envelope([partRecord("quiz", '{"kind":"quiz"}')])),
+      /part kind "quiz" is not a known kind/u,
+    ],
+    [
+      "a part kind in capitals",
+      utf8(envelope([partRecord("Syntax")])),
+      /is not a known kind/u,
+    ],
+    [
+      "a part kind that is not text",
+      utf8(envelope([partRecord(null)])),
+      /part kind null is not a known kind/u,
+    ],
+    [
+      "a part certified as another part kind than its payload states",
+      utf8(envelope([partRecord("syntax", '{"kind":"build"}')])),
+      /compiled\/a\.json is certified as a syntax part and states another kind/u,
+    ],
+    [
+      "a part whose payload states no kind",
+      utf8(envelope([partRecord("syntax", "{}")])),
+      /is certified as a syntax part and states another kind/u,
+    ],
+    [
+      "a part whose payload is not JSON",
+      utf8(envelope([partRecord("syntax", "x")])),
+      /is certified as a syntax part and states another kind/u,
     ],
     [
       "an unknown kind",
@@ -219,20 +291,20 @@ describe("the test-records transport", () => {
     ],
     [
       "a record text that is not a string",
-      utf8(envelope([{ path: "compiled/a.json", kind: "part", text: 1 }])),
+      utf8(envelope([{ path: "compiled/a.json", kind: "chapter", text: 1 }])),
       /must be strings/u,
     ],
     [
       "a repeated envelope key",
       utf8(
-        `{"version":2,"records":[],"records":${JSON.stringify([record("compiled/a.json")])}}`,
+        `{"version":3,"records":[],"records":${JSON.stringify([record("compiled/a.json")])}}`,
       ),
       /key records is repeated/u,
     ],
     [
       "an escaped repeated record key",
       utf8(
-        '{"version":2,"records":[{"path":"compiled/a.json","kind":"part","text":"x","\\u0074ext":"y"}]}',
+        '{"version":3,"records":[{"path":"compiled/a.json","kind":"part","text":"x","\\u0074ext":"y"}]}',
       ),
       /key text is repeated/u,
     ],
@@ -378,7 +450,7 @@ describe("the compiled inventory", () => {
   });
 });
 
-type Records = { path: string; kind: string; text: string }[];
+type Records = { path: string; kind: string; part?: string; text: string }[];
 
 // The global setup's own path, given an envelope the compiler did not write.
 function altered(change: (records: Records) => void) {
@@ -401,13 +473,17 @@ const recordChanges: [string, (records: Records) => void][] = [
   [
     "an extra record",
     (r) => {
-      r.push({ path: "compiled/zz.json", kind: "part", text: "{}" });
+      r.push({ path: "compiled/zz.json", kind: "chapter", text: "{}" });
     },
   ],
   [
     "a same-count wrong path",
     (r) => {
-      r.splice(-1, 1, { path: "compiled/zz.json", kind: "part", text: "{}" });
+      r.splice(-1, 1, {
+        path: "compiled/zz.json",
+        kind: "chapter",
+        text: "{}",
+      });
     },
   ],
 ];

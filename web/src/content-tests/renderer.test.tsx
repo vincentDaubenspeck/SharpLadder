@@ -4,14 +4,16 @@ import type {
   Block,
   CodeBlock,
   LinkSpan,
+  TermSpan,
   TextBlock,
 } from "../generated/body.ts";
-import type { PartFile } from "../generated/content.ts";
+import { witness as cards } from "../generated/witness/chapters/fixture-basics/cards.ts";
 import { witness as basics } from "../generated/witness/chapters/fixture-basics/chapter.ts";
 import { witness as syntax } from "../generated/witness/chapters/fixture-basics/syntax.ts";
 import { witness as second } from "../generated/witness/chapters/fixture-second/chapter.ts";
 import { assertNever } from "../content/assertNever.ts";
 import { Blocks } from "../content/Blocks.tsx";
+import type { StaticPart } from "../content/approach.ts";
 import { ContentView } from "../content/ContentView.tsx";
 import { buildSlugMap } from "../content/href.ts";
 import { Spans } from "../content/Spans.tsx";
@@ -125,20 +127,27 @@ describe("content view", () => {
 
   it.each([
     ["syntax", "Syntax"],
-    ["build", "Build"],
     ["idioms", "Idioms"],
     ["gotchas", "Gotchas"],
     ["library", "Library"],
   ] as const)("labels a %s part", (kind, label) => {
-    const part: PartFile = { ...syntax, kind };
+    const part: StaticPart = { ...syntax, kind };
     const { container } = render(<ContentView doc={part} slugs={slugs} />);
     expect(container.querySelector("h2")?.textContent).toBe(label);
+  });
+
+  it("labels a cards part and gives each card its own heading", () => {
+    const { container } = render(<ContentView doc={cards} slugs={slugs} />);
+    expect(container.querySelector("h2")?.textContent).toBe("Cards");
+    expect([...container.querySelectorAll("h4")].map((h) => h.id)).toEqual(
+      cards.sections.flatMap((section) => section.cards.map((c) => c.id)),
+    );
   });
 
   it("throws on an unknown part kind", () => {
     const part: unknown = { ...syntax, kind: "extras" };
     expect(() =>
-      render(<ContentView doc={part as PartFile} slugs={slugs} />),
+      render(<ContentView doc={part as StaticPart} slugs={slugs} />),
     ).toThrow(/Unknown content variant/u);
   });
 });
@@ -147,11 +156,13 @@ describe("spans", () => {
   it("throws on a link inside link content", () => {
     const inner: LinkSpan = {
       type: "link",
+      kind: "anchor",
       id: "fix-parts",
       content: [{ type: "text", text: "inner" }],
     };
     const outer: unknown = {
       type: "link",
+      kind: "anchor",
       id: "fix-links",
       content: [{ type: "em", content: [inner] }],
     };
@@ -163,6 +174,7 @@ describe("spans", () => {
   it("renders a link with its href and author text", () => {
     const link: LinkSpan = {
       type: "link",
+      kind: "anchor",
       id: "second-start",
       chapter: "ch-second",
       content: [
@@ -178,5 +190,64 @@ describe("spans", () => {
       "/chapters/fixture-second#second-start",
     );
     expect(anchor?.querySelector("strong > em")?.textContent).toBe("there");
+  });
+
+  it("renders each Term as a native button that opens only its own definition", () => {
+    const term: TermSpan = {
+      type: "term",
+      id: "term-a",
+      short: "A short definition.",
+      content: [{ type: "em", content: [{ type: "text", text: "word" }] }],
+    };
+    const { container } = render(
+      <p>
+        <Spans
+          spans={[term, { type: "text", text: " and " }, term]}
+          slugs={slugs}
+        />
+      </p>,
+    );
+    const buttons = [...container.querySelectorAll("button")];
+    expect(buttons).toHaveLength(2);
+    const targets = buttons.map((b) => b.getAttribute("popovertarget"));
+    expect(new Set(targets).size).toBe(2);
+    for (const button of buttons) {
+      expect(button.getAttribute("type")).toBe("button");
+      expect(button.getAttribute("popovertargetaction")).toBe("toggle");
+      expect(button.querySelector("em")?.textContent).toBe("word");
+      expect([...button.attributes].map((a) => a.name).sort()).toEqual([
+        "popovertarget",
+        "popovertargetaction",
+        "type",
+      ]);
+      const definition = button.nextElementSibling;
+      expect(definition?.tagName).toBe("SPAN");
+      expect(definition?.id).toBe(button.getAttribute("popovertarget"));
+      expect(definition?.getAttribute("popover")).toBe("auto");
+      expect(definition?.textContent).toBe("A short definition. Definition");
+      const links = [...(definition?.querySelectorAll("a") ?? [])];
+      expect(links.map((a) => a.getAttribute("href"))).toEqual([
+        "/glossary#term-a",
+      ]);
+    }
+  });
+
+  it("throws on a link inside Term content", () => {
+    const term: unknown = {
+      type: "term",
+      id: "term-a",
+      short: "s",
+      content: [
+        {
+          type: "link",
+          kind: "anchor",
+          id: "fix-parts",
+          content: [{ type: "text", text: "inner" }],
+        },
+      ],
+    };
+    expect(() =>
+      render(<Spans spans={[term as TermSpan]} slugs={slugs} />),
+    ).toThrow(/Unknown content variant/u);
   });
 });

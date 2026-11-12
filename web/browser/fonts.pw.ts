@@ -214,6 +214,7 @@ async function register(
       stretch: `${String(face.stretch[0])}% ${String(face.stretch[1])}%`,
     })),
   );
+  await settle(page);
   status.forEach((value, i) => {
     if (value !== "loaded")
       throw new Error(
@@ -393,6 +394,7 @@ async function glyphImages(page: Page, probes: Probe[]) {
   await page.evaluate(() => {
     document.querySelector("[data-glyph-probe]")?.remove();
   });
+  await settle(page);
   return out;
 }
 
@@ -402,6 +404,7 @@ for (const env of environments(platform)) {
   }, info) => {
     const served = watchFonts(page);
     await page.goto(distUrl);
+    await settle(page);
     const stacks = await applyEnvironment(page, env);
     const targets = roleNames.map((role) => ({
       id: `${role}-target`,
@@ -488,7 +491,7 @@ for (const env of environments(platform)) {
     const glyphs = await glyphImages(page, glyphProbes);
 
     await resize(page, { width: 390, height: 844 });
-    const reflow = await page.evaluate(() => {
+    await page.evaluate(() => {
       document.querySelector("[data-font-probes]")?.remove();
       const box = document.createElement("div");
       box.dataset["fontProbes"] = "";
@@ -498,6 +501,9 @@ for (const env of environments(platform)) {
         );
       box.innerHTML = `<h1>${words}</h1><p>${words}</p><p><code>${words}</code></p>`;
       document.body.append(box);
+    });
+    await settle(page);
+    const reflow = await page.evaluate(() => {
       const root = document.documentElement;
       return { scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
     });
@@ -736,6 +742,7 @@ test("served fonts are exactly the recorded build faces", async ({
 }, info) => {
   const served = watchFonts(page);
   await page.goto(distUrl);
+  await settle(page);
   const declared = await page.evaluate(async () =>
     Promise.all(
       Array.from(document.fonts, async (face) => {
@@ -819,6 +826,7 @@ for (const mode of ["failed", "delayed"] as const)
       });
       // Firefox and WebKit hold the load event for a pending font, so only the document is awaited.
       await page.goto(distUrl, { waitUntil: "domcontentloaded" });
+      if (mode === "failed") await settle(page);
       await applyEnvironment(page, shippedEnv);
       const targets = roleNames.map((role) => ({
         id: `${role}-target`,
@@ -964,6 +972,7 @@ test("code: ligatures stay off and synthetic styles are recorded", async ({
   page,
 }, info) => {
   await page.goto(distUrl);
+  await settle(page);
   const code = faceOf("SL Code");
   const refs = await references(page);
   await register(
@@ -1052,6 +1061,7 @@ test("control: unauthenticated, broken, circular and absent references are refus
   page,
 }) => {
   await page.goto(distUrl);
+  await settle(page);
   const [first] = faces;
   if (first === undefined) throw new Error("no shipped face");
   const response = await page.request.get(`${distUrl}${first.distPath}`);

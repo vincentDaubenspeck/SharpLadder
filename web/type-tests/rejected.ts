@@ -215,7 +215,7 @@ export const row07 = {
       body: [
         {
           // @ts-expect-error Row 7: Discriminated union: unknown block type.
-          type: "table",
+          type: "figure",
           blockId: "matrix-one/b1",
           content: [{ type: "text", text: "Cell." }],
         },
@@ -315,8 +315,8 @@ export const row11 = {
   kind: "syntax",
   chapter: "ch-matrix",
   order: 1,
-  sections: [],
   // @ts-expect-error Row 11: At least one item (part with no sections).
+  sections: [],
 } satisfies ContentDoc;
 
 export const row12 = {

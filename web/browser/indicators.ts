@@ -1,7 +1,7 @@
 // Group D indicator measurements and thresholds, shared by the emulated and the real high-contrast specs.
 import { expect, type Locator, type Page } from "@playwright/test";
 import type { Theme } from "./group-d.ts";
-import { differing, paintOf, shot } from "./probe.ts";
+import { differing, paintOf, settle, shot } from "./probe.ts";
 
 export const spec = (page: Page, name: string) =>
   page.locator(`[data-spec="${name}"]`);
@@ -25,20 +25,15 @@ export async function resize(
     await session.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
     await session.detach();
   }
-  await page.evaluate(
-    () =>
-      new Promise<void>((done) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            done();
-          });
-        });
-      }),
-  );
+  await settle(page);
   expect(
     await page.evaluate(() => visualViewport?.scale),
     "the visual viewport is unscaled",
   ).toBe(1);
+  expect(
+    await page.evaluate(() => window.innerWidth),
+    "the viewport is the requested width",
+  ).toBe(size.width);
 }
 
 /** Focuses a specimen by keyboard, so :focus-visible applies as it would for a user. */
@@ -46,8 +41,12 @@ export async function tabTo(page: Page, name: string) {
   await page.locator("body").focus();
   for (let i = 0; i < 8; i += 1) {
     await page.keyboard.press("Tab");
-    if (await spec(page, name).evaluate((el) => el === document.activeElement))
+    if (
+      await spec(page, name).evaluate((el) => el === document.activeElement)
+    ) {
+      await settle(page);
       return;
+    }
   }
   throw new Error(`Tab never reached ${name}`);
 }
@@ -65,6 +64,7 @@ export const perimeter = (
 async function restStroke(page: Page, target: Locator) {
   // A taller font environment can push the tab past the phone viewport, where a strip would be clipped.
   await target.scrollIntoViewIfNeeded();
+  await settle(page);
   const box = await target.boundingBox();
   if (box === null) throw new Error("no rest-border box");
   const strip = (y: number) => ({ x: box.x, y, width: box.width, height: 2 });
@@ -119,6 +119,7 @@ export async function indicators(page: Page): Promise<Indicators> {
     (await paintOf(page, clipped, { "outline-style": "none" })) /
     perimeter(clippedBox, 2, 2);
   await page.locator("body").focus();
+  await settle(page);
   const rung = spec(page, "rung");
   const rungBox = await rung.boundingBox();
   if (rungBox === null) throw new Error("no rung box");

@@ -36,4 +36,45 @@
   textarea {
     font: inherit;
   }
+
+  [role="group"] > button[aria-pressed] {
+    background: var(--surface);
+    color: var(--text-2);
+    border: 1px solid var(--line);
+    padding: var(--space-0-3125) var(--space-0-625);
+    cursor: pointer;
+  }
+
+  [role="group"] > button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    text-decoration: underline;
+  }
+
+  /* A Term reads as part of its sentence; the dotted rule is the one sign that it opens. */
+  button[popovertarget] {
+    background: none;
+    color: var(--text);
+    border: 0;
+    border-bottom: 1.5px dotted var(--accent);
+    padding: 0;
+    cursor: pointer;
+  }
+
+  [popover] {
+    max-width: 34ch;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--r-sm);
+    padding: var(--space-0-625) var(--space-0-75);
+    font-family: var(--font-ui);
+    font-size: var(--fs-cat-0-875-1-5);
+    line-height: var(--lh-cat-0-875-1-5);
+  }
+
+  [popover] a {
+    display: block;
+    margin-top: var(--space-0-375);
+  }
 }

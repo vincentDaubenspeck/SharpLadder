@@ -1,10 +1,11 @@
-import type { LinkSpan } from "../generated/body.ts";
+import type { LinkSpan, TermSpan } from "../generated/body.ts";
 import type { ChapterFile } from "../generated/content.ts";
 
 // The same whole-string patterns as the content schema, so a trailing line feed never matches.
 const idPattern = /^[a-z][a-z0-9-]{0,47}(?![\s\S])/u;
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/u;
 const slugMaxLength = 48;
+const termPattern = /^term-[a-z0-9-]/u;
 
 // Values may arrive untyped at run time, and a regular expression would coerce a non-string.
 function isString(value: unknown): value is string {
@@ -17,6 +18,11 @@ function isTargetId(value: unknown): value is string {
 
 function isChapterId(value: unknown): value is string {
   return isString(value) && idPattern.test(value) && value.startsWith("ch-");
+}
+
+// Values may arrive untyped at run time, so a kind the types rule out is still met.
+function isAnchorKind(value: unknown): boolean {
+  return value === "anchor";
 }
 
 function isSlug(value: unknown): value is string {
@@ -63,11 +69,37 @@ export function buildSlugMap(chapters: readonly ChapterFile[]): SlugMap {
   return new SlugMap(chapters);
 }
 
+// The compiler states what a target is; an error entry lives on the one error page and belongs
+// to no chapter, so a chapter beside it is refused, never ignored.
+function errorHref(link: object, id: string): string {
+  if (!id.startsWith("err-") || "chapter" in link) {
+    throw new Error(`Malformed error entry target: ${JSON.stringify(id)}`);
+  }
+  return `/errors#${id}`;
+}
+
+// A glossary entry lives on the one glossary page and belongs to no chapter, so a chapter beside
+// it is refused, never ignored.
+export function termHref(term: TermSpan): string {
+  const { id } = term;
+  if (!isTargetId(id) || !termPattern.test(id) || "chapter" in term) {
+    throw new Error(`Malformed Term target: ${JSON.stringify(id)}`);
+  }
+  return `/glossary#${id}`;
+}
+
 export function internalHref(link: LinkSpan, slugs: SlugMap): string {
-  const { id, chapter } = link;
+  const { id, kind } = link;
   if (!isTargetId(id)) {
     throw new Error(`Malformed link target: ${JSON.stringify(id)}`);
   }
+  if (kind === "error") {
+    return errorHref(link, id);
+  }
+  if (!isAnchorKind(kind)) {
+    throw new Error(`Unknown link kind: ${JSON.stringify(kind)}`);
+  }
+  const { chapter } = link;
   if (chapter === undefined) {
     return `#${id}`;
   }

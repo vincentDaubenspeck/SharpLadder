@@ -14,7 +14,7 @@ namespace SharpLadder.Content;
 internal static partial class TypeEmitter
 {
     // Raised whenever the accepted forms or the emitted shapes change.
-    public const int GrammarVersion = 1;
+    public const int GrammarVersion = 2;
 
     public const string BodyFile = "body.schema.json";
     public const string ContentFile = SchemaSet.RootFile;
@@ -25,6 +25,11 @@ internal static partial class TypeEmitter
 
     // The pinned formatter's default line width; output must already be in its format.
     private const int Width = 80;
+
+    // A bounded array is written as one tuple per length, each kept whole on a line; the format
+    // check on the generated modules catches a tuple that a deeper position would still break.
+    private const int MaxBound = 16;
+    private const int TupleWidth = 60;
 
     private static readonly string Header = $"// SharpLadder.Content type emitter output, grammar {GrammarVersion.ToString(CultureInfo.InvariantCulture)}. Do not edit.";
     private static readonly string[] Files = [BodyFile, ContentFile];
@@ -250,7 +255,13 @@ internal static partial class TypeEmitter
     private static Atom ConstForm(JsonObject node, string at)
     {
         Keys(node, at, ["const"], []);
-        return node["const"]?.GetValueKind() == JsonValueKind.String
+        var kind = node["const"]?.GetValueKind();
+        if (kind is JsonValueKind.True or JsonValueKind.False)
+        {
+            return new Atom(kind == JsonValueKind.True ? "true" : "false");
+        }
+
+        return kind == JsonValueKind.String
             ? new Atom($"\"{Literal(node["const"], at)}\"")
             : new Atom(SafeInteger(node["const"], at, "const").Token);
     }
@@ -317,22 +328,25 @@ internal static partial class TypeEmitter
         return new Atom("boolean");
     }
 
-    private static string Discriminator(JsonNode? definition, string name, string at)
+    // The required string Const an Object holds under a tag name, or null when it holds none.
+    private static string? Tag(JsonObject target, string tag, string at)
     {
-        if (definition is not JsonObject target || !IsString(target["type"], out var kind) || !string.Equals(kind, "object", StringComparison.Ordinal))
+        var node = (target["properties"] as JsonObject)?[tag] as JsonObject;
+        var required = target["required"] as JsonArray;
+        var held = node is { Count: 1 } && node["const"]?.GetValueKind() == JsonValueKind.String
+            && required?.Any(r => IsString(r, out var s) && string.Equals(s, tag, StringComparison.Ordinal)) == true;
+        return held ? Literal(node!["const"], at) : null;
+    }
+
+    private static (string Type, string? Kind) ObjectTags(JsonNode? definition, string name, string at)
+    {
+        if (definition is not JsonObject target || !IsString(target["type"], out var form) || !string.Equals(form, "object", StringComparison.Ordinal))
         {
             throw Fail(at, $"union member {name} is not an Object");
         }
 
-        var tag = (target["properties"] as JsonObject)?["type"] as JsonObject;
-        var required = target["required"] as JsonArray;
-        if (tag is null || tag.Count != 1 || tag["const"]?.GetValueKind() != JsonValueKind.String
-            || required?.Any(r => IsString(r, out var s) && string.Equals(s, "type", StringComparison.Ordinal)) != true)
-        {
-            throw Fail(at, $"union member {name} needs a required string const property named type");
-        }
-
-        return Literal(tag["const"], at);
+        var type = Tag(target, "type", at) ?? throw Fail(at, $"union member {name} needs a required string const property named type");
+        return (type, Tag(target, "kind", at));
     }
 
     private static HashSet<string> Required(JsonObject node, string at, JsonObject properties)
@@ -495,8 +509,9 @@ internal static partial class TypeEmitter
     {
         ObjectOf obj => "{" + string.Concat(obj.Fields.Select(f =>
             "\n" + Place(Spaces(indent + 2) + f.Name + (f.Optional ? "?:" : ":"), f.Type, indent + 2) + ";")) + "\n" + Spaces(indent) + "}",
-        ArrayOf { NonEmpty: true } array => "[\n" + Spaces(indent + 2) + Block(array.Item, indent + 2) + ",\n"
-            + Spaces(indent + 2) + "..." + Block(array with { NonEmpty = false }, indent + 2) + ",\n" + Spaces(indent) + "]",
+        ArrayOf { Least: 2 } array => Flat(array) ?? throw new InvalidOperationException("an array of two or more passed the shape check without a one-line form"),
+        ArrayOf { Least: 1 } array => "[\n" + Spaces(indent + 2) + Block(array.Item, indent + 2) + ",\n"
+            + Spaces(indent + 2) + "..." + Block(array with { Least = 0 }, indent + 2) + ",\n" + Spaces(indent) + "]",
         ArrayOf array => Flat(array) ?? Block(array.Item, indent) + "[]",
 
         // In an element position a union that holds an object is parenthesised, as the formatter writes it.
@@ -523,7 +538,12 @@ internal static partial class TypeEmitter
                 }
 
                 var element = array.Item is UnionOf ? $"({item})" : item;
-                return array.NonEmpty ? $"[{item}, ...{element}[]]" : element + "[]";
+                return array.Least switch
+                {
+                    0 => element + "[]",
+                    1 => $"[{item}, ...{element}[]]",
+                    _ => $"[{item}, {item}, ...{element}[]]",
+                };
             default:
                 return null;
         }
@@ -536,7 +556,8 @@ internal static partial class TypeEmitter
 
     private sealed record UnionOf(IReadOnlyList<Ts> Members) : Ts;
 
-    private sealed record ArrayOf(Ts Item, bool NonEmpty) : Ts;
+    // Least is the fewest items the array may hold: none, one or two.
+    private sealed record ArrayOf(Ts Item, int Least) : Ts;
 
     private sealed record ObjectOf(IReadOnlyList<Field> Fields) : Ts;
 
@@ -704,7 +725,9 @@ internal static partial class TypeEmitter
             return (new Atom(Alias(name)), target, name);
         }
 
-        // A union is admitted only as Objects told apart by a required string Const named type.
+        // A union is admitted only as members told apart by one required string Const: type, or
+        // kind where every member is an Object holding the same type. Where type tells them apart,
+        // a member may itself be such a kind union, standing for the type its Objects share.
         private UnionOf UnionForm(JsonObject node, string file, string at, List<string>? edges)
         {
             Keys(node, at, ["oneOf"], []);
@@ -713,8 +736,8 @@ internal static partial class TypeEmitter
                 throw Fail(at, "oneOf must hold two or more members");
             }
 
-            var seen = new HashSet<string>(StringComparer.Ordinal);
             var types = new List<Ts>();
+            var tags = new List<(string Type, string? Kind, string Name, string At)>();
             for (var i = 0; i < members.Count; i++)
             {
                 var memberAt = $"{at}/oneOf/{Count(i)}";
@@ -724,16 +747,59 @@ internal static partial class TypeEmitter
                 }
 
                 var (type, targetFile, name) = Ref(member, file, memberAt, edges);
-                var value = Discriminator(_definitions[targetFile][name], name, memberAt);
+                var (tag, kind) = MemberTags(targetFile, name, memberAt);
+                tags.Add((tag, kind, name, memberAt));
+                types.Add(type);
+            }
+
+            var byKind = tags.All(t => string.Equals(t.Type, tags[0].Type, StringComparison.Ordinal)) && tags.Exists(t => t.Kind is not null);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var (type, kind, name, memberAt) in tags)
+            {
+                if (byKind && kind is null)
+                {
+                    throw Fail(memberAt, $"union member {name} shares type \"{type}\" and needs a required string const property named kind");
+                }
+
+                var value = byKind ? kind! : type;
                 if (!seen.Add(value))
                 {
                     throw Fail(memberAt, $"discriminator \"{value}\" is repeated");
                 }
-
-                types.Add(type);
             }
 
             return new UnionOf(types);
+        }
+
+        // The tags of one member: an Object's own, or for a kind union the type its Objects share.
+        private (string Type, string? Kind) MemberTags(string file, string name, string at)
+        {
+            var definition = _definitions[file][name];
+            if (definition is not JsonObject { Count: 1 } union || union["oneOf"] is not JsonArray inner)
+            {
+                return ObjectTags(definition, name, at);
+            }
+
+            string? shared = null;
+            foreach (var member in inner)
+            {
+                var match = member is JsonObject { Count: 1 } reference && IsString(reference["$ref"], out var text) ? RefPattern().Match(text) : Match.Empty;
+                var target = match.Success && match.Groups["file"].Success ? match.Groups["file"].Value + ".schema.json" : file;
+                if (!match.Success || !_definitions.TryGetValue(target, out var known) || !known.TryGetPropertyValue(match.Groups["name"].Value, out var inside))
+                {
+                    throw Fail(at, $"union member {name} is a union with a member that is not a $ref to a definition");
+                }
+
+                var (type, kind) = ObjectTags(inside, match.Groups["name"].Value, at);
+                if (kind is null || (shared is not null && !string.Equals(shared, type, StringComparison.Ordinal)))
+                {
+                    throw Fail(at, $"union member {name} is a union whose members are not told apart by kind under one shared type");
+                }
+
+                shared = type;
+            }
+
+            return (shared ?? throw Fail(at, $"union member {name} is an empty union"), null);
         }
 
         private Atom RefinementForm(JsonObject node, string file, string at, List<string>? edges)
@@ -761,22 +827,56 @@ internal static partial class TypeEmitter
             return type;
         }
 
-        private ArrayOf ArrayForm(JsonObject node, string file, string at, List<string>? edges)
+        private Ts ArrayForm(JsonObject node, string file, string at, List<string>? edges)
         {
-            Keys(node, at, ["type", "items"], ["minItems"]);
+            Keys(node, at, ["type", "items"], ["minItems", "maxItems"]);
             if (node["items"] is not JsonObject items)
             {
                 throw Fail(at, "items must be one schema; tuples are not supported");
             }
 
-            var nonEmpty = node.ContainsKey("minItems");
-            if (nonEmpty && (node["minItems"] is not JsonValue min || min.GetValueKind() != JsonValueKind.Number
-                || !string.Equals(min.ToJsonString(), "1", StringComparison.Ordinal)))
+            var token = !node.ContainsKey("minItems") ? "0" : node["minItems"] is JsonValue min && min.GetValueKind() == JsonValueKind.Number ? min.ToJsonString() : null;
+            var least = token switch
             {
-                throw Fail(at, "minItems must be absent or exactly 1");
+                "0" when !node.ContainsKey("minItems") => 0,
+                "1" => 1,
+                "2" => 2,
+                _ => throw Fail(at, "minItems must be absent, 1 or 2"),
+            };
+            var item = Node(items, file, at + "/items", edges);
+            if (least == 2 && (node.ContainsKey("maxItems") || !items.ContainsKey("$ref") || item is not Atom))
+            {
+                throw Fail(at, "minItems 2 needs items that are a $ref and no maxItems");
             }
 
-            return new ArrayOf(Node(items, file, at + "/items", edges), nonEmpty);
+            if (!node.ContainsKey("maxItems"))
+            {
+                return new ArrayOf(item, least);
+            }
+
+            if (!items.ContainsKey("$ref") || item is not Atom alias)
+            {
+                throw Fail(at, "maxItems needs items that are a $ref");
+            }
+
+            var max = SafeInteger(node["maxItems"], at, "maxItems").Value;
+            if (max is < 1 or > MaxBound)
+            {
+                throw Fail(at, $"maxItems must be from 1 to {Count(MaxBound)}");
+            }
+
+            var tuples = new List<Ts>();
+            for (var length = least; length <= max; length++)
+            {
+                tuples.Add(new Atom("[" + string.Join(", ", Enumerable.Repeat(alias.Text, length)) + "]"));
+            }
+
+            if (((Atom)tuples[^1]).Text.Length > TupleWidth)
+            {
+                throw Fail(at, $"maxItems gives a tuple longer than {Count(TupleWidth)} characters");
+            }
+
+            return tuples.Count == 1 ? tuples[0] : new UnionOf(tuples);
         }
 
         private Ts ObjectForm(JsonObject node, string file, string at)

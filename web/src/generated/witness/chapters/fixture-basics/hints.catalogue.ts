@@ -1,0 +1,51 @@
+// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "hints-catalogue",
+  chapter: "ch-fixture",
+  order: 7,
+  ladders: [
+    {
+      id: "ladder-lone-word",
+      cue: {
+        blockId: "ladder-lone-word/b1",
+        text: "You want the first word of a sentence that no other word repeats.",
+      },
+      spoken: {
+        segments: [
+          {
+            target: {
+              type: "block",
+              blockId: "ladder-lone-word/b1",
+            },
+            text: "You want the first word of a sentence that no other word repeats.",
+          },
+        ],
+        audio:
+          "sha256:10a86db702a6f3acabb4f301b94ae5ea13d65df021c325a795c630344a955831",
+      },
+    },
+    {
+      id: "ladder-lone-word-alt",
+      cue: {
+        blockId: "ladder-lone-word-alt/b1",
+        text: "You want the earliest word in a sentence that appears just once.",
+      },
+      spoken: {
+        segments: [
+          {
+            target: {
+              type: "block",
+              blockId: "ladder-lone-word-alt/b1",
+            },
+            text: "You want the earliest word in a sentence that appears just once.",
+          },
+        ],
+        audio:
+          "sha256:f52c9e8c6762e1e54a82905fe6a31e732eba117b4a42faf4d389cd1f38fa5376",
+      },
+    },
+  ],
+} satisfies ContentDoc;

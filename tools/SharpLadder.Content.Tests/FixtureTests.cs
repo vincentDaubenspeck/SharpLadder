@@ -15,7 +15,7 @@ public sealed class FixtureTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Equal(
-            ["chapters/fixture-basics/build.json", "chapters/fixture-basics/chapter.json", "chapters/fixture-basics/gotchas.json", "chapters/fixture-basics/idioms.json", "chapters/fixture-basics/library.json", "chapters/fixture-basics/syntax.json", "chapters/fixture-empty-intro/chapter.json", "chapters/fixture-no-sections/chapter.json", "chapters/fixture-second/chapter.json", "aliases.json", "patterns.json"],
+            ["chapters/fixture-basics/build.json", "chapters/fixture-basics/cards.json", "chapters/fixture-basics/chapter.json", "chapters/fixture-basics/drill.json", "chapters/fixture-basics/gotchas.json", "chapters/fixture-basics/hints.json", "chapters/fixture-basics/hints.catalogue.json", "chapters/fixture-basics/idioms.json", "chapters/fixture-basics/library.json", "chapters/fixture-basics/syntax.json", "chapters/fixture-empty-intro/chapter.json", "chapters/fixture-no-sections/chapter.json", "chapters/fixture-second/chapter.json", "errors/err-fixture-cs0165.json", "errors/err-fixture-null.json", "errors/err-fixture-off-by-one.json", "glossary/term-fixture-loop.json", "glossary/term-fixture-set.json", "aliases.json", "patterns.json"],
             result.Files.Select(f => f.RelativePath),
             StringComparer.Ordinal);
     }

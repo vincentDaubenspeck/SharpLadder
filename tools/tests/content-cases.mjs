@@ -3,8 +3,8 @@
 // input and a malformed golden file, and fails when no SDK is found; the compiler refuses a
 // relative argument, rejects output inside the content root, writes no partial output, and
 // reports a malformed schema with exit 2; alias retention passes kept and honestly moved
-// names and fails a name removed or redirected anywhere in the history, a commit without the
-// record other than the named first one, a first commit that is absent or not an ancestor, a
+// names and fails a name removed or redirected anywhere in the history, any commit without the
+// record, the named first one included, a first commit that is absent or not an ancestor, a
 // shallow clone, a grafts file, a record that is not a plain file, a replaced commit, a forged
 // commit-graph cache and a tree without history.
 // Usage: node tools/tests/content-cases.mjs <empty work directory>
@@ -190,22 +190,27 @@ const noNames = record({}, {});
 const kept = history("kept", begin, record({ old: "test", older: "test" }, { begin: "start" }));
 check("retention passes an added name", retained(kept).length === 0, retained(kept).join("\n"));
 
-// The first record: uncommitted on the named first commit, whose own parents also lack it, then
-// committed as its child.
-const opening = history("opening", null, null);
+// The named first commit must hold the record itself: neither a record in the working tree nor
+// one committed by its child stands in for it.
+const opening = history("opening", null);
+const lacking = `commit ${opening.commits[0]} holds no ${aliasRecord}; every commit from ${opening.commits[0]} on holds it`;
 place(opening.dir, begin);
-const uncommitted = retained(opening, opening.commits[1]);
-check("retention passes the first record while it is uncommitted on the first commit", uncommitted.length === 0, uncommitted.join("\n"));
-const earlier = retained(opening, opening.commits[0]);
+const uncommitted = retained(opening);
 check(
-  "retention fails the same tree when HEAD is not the named first commit",
-  earlier.length === 1 && earlier[0].startsWith(`commit ${opening.commits[1]} holds no `),
-  earlier.join("\n"),
+  "retention fails a first commit that lacks the record while HEAD is that commit",
+  uncommitted.length === 1 && uncommitted[0] === lacking,
+  uncommitted.join("\n"),
 );
 gitIn(opening.dir, "add", aliasRecord);
 gitIn(opening.dir, "commit", "-q", "-m", "first record");
-const committed = retained(opening, opening.commits[1]);
-check("retention passes the first record committed on the first commit", committed.length === 0, committed.join("\n"));
+const child = retained(opening);
+check(
+  "retention fails a first commit that lacks the record under a child that holds it",
+  child.length === 1 && child[0] === lacking,
+  child.join("\n"),
+);
+const committed = retained(opening, gitIn(opening.dir, "rev-parse", "HEAD"));
+check("retention passes when HEAD is the first commit and holds the record", committed.length === 0, committed.join("\n"));
 
 const moved = history("moved", begin, record({ old: "exam", test: "exam" }, { begin: "opening", start: "opening" }));
 check("retention passes a name whose old end was retired to its new end", retained(moved).length === 0, retained(moved).join("\n"));
@@ -314,8 +319,8 @@ check(
 const late = history("late", begin, null, begin);
 const lateProblems = retained(late);
 check(
-  "retention fails a commit without the record that is not the named first commit",
-  lateProblems.length === 1 && lateProblems[0].startsWith(`commit ${late.commits[1]} holds no ${aliasRecord}; only `),
+  "retention fails a commit after the first one that lacks the record",
+  lateProblems.length === 1 && lateProblems[0].startsWith(`commit ${late.commits[1]} holds no ${aliasRecord}; every `),
   lateProblems.join("\n"),
 );
 const start = history("start", null, begin);
@@ -325,13 +330,15 @@ check(
   wrongFirst.length === 1 && wrongFirst[0] === `commit ${"0".repeat(40)} is not in this repository`,
   wrongFirst.join("\n"),
 );
-// History before the first commit is not read, so only what follows it must hold the record.
+// History before the first commit is not read, so only it and what follows must hold the record.
 const after = history("after", null, null, begin, begin);
-check("retention reads nothing before the first commit", retained(after, after.commits[1]).length === 0, retained(after, after.commits[1]).join("\n"));
+check("retention reads nothing before the first commit", retained(after, after.commits[2]).length === 0, retained(after, after.commits[2]).join("\n"));
 const afterProblems = retained(after, after.commits[0]);
 check(
-  "retention fails a commit after the first one that lacks the record",
-  afterProblems.length === 1 && afterProblems[0].startsWith(`commit ${after.commits[1]} holds no ${aliasRecord}; only `),
+  "retention names every commit that lacks the record, the first one included",
+  afterProblems.length === 2 &&
+    afterProblems[0].startsWith(`commit ${after.commits[1]} holds no ${aliasRecord}; every `) &&
+    afterProblems[1].startsWith(`commit ${after.commits[0]} holds no ${aliasRecord}; every `),
   afterProblems.join("\n"),
 );
 const short = retained(start, start.commits[0].slice(0, 12));
@@ -417,7 +424,7 @@ check(
 );
 
 // The record stored as a link in the earlier commit, whatever the link names.
-const linked = history("linked", null);
+const linked = history("linked", noNames);
 writeFileSync(join(work, "target.txt"), "elsewhere");
 const blob = gitIn(linked.dir, "hash-object", "-w", join(work, "target.txt"));
 gitIn(linked.dir, "update-index", "--add", "--cacheinfo", `120000,${blob},${aliasRecord}`);

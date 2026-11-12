@@ -90,7 +90,7 @@ public sealed class PayloadUpdateTests
         Assert.Equal(2, failed.Code);
         Assert.DoesNotContain("PASS", failed.Output, StringComparison.Ordinal);
         Assert.Contains($"  partial publication: {work.Compiled} was written and {work.Generated} was not; nothing is certified", failed.Output, StringComparison.Ordinal);
-        Assert.Equal(12, Directory.EnumerateFiles(work.Compiled, "*", SearchOption.AllDirectories).Count());
+        Assert.Equal(21, Directory.EnumerateFiles(work.Compiled, "*", SearchOption.AllDirectories).Count());
         Assert.Equal(["planted.txt"], Directory.EnumerateFileSystemEntries(work.Generated).Select(Path.GetFileName), StringComparer.Ordinal);
 
         File.Delete(planted);

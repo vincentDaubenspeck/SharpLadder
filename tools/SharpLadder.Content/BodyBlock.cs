@@ -7,6 +7,7 @@ namespace SharpLadder.Content;
 [JsonDerivedType(typeof(ListNode), "list")]
 [JsonDerivedType(typeof(CodeNode), "code")]
 [JsonDerivedType(typeof(TextNode), "text")]
+[JsonDerivedType(typeof(TableNode), "table")]
 internal abstract class BodyBlock
 {
     // Positional, for rendering and highlighting only; never an identity.

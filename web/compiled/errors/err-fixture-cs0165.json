@@ -1,0 +1,65 @@
+{
+  "type": "error",
+  "kind": "compiler",
+  "id": "err-fixture-cs0165",
+  "code": "CS0165",
+  "wrote": "Read a local variable before giving it a value",
+  "got": "Use of unassigned local variable \u0027total\u0027",
+  "see": [
+    "syn-fix-sum",
+    "term-fixture-set"
+  ],
+  "cause": [
+    {
+      "type": "paragraph",
+      "blockId": "err-fixture-cs0165/b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "The compiler cannot find a value for "
+        },
+        {
+          "type": "code",
+          "text": "total"
+        },
+        {
+          "type": "text",
+          "text": " on "
+        },
+        {
+          "type": "strong",
+          "content": [
+            {
+              "type": "text",
+              "text": "every"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "text": " path to the read."
+        }
+      ]
+    }
+  ],
+  "hint": [
+    {
+      "type": "paragraph",
+      "blockId": "err-fixture-cs0165/b2",
+      "content": [
+        {
+          "type": "text",
+          "text": "Give the variable a starting value where you declare it."
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "blockId": "err-fixture-cs0165/b3",
+      "id": "fix-shape",
+      "label": "Shape",
+      "spoken": "A declaration with a starting value",
+      "source": "type name = start;"
+    }
+  ]
+}

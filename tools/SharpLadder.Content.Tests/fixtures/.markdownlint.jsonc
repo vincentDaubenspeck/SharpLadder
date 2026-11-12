@@ -1,6 +1,9 @@
-// Content files start with front matter and ## sections, and fence attributes run long.
+// Content files start with front matter and ## sections, and fence attributes run long. A
+// glossary or error entry, and a drill, is its own file, so a link to one names no heading of
+// the linking file; the content compiler resolves or keeps those links.
 {
   "default": true,
   "MD013": { "code_blocks": false },
-  "MD041": false
+  "MD041": false,
+  "MD051": { "ignored_pattern": "^(?:err|term|drill)-" }
 }

@@ -3,6 +3,7 @@ import type { LinkContentSpan, Span } from "../generated/body.ts";
 import { assertNever } from "./assertNever.ts";
 import { ContentLink } from "./ContentLink.tsx";
 import type { SlugMap } from "./href.ts";
+import { Term } from "./Term.tsx";
 
 // Inline content is static, so a position is a stable key.
 export function Spans({
@@ -41,6 +42,8 @@ function SpanNode({ span, slugs }: { span: Span; slugs: SlugMap }): ReactNode {
       );
     case "link":
       return <ContentLink link={span} slugs={slugs} />;
+    case "term":
+      return <Term term={span} />;
     default:
       return assertNever(span);
   }
