@@ -20,6 +20,6 @@
       }
     ],
     "winner": "node_modules/@playwright/test",
-    "reason": "The browser suite imports @playwright/test, which depends on playwright, and both declare the playwright command; this winner is admitted for these package versions with node 26.13.0, npm 11.20.0 and cmd-shim 8.0.0, and the check validates the installed output, not how npm chose it."
+    "reason": "The browser suite imports @playwright/test, which depends on playwright, and both declare the playwright command; this winner is admitted for these package versions with node 26.13.1, npm 11.20.0 and cmd-shim 8.0.0, and the check validates the installed output, not how npm chose it."
   }
 ]

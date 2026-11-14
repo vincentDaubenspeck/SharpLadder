@@ -1284,7 +1284,7 @@ describe("Windows .bin shims", () => {
   it.each([
     ["missing", "", "tools/tool-pins.json cannot be read: ENOENT"],
     ["not JSON", "{", "tools/tool-pins.json cannot be read: "],
-    ["without the pin", { node: { version: "26.13.0" } }, "no node.cmdShim"],
+    ["without the pin", { node: { version: "26.13.1" } }, "no node.cmdShim"],
     ["with a range", { node: { cmdShim: "^8.0.0" } }, "no node.cmdShim"],
     [
       "with another version",

@@ -31,7 +31,7 @@ const analyzers = {
 const packageVersions = {
   "LateApexEarlySpeed.Json.Schema": "4.2.3",
   Markdig: "1.6.0",
-  "Microsoft.AspNetCore.Mvc.Testing": "10.0.14",
+  "Microsoft.AspNetCore.Mvc.Testing": "10.0.15",
   "Microsoft.Build.Locator": "1.11.2",
   "Microsoft.CodeAnalysis.CSharp": "5.6.0",
   "Microsoft.CodeAnalysis.CSharp.Workspaces": "5.6.0",

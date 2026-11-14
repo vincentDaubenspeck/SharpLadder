@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +63,7 @@ jobs:
           npm run audit
 
   secrets:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       GITLEAKS_VERSION: 8.30.1
@@ -87,7 +87,7 @@ jobs:
         run: gitleaks detect --source . --log-opts=--all --redact --no-banner
 
   tests-sh:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       REQUIRE_PARITY: "1"
@@ -148,7 +148,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -172,7 +172,7 @@ jobs:
         run: dotnet test --project tools/SharpLadder.Content.Tests/SharpLadder.Content.Tests.csproj
 
   workflows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       ACTIONLINT_VERSION: 1.7.12

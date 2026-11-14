@@ -327,12 +327,12 @@ if [ -n "$node" ]; then
     cat "$tmp/out"
   fi
 fi
-sed -e 's/"10\.0\.403"/"10.0.402"/' "$src/global.json" > global.json
+sed -e 's/"10\.0\.404"/"10.0.402"/' "$src/global.json" > global.json
 
 rc=0
 sh tools/check.sh > "$tmp/out" 2>&1 || rc=$?
 for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run npm ci in web/' \
-  '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403' \
+  '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.404' \
   '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
   '  web/x.sh:2: shellcheck directive needs a reason comment on the line above' \
   '  needs .NET config (see above)' 'FAIL nuget vulnerabilities' 'FAIL nuget licences'; do
@@ -361,7 +361,7 @@ else
     fail "check.ps1 propagates a failure (exit $rc)"
   fi
   if [ "$rc" -ne 0 ] && tr -d '\r' < "$tmp/out" |
-    grep -qxF '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403'; then
+    grep -qxF '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.404'; then
     pass "check.ps1 fails a global.json that differs from the SDK pin (exit $rc)"
   else
     fail "check.ps1 fails a global.json that differs from the SDK pin (exit $rc)"

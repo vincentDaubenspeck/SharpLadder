@@ -295,9 +295,9 @@ try {
       $lines -ccontains 'FAIL .NET config') { Write-Pass 'missing .NET SDK fails' }
     else { Write-Fail 'missing .NET SDK fails'; Write-Output $r.All }
   }
-  $sdkPin = '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.403'
+  $sdkPin = '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.404'
   $globalJson = [IO.File]::ReadAllText((Join-Path -Path $src -ChildPath 'global.json'))
-  Write-Text 'global.json' ($globalJson -replace '"10\.0\.403"', '"10.0.402"')
+  Write-Text 'global.json' ($globalJson -replace '"10\.0\.404"', '"10.0.402"')
 
   $r = Invoke-Program $psExe @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/check.ps1')
   foreach ($want in @('FAIL shell suppression reasons', '  web/node_modules not found; run npm ci in web/',

@@ -26,14 +26,14 @@ The web app lives in `web/`; run `npm ci` and `npm run dev` there.
 The checks need these tools, at exactly these versions (pins and the
 publishers' SHA-256 or SHA-512 digests in `tools/tool-pins.json`):
 
-- Node 26.13.0 (`web/.nvmrc`) with its bundled npm 11.20.0
+- Node 26.13.1 (`web/.nvmrc`) with its bundled npm 11.20.0
   (`packageManager` in `web/package.json`), then `npm ci` in `web/`
 - shfmt 3.14.1, editorconfig-checker 4.0.2 and ShellCheck 0.11.0
 - yamllint 1.38.0 (Python 3.10 or later; installed from
   `tools/requirements-yamllint.txt` with hash checking)
 - PowerShell with PSScriptAnalyzer 1.25.0
   (`Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser`)
-- .NET SDK 10.0.403, pinned in `global.json` with roll-forward disabled
+- .NET SDK 10.0.404, pinned in `global.json` with roll-forward disabled
 
 `node tools/install-tools.mjs` downloads Node, shfmt, editorconfig-checker,
 ShellCheck, the CycloneDX CLI 0.33.1 and the .NET SDK into `.tools/`, verifies
