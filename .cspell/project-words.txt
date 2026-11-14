@@ -85,6 +85,7 @@ iend
 ihdr
 iidfile
 isexe
+isinstance
 jstf
 jsxs
 jzazbz
@@ -117,6 +118,7 @@ mountvol
 mport
 msbuild
 msvc
+namelist
 Newtonsoft
 noconcurrent
 nologo
@@ -186,6 +188,7 @@ shfmt
 silf
 slnx
 spif
+startswith
 statx
 styl
 stylesheet

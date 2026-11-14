@@ -156,7 +156,7 @@ function build(label, code, expected, severities = {}) {
   let config = globalconfig;
   for (const [id, sev] of Object.entries(severities)) {
     const line = `dotnet_diagnostic.${id}.severity = `;
-    config = config.replace(new RegExp(`^${line.replace(/\./g, "\\.")}.*$`, "m"), `${line}${sev}`);
+    config = config.replace(new RegExp(`^${RegExp.escape(line)}.*$`, "m"), `${line}${sev}`);
   }
   writeFileSync(join(probe, ".globalconfig"), config);
   writeFileSync(join(probe, "Sample.cs"), code);

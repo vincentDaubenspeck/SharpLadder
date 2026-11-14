@@ -37,10 +37,25 @@ jobs:
       - name: Install pinned tools (checksum verified)
         if: matrix.language == 'csharp'
         shell: bash
+        run: node tools/install-tools.mjs
+      # The C# extractor archives config files it finds in the checkout, so the SDK lives outside.
+      - name: Move the pinned tools out of the checkout
+        if: matrix.language == 'csharp'
+        shell: bash
         run: |
-          node tools/install-tools.mjs
-          printf '%s\n' "$GITHUB_WORKSPACE/.tools/dotnet" >> "$GITHUB_PATH"
-          printf 'DOTNET_ROOT=%s\n' "$GITHUB_WORKSPACE/.tools/dotnet" >> "$GITHUB_ENV"
+          src="$GITHUB_WORKSPACE/.tools"
+          dest="$RUNNER_TEMP/sl-tools"
+          if [ -e "$dest" ] || [ -L "$dest" ]; then
+            echo "$dest already exists" >&2
+            exit 1
+          fi
+          mv -T -- "$src" "$dest"
+          if [ -e "$src" ] || [ -L "$src" ]; then
+            echo "$src is still in the checkout" >&2
+            exit 1
+          fi
+          printf '%s\n' "$dest/dotnet" >> "$GITHUB_PATH"
+          printf 'DOTNET_ROOT=%s\n' "$dest/dotnet" >> "$GITHUB_ENV"
       - name: Prove the pinned SDK is the one in use
         if: matrix.language == 'csharp'
         shell: bash
@@ -48,7 +63,7 @@ jobs:
           found=$(command -v dotnet)
           echo "dotnet: $found"
           case "$found" in
-            "$GITHUB_WORKSPACE/.tools/dotnet/"*) ;;
+            "$RUNNER_TEMP/sl-tools/dotnet/"*) ;;
             *) echo "dotnet does not resolve to the pinned SDK" >&2; exit 1 ;;
           esac
           version=$(dotnet --version)
@@ -75,6 +90,64 @@ jobs:
             echo "no C# lines extracted" >&2
             exit 1
           fi
-      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      - id: analyze
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
+      # The source archive records every file the analysis read, inside the checkout or not.
+      - name: List the source archive of each database
+        shell: bash
+        env:
+          DB_LOCATIONS: ${{ steps.analyze.outputs.db-locations }}
+          MATRIX_LANGUAGE: ${{ matrix.language }}
+        run: |
+          python3 -I - <<'PY'
+          import json
+          import os
+          import sys
+          import zipfile
+
+
+          def unique(pairs):
+              # A repeated key would otherwise keep only its last value.
+              if len({key for key, _ in pairs}) != len(pairs):
+                  raise ValueError("duplicate key")
+              return dict(pairs)
+
+
+          sha = os.environ["GITHUB_SHA"]
+          root = os.environ["GITHUB_WORKSPACE"] + "/"
+          # The analyze action keys each database by the CodeQL language, not the matrix name.
+          keys = {"csharp": "csharp", "javascript-typescript": "javascript"}
+          matrix = os.environ["MATRIX_LANGUAGE"]
+          if matrix not in keys:
+              sys.exit(f"no database key for the matrix language {matrix!r}")
+          language = keys[matrix]
+          raw = os.environ["DB_LOCATIONS"]
+          try:
+              locations = json.loads(raw, object_pairs_hook=unique)
+          except ValueError as err:
+              sys.exit(f"cannot parse db-locations {raw!r}: {err}")
+          if not isinstance(locations, dict) or list(locations) != [language]:
+              sys.exit(f"db-locations {raw!r} must be an object with the one key {language}")
+          database = locations[language]
+          if not isinstance(database, str) or not database:
+              sys.exit(f"{language}: the database path in {raw!r} is empty or not a string")
+          print(f"{len(locations)} database(s) at {sha}")
+          archive = os.path.join(database, "src.zip")
+          try:
+              with zipfile.ZipFile(archive) as src:
+                  names = sorted(src.namelist())
+          except (OSError, zipfile.BadZipFile) as err:
+              sys.exit(f"{language}: cannot read {archive}: {err}")
+          # Entries hold the absolute path without its leading slash.
+          paths = ["/" + n for n in names]
+          inside = [p[len(root):] for p in paths if p.startswith(root)]
+          outside = [p for p in paths if not p.startswith(root)]
+          print(f"{language} {sha} checkout-relative: {len(inside)}")
+          for name in inside:
+              print(f"  {name}")
+          print(f"{language} {sha} outside-checkout: {len(outside)}")
+          for name in outside:
+              print(f"  {name}")
+          PY

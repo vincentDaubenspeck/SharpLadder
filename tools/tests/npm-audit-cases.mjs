@@ -191,23 +191,27 @@ function stageRecords(bytes) {
 // source. What the runner returned is saved, so a case compares the shown blocks with that call.
 const checks = join(src, "tools", "checks");
 const stageModule = (body) => `
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { exec, setExitCode } from ${JSON.stringify(pathToFileURL(join(checks, "lib.mjs")).href)};
 import { npmAuditNotRun, npmAuditStage } from ${JSON.stringify(pathToFileURL(join(checks, "web.mjs")).href)};
 ${body}
 setExitCode();
 `;
+// Runner values arrive as JSON data in a file, so none has to be escaped as code.
 const stageSource = (runner) =>
-  stageModule(`const runner = ${runner};
+  stageModule(`const data = JSON.parse(readFileSync(process.argv[3], "utf8"));
+const runner = ${runner};
 await npmAuditStage(process.argv[1], (...a) => {
   const r = runner(...a);
   writeFileSync(process.argv[2], JSON.stringify(r));
   return r;
 });`);
 let stageRuns = 0;
-async function stage({ runner = "exec", dir = project, registry, env = {}, source } = {}) {
+async function stage({ runner = "exec", data = null, dir = project, registry, env = {}, source } = {}) {
   const saved = join(work, `exec-${String(++stageRuns)}.json`);
-  const r = await run(process.execPath, ["--input-type=module", "-e", source ?? stageSource(runner), dir, saved], {
+  const given = join(work, `data-${String(stageRuns)}.json`);
+  writeFileSync(given, JSON.stringify(data));
+  const r = await run(process.execPath, ["--input-type=module", "-e", source ?? stageSource(runner), dir, saved, given], {
     cwd: work,
     env: { ...fixtureEnv(process.env, registry), ...env },
   });
@@ -527,8 +531,10 @@ for (const [label, opts] of [
 
 // Injected outcomes: only stdout is read as the report, only a valid report with nothing found
 // passes, and every failure shows both streams exactly as the runner returned them.
-const injected = ({ code = 0, signal = null, stdout = "", stderr = "" }) =>
-  `() => (${JSON.stringify({ code, signal, stdout, stderr, out: `${stdout}${stderr}` })})`;
+const injected = ({ code = 0, signal = null, stdout = "", stderr = "" }) => ({
+  runner: "() => ({ ...data })",
+  data: { code, signal, stdout, stderr, out: `${stdout}${stderr}` },
+});
 const reportText = (edit = () => {}) => {
   const data = {
     auditReportVersion: 2,
@@ -557,7 +563,7 @@ for (const severity of severities) {
   // npm exits 0 on an info advisory at --audit-level=low and 1 above it.
   const code = severity === "info" ? 0 : 1;
   const result = { code, stdout: reportText(vulnerable(severity)), stderr: `npm warn fixture ${severity} stderr\n` };
-  r = await stage({ runner: injected(result) });
+  r = await stage(injected(result));
   check(
     `npm audit stage shows the whole ${severity} report and its stderr after exit ${String(code)}`,
     stageFails(r, found(severity)) &&
@@ -611,7 +617,7 @@ for (const [label, result, why] of [
     /version is undefined, not 2$/mu,
   ],
 ]) {
-  r = await stage({ runner: injected({ stderr: `npm warn fixture stderr for ${label}\n`, ...result }) });
+  r = await stage(injected({ stderr: `npm warn fixture stderr for ${label}\n`, ...result }));
   check(`npm audit stage fails ${label} and shows both streams`, stageFails(r, why), show(r));
 }
 
@@ -622,7 +628,7 @@ for (const [label, result, why] of [
   ["text on stdout with empty stderr", { code: 1, stdout: "fixture text\n" }, noJson],
   ["both streams empty", { code: 1 }, exited],
 ]) {
-  r = await stage({ runner: injected(result) });
+  r = await stage(injected(result));
   check(`npm audit stage shows ${label} as captured`, stageFails(r, why), show(r));
 }
 
@@ -631,7 +637,7 @@ const oddStdout =
   "﻿{\r\n\r\n  \"x\": 1  \r\n\tü✓\u{1D11E}\nFAIL npm audit\nPASS npm audit\n  end of npm audit stdout\n" +
   "  npm audit stderr, 3 bytes:\nno final newline  ";
 const oddStderr = "\r\n  stderr é \u{1F600}  \r\nPASS npm audit\n\n\nlast line without a newline \t";
-r = await stage({ runner: injected({ code: 1, stdout: oddStdout, stderr: oddStderr }) });
+r = await stage(injected({ code: 1, stdout: oddStdout, stderr: oddStderr }));
 check(
   "npm audit stage shows CRLF, blank lines, edge spaces, Unicode and no final newline unchanged",
   stageFails(r, noJson) && r.exec?.stdout === oddStdout && r.exec?.stderr === oddStderr,
@@ -639,21 +645,21 @@ check(
 );
 const crlfReport = `${reportText(lowFound).replace(/\n/gu, "\r\n").trimEnd()}  `;
 const crlfStderr = "  npm warn é fixture  \r\n\r\n";
-r = await stage({ runner: injected({ stdout: crlfReport, stderr: crlfStderr }) });
+r = await stage(injected({ stdout: crlfReport, stderr: crlfStderr }));
 check(
   "npm audit stage shows a valid CRLF report without a final newline unchanged",
   stageFails(r, found("low")) && r.exec?.stdout === crlfReport && r.exec?.stderr === crlfStderr,
   show(r),
 );
 
-r = await stage({ runner: injected({ stdout: reportText(), stderr: "npm warn fixture warning\n" }) });
+r = await stage(injected({ stdout: reportText(), stderr: "npm warn fixture warning\n" }));
 check(
   "npm audit stage passes a clean report beside a stderr warning and shows it",
   stagePasses(r) && /^ {2}npm warn fixture warning$/mu.test(r.reasons),
   show(r),
 );
 
-r = await stage({ runner: `(cmd, args, opts) => exec(${JSON.stringify(join(work, "no-such-program"))}, [], opts)` });
+r = await stage({ runner: "(cmd, args, opts) => exec(data, [], opts)", data: join(work, "no-such-program") });
 check(
   "npm audit stage fails when npm cannot start",
   stageFails(r, /^ {2}npm audit did not complete \(.*ENOENT.*\)$/mu) && r.exec?.stdout === "" && r.exec?.stderr === "",
@@ -661,7 +667,7 @@ check(
 );
 
 const partial = '{"auditReportVersion": 2, "vulnerabilities": {';
-r = await stage({ runner: injected({ code: null, signal: "SIGKILL", stdout: partial, stderr: "npm http fixture\n" }) });
+r = await stage(injected({ code: null, signal: "SIGKILL", stdout: partial, stderr: "npm http fixture\n" }));
 check(
   "npm audit stage fails a run killed by a signal and shows what it captured",
   stageFails(r, /^ {2}npm audit did not complete \(killed by SIGKILL\)$/mu),
@@ -676,15 +682,17 @@ check("npm audit stage fails a run that times out", stageFails(r, /ETIMEDOUT/u),
 
 // Real children that write and then hang or overfill a buffer. The blocks must be what that exec
 // call returned, and exec must have kept what was written before the error.
-const writer = (program, limits) =>
-  `(cmd, args, opts) => exec(process.execPath, ["-e", ${JSON.stringify(program)}], { ...opts, ...${JSON.stringify(limits)} })`;
+const writer = (program, limits) => ({
+  runner: '(cmd, args, opts) => exec(process.execPath, ["-e", data.program], { ...opts, ...data.limits })',
+  data: { program, limits },
+});
 const hang = "setTimeout(() => {}, 60000);";
 for (const [label, out, err] of [
   ["a complete clean report", reportText(), "npm warn fixture before the timeout\n"],
   ["a partial report", partial, "npm http fixture partial\n"],
 ]) {
   const program = `process.stdout.write(${JSON.stringify(out)}); process.stderr.write(${JSON.stringify(err)}); ${hang}`;
-  r = await stage({ runner: writer(program, { timeout: 5000 }) });
+  r = await stage(writer(program, { timeout: 5000 }));
   check(
     `npm audit stage shows ${label} and stderr written before a timeout`,
     stageFails(r, /^ {2}npm audit did not complete \(.*ETIMEDOUT.*\)$/mu) && r.exec?.stdout === out && r.exec?.stderr === err,
@@ -694,7 +702,7 @@ for (const [label, out, err] of [
 for (const name of ["stdout", "stderr"]) {
   const program = `process.stdout.write("OUT-HEAD\\n"); process.stderr.write("ERR-HEAD\\n");
 setTimeout(() => process.${name}.write("x".repeat(65536)), 500); ${hang}`;
-  r = await stage({ runner: writer(program, { timeout: 10000, maxBuffer: 4096 }) });
+  r = await stage(writer(program, { timeout: 10000, maxBuffer: 4096 }));
   check(
     `npm audit stage shows the streams exec kept when ${name} overfills its buffer`,
     stageFails(r, /^ {2}npm audit did not complete \(.*ENOBUFS.*\)$/mu) &&
