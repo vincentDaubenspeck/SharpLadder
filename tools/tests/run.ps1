@@ -11,7 +11,8 @@
 #   g. Licence allowlist and override record cases, and a disallowed licence through check.ps1 and check.sh
 #   h. .NET config: SDK pin, props evaluation, digest cases and the probe build
 #   i. C# cases (tools/tests/csharp-cases.mjs): suppression fixtures, nuget vulnerabilities and licences, no SDK
-#   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit
+#   j. npm audit cases (tools/tests/npm-audit-cases.mjs): a low-severity advisory fails the audit;
+#      the check run's npm audit stage fails closed
 #   k. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
 #   l. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed

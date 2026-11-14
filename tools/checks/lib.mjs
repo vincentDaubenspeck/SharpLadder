@@ -35,15 +35,20 @@ export const dotnet = existsSync(join(dotnetHome, win ? "dotnet.exe" : "dotnet")
 
 // The npm bundled with the running Node, started without a shell (npm is a batch file on Windows).
 const nodeDir = dirname(process.execPath);
-const npmCli = [
+export const npmCli = [
   join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"),
   join(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
 ].find((p) => existsSync(p));
 
-// Runs a program; returns its exit code (null when it could not start) and merged output.
+// Runs a program; returns its exit code (null when it could not start, was killed or timed
+// out), the signal that ended it, merged output in out, each stream on its own, and the
+// error message in error when the run failed.
 export function exec(cmd, args, opts = {}) {
   if (cmd === "npm") {
-    if (!npmCli) return { code: null, out: "npm not found next to node" };
+    if (!npmCli) {
+      const error = "npm not found next to node";
+      return { code: null, signal: null, out: error, stdout: "", stderr: "", error };
+    }
     return exec(process.execPath, [npmCli, ...args], opts);
   }
   const r = spawnSync(cmd, args, {
@@ -52,8 +57,17 @@ export function exec(cmd, args, opts = {}) {
     maxBuffer: 64 * 1024 * 1024,
     ...opts,
   });
-  if (r.error) return { code: null, out: String(r.error.message) };
-  return { code: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+  const signal = r.signal ?? null;
+  const stdout = r.stdout ?? "";
+  const stderr = r.stderr ?? "";
+  const out = `${stdout}${stderr}`;
+  // Output written before a timeout or an overfull buffer is often the only clue to the cause.
+  if (r.error) {
+    const error = String(r.error.message);
+    const sep = out === "" || out.endsWith("\n") ? "" : "\n";
+    return { code: null, signal, out: `${out}${sep}${error}`, stdout, stderr, error };
+  }
+  return { code: r.status, signal, out, stdout, stderr };
 }
 
 // Returns null when the tool runs at the pinned version, else the problem text.

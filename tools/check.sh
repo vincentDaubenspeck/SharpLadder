@@ -2,9 +2,9 @@
 # Repository checks. Run before every commit; the pre-push hook and CI run it too.
 # tools/check.ps1 runs the same components on Windows.
 #   1. Text rules (tools/checks/text.sh): phrases, encoding, HEAD commit message
-#   2. Tool checks (tools/checks/run.mjs): web, shell, PowerShell, EditorConfig, YAML, .NET config,
-#      .NET build and tests, C# suppression reasons, nuget vulnerabilities, nuget licences, content,
-#      alias retention
+#   2. Tool checks (tools/checks/run.mjs): web, npm audit, shell, PowerShell, EditorConfig, YAML,
+#      .NET config, .NET build and tests, C# suppression reasons, nuget vulnerabilities,
+#      nuget licences, content, alias retention
 set -eu
 
 root=$(git rev-parse --show-toplevel)

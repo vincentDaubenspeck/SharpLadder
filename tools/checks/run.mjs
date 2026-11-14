@@ -16,7 +16,7 @@ import { contentChecks } from "./content.mjs";
 import { csharpChecks } from "./csharp.mjs";
 import { dotnetChecks } from "./dotnet.mjs";
 import { shellChecks, trackedShellFiles } from "./shell.mjs";
-import { runWebStage, webStages } from "./web.mjs";
+import { npmAuditNotRun, npmAuditStage, runWebStage, webStages } from "./web.mjs";
 
 const top = exec("git", ["rev-parse", "--show-toplevel"]);
 if (top.code !== 0) {
@@ -52,6 +52,8 @@ for (const stage of webStages) {
   }
   runWebStage(web, stage);
 }
+if (nodeProblems.length > 0) npmAuditNotRun(["needs Node and npm (see above)"]);
+else await npmAuditStage(web);
 
 shellChecks(trackedShellFiles(root));
 

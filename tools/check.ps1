@@ -1,9 +1,9 @@
 # Repository checks for Windows PowerShell.
 # Runs the same components as tools/check.sh:
 #   1. Text rules (tools/checks/text.ps1): phrases, encoding, HEAD commit message
-#   2. Tool checks (tools/checks/run.mjs): web, shell, PowerShell, EditorConfig, YAML, .NET config,
-#      .NET build and tests, C# suppression reasons, nuget vulnerabilities, nuget licences, content,
-#      alias retention
+#   2. Tool checks (tools/checks/run.mjs): web, npm audit, shell, PowerShell, EditorConfig, YAML,
+#      .NET config, .NET build and tests, C# suppression reasons, nuget vulnerabilities,
+#      nuget licences, content, alias retention
 $ErrorActionPreference = 'Stop'
 
 $root = (& git rev-parse --show-toplevel)
