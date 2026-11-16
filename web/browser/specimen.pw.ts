@@ -417,13 +417,10 @@ for (const env of envs)
     const engine = engineOf(info);
     const how = defaultFont[engine];
     if (how === undefined) throw new Error(`unrecorded engine ${engine}`);
-    if (how === null) {
-      info.annotations.push({
-        type: "unsupported",
-        description: `${engine}: no browser default font size setting is exposed`,
-      });
-      return;
-    }
+    test.skip(
+      how === null,
+      `${engine}: no browser default font size setting is exposed, so the enlarged default font is not verified by any automated test on this engine`,
+    );
     let target = page;
     let own: Browser | null = null;
     // The DevTools session stays open for the test, since the setting belongs to it.
