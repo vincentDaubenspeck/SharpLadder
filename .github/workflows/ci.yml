@@ -89,8 +89,6 @@ jobs:
   tests-sh:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -107,14 +105,12 @@ jobs:
         shell: bash
         working-directory: web
         run: npm ci
-      - name: Hook and check tests (sh, parity with pwsh)
+      - name: Hook and check tests
         run: sh tools/tests/run.sh
 
-  tests-ps:
+  tests-windows:
     runs-on: windows-latest
     timeout-minutes: 25
-    env:
-      REQUIRE_PARITY: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -141,8 +137,9 @@ jobs:
         shell: pwsh
         working-directory: web
         run: npm test
-      - name: Hook and check tests (Windows PowerShell, parity with sh)
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/run.ps1
+      - name: Hook and check tests
+        shell: bash
+        run: sh tools/tests/run.sh
 
   content:
     strategy:

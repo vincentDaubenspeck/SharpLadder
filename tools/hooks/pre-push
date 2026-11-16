@@ -1,8 +1,15 @@
 #!/bin/sh
-# pre-push hook: runs the repository checks and blocks the push on failure.
-root=$(git rev-parse --show-toplevel) || exit 1
-if ! sh "$root/tools/check.sh"; then
-  echo "pre-push: tools/check.sh failed; push blocked" >&2
+# pre-push hook: blocks the push while the working tree has changes the pushed commits leave out.
+if ! root=$(git rev-parse --show-toplevel); then
+  echo "pre-push: repository root not found; push blocked" >&2
+  exit 1
+fi
+if ! status=$(git -C "$root" status --porcelain); then
+  echo "pre-push: git status failed; push blocked" >&2
+  exit 1
+fi
+if [ -n "$status" ]; then
+  echo "pre-push: working tree is not clean; push blocked" >&2
   exit 1
 fi
 exit 0

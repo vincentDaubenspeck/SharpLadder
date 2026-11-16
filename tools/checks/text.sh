@@ -1,6 +1,5 @@
 #!/bin/sh
-# Text rules, run by tools/check.sh and tools/check.ps1.
-# tools/checks/text.ps1 is the PowerShell twin; tools/tests checks they agree.
+# Text rules, run by tools/check.sh.
 #   1. Unfinished-text scan against tools/forbidden-phrases.txt
 #   2. UTF-8, LF line endings and final newline on tracked text files
 #   3. HEAD commit message against the commit-msg hook rule
@@ -38,7 +37,7 @@ fi
 git -c core.quotepath=off ls-files > "$tmp/all"
 
 # Only these exact paths are exempt.
-printf '%s\n' tools/checks/text.sh tools/checks/text.ps1 tools/forbidden-phrases.txt > "$tmp/exempt"
+printf '%s\n' tools/checks/text.sh tools/forbidden-phrases.txt > "$tmp/exempt"
 grep_rc -v -x -F -f "$tmp/exempt" "$tmp/all" > "$tmp/scan" || :
 tr -d '\r' < "$phrase_file" | sed -e '/^#/d' -e '/^$/d' > "$tmp/phrases"
 [ -s "$tmp/phrases" ] || die "$phrase_file has no phrases"

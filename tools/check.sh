@@ -1,6 +1,5 @@
 #!/bin/sh
-# Repository checks. Run before every commit; the pre-push hook and CI run it too.
-# tools/check.ps1 runs the same components on Windows.
+# Repository checks. Run before every commit; CI runs it too.
 #   1. Text rules (tools/checks/text.sh): phrases, encoding, HEAD commit message
 #   2. Tool checks (tools/checks/run.mjs): web, npm audit, shell, PowerShell, EditorConfig, YAML,
 #      .NET config, .NET build and tests, C# suppression reasons, nuget vulnerabilities,

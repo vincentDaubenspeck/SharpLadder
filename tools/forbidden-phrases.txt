@@ -1,4 +1,4 @@
-# Phrases that tools/check.sh, tools/check.ps1 and tools/hooks/commit-msg reject.
+# Phrases that tools/check.sh and tools/hooks/commit-msg reject.
 # Lines starting with # are comments.
 # Plain lines match as substrings, ignoring case.
 # ~ prefixes a whole-word match, ignoring case.

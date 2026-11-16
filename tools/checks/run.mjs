@@ -1,4 +1,4 @@
-// Tool-based checks shared by tools/check.sh and tools/check.ps1.
+// Tool-based checks, run by tools/check.sh.
 // Each stage prints PASS or FAIL; a missing or wrong-version tool is a FAIL, never a skip.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

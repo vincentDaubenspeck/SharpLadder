@@ -100,7 +100,7 @@ export function report(name, problems) {
   }
 }
 export const anyFailed = () => failed;
-// The run's exit status, which check.sh and check.ps1 read.
+// The run's exit status, which check.sh reads.
 export function setExitCode() {
   process.exitCode = failed ? 1 : 0;
 }
