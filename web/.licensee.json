@@ -15,6 +15,7 @@
     ]
   },
   "packages": {
+    "@axe-core/playwright": "4.14.0",
     "@cspell/dict-django": "4.1.7",
     "@cspell/dict-en-common-misspellings": "2.2.6",
     "argparse": "3.0.4",
@@ -40,10 +41,11 @@
     "spdx-ranges": "2.1.1"
   },
   "reasons": {
+    "@axe-core/playwright@4.14.0": "Playwright runner for the accessibility scan in the browser tests; development-only, not bundled into the site.",
     "@cspell/dict-django@4.1.7": "Spelling dictionary for the cspell check; development-only, not shipped.",
     "@cspell/dict-en-common-misspellings@2.2.6": "Spelling dictionary data with a non-SPDX licence field; development-only, not shipped.",
     "argparse@3.0.4": "Argument parser inside the Markdown linter; development-only, not shipped.",
-    "axe-core@4.14.0": "Accessibility test engine for the lint rules; development-only, not bundled into the site.",
+    "axe-core@4.14.0": "Accessibility test engine for the accessibility scan and the lint rules; development-only, not bundled into the site.",
     "caniuse-lite@1.0.30001822": "CC-BY browser-support data used by browser-targeting build tooling; development-only, not shipped.",
     "docopt@0.6.2": "MIT declared in the legacy licenses metadata field that licensee does not recognise; development-only CLI parser, not shipped.",
     "fonteditor-core@2.6.3": "MIT declared in the legacy licenses metadata field, shipped MIT text; build-time WOFF2 converter, not bundled into the site.",
