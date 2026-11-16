@@ -17,8 +17,6 @@
 #   k. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   l. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
 #   m. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
-#   n. Linux check cases (tools/tests/check-linux-cases.sh): input identity and image selection, stand-in docker
-#   o. Flake check cases (tools/tests/flake-check-cases.mjs): refusals, prior chains and selection, stand-in build and Playwright
 # Usage: sh tools/tests/run.sh
 # Parts g, h and j need the pinned .NET SDK and nuget.org. The PowerShell cases in parts d and e fail without PowerShell.
 set -eu
@@ -450,15 +448,7 @@ else
   rc=0
   "$node" "$src/tools/tests/browser-cases.mjs" "$tmp/browsers" > "$tmp/out" 2>&1 || rc=$?
   count_lines "browser provisioning cases" "$rc" "$tmp/out"
-
-  rc=0
-  "$node" "$src/tools/tests/flake-check-cases.mjs" "$tmp/flake" > "$tmp/out" 2>&1 || rc=$?
-  count_lines "flake check cases" "$rc" "$tmp/out"
 fi
-
-rc=0
-sh "$src/tools/tests/check-linux-cases.sh" "$tmp/check-linux" > "$tmp/out" 2>&1 || rc=$?
-count_lines "Linux check cases" "$rc" "$tmp/out"
 
 echo "$passed passed, $failed failed in $(($(date +%s) - started))s"
 [ "$failed" -eq 0 ]

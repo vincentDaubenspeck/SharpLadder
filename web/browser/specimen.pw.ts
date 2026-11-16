@@ -1,10 +1,11 @@
 import {
   expect,
-  test,
   type Browser,
   type Page,
   type TestInfo,
 } from "@playwright/test";
+import { cell } from "./evidence.ts";
+import { test } from "./fixture.ts";
 import { environments, host, type Environment } from "./fonts.ts";
 import {
   indicators,
@@ -129,39 +130,6 @@ test.beforeEach(async ({ page }) => {
   await settle(page);
 });
 
-test("the engine is the pinned build", ({ browser }, info) => {
-  expect(browser.version()).toBe(info.project.metadata["version"]);
-});
-
-test("TH3 two modules with the same local class render distinct styles", async ({
-  page,
-}) => {
-  const a = spec(page, "iso-a");
-  const b = spec(page, "iso-b");
-  const [ca, cb] = [
-    await a.getAttribute("class"),
-    await b.getAttribute("class"),
-  ];
-  expect(ca).toMatch(/_box$/u);
-  expect(cb).toMatch(/_box$/u);
-  expect(ca).not.toBe(cb);
-  const colour = (l: typeof a) =>
-    l.evaluate((el) => getComputedStyle(el).color);
-  expect(await colour(a)).not.toBe(await colour(b));
-  // Control: one global class shared by both, as an unscoped sheet would give.
-  await page.setContent(
-    "<style>.box{color:#286773}.box{color:#95533f}</style><div class=box id=a>A</div><div class=box id=b>B</div>",
-  );
-  await settle(page);
-  const same = await page.evaluate(() =>
-    ["a", "b"].map(
-      (id) =>
-        getComputedStyle(document.getElementById(id) ?? document.body).color,
-    ),
-  );
-  expect(same[0]).toBe(same[1]);
-});
-
 /** The layered rule wins over base when the components value reaches the element. */
 async function layeredWins(page: Page) {
   return page.evaluate(() => {
@@ -175,46 +143,60 @@ async function layeredWins(page: Page) {
   });
 }
 
-test("TH3 layer precedence holds with the imports reversed", async ({
-  page,
-}) => {
-  const want = await page.evaluate(() => {
-    const probe = document.createElement("div");
-    probe.style.setProperty("font-family", "var(--font-ui)");
-    document.body.append(probe);
-    const value = getComputedStyle(probe).fontFamily;
-    probe.remove();
-    return value;
-  });
-  await settle(page);
-  expect(
-    await spec(page, "order").evaluate((el) => getComputedStyle(el).fontFamily),
-  ).toBe(want);
-  expect(await layeredWins(page)).toBe(true);
-});
+test(
+  "TH3 layer precedence holds with the imports reversed",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    const want = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.setProperty("font-family", "var(--font-ui)");
+      document.body.append(probe);
+      const value = getComputedStyle(probe).fontFamily;
+      probe.remove();
+      return value;
+    });
+    await settle(page);
+    expect(
+      await spec(page, "order").evaluate(
+        (el) => getComputedStyle(el).fontFamily,
+      ),
+    ).toBe(want);
+    expect(await layeredWins(page)).toBe(true);
+  },
+);
 
-test("control: an unlayered rule, a lower-layer !important and no layer statement each beat the module", async ({
-  page,
-}) => {
-  await page.addStyleTag({ content: "code { font-family: serif; }" });
-  await settle(page);
-  expect(await layeredWins(page)).toBe(false);
-  await page.reload();
-  await expect(spec(page, "dst")).toBeVisible();
-  await page.addStyleTag({
-    content: "@layer base { code { font-family: serif !important; } }",
-  });
-  await settle(page);
-  expect(await layeredWins(page)).toBe(false);
-  await page.setContent(
-    `<style>@layer components{.c{font-family:serif}}@layer base{code{font-family:monospace}}</style>
+// The checker compares computed style alike in every engine; each engine's cascade is TH3's test.
+test(
+  "control: an unlayered rule, a lower-layer !important and no layer statement each beat the module",
+  {
+    tag: "@single",
+  },
+  async ({ page }) => {
+    await page.addStyleTag({ content: "code { font-family: serif; }" });
+    await settle(page);
+    expect(await layeredWins(page)).toBe(false);
+    await page.reload();
+    await expect(spec(page, "dst")).toBeVisible();
+    await page.addStyleTag({
+      content: "@layer base { code { font-family: serif !important; } }",
+    });
+    await settle(page);
+    expect(await layeredWins(page)).toBe(false);
+    await page.setContent(
+      `<style>@layer components{.c{font-family:serif}}@layer base{code{font-family:monospace}}</style>
 <code data-spec="order" class="c">x</code><code data-spec="plain">y</code>`,
-  );
-  await settle(page);
-  expect(await layeredWins(page)).toBe(false);
-});
+    );
+    await settle(page);
+    expect(await layeredWins(page)).toBe(false);
+  },
+);
 
-for (const env of envs)
+// The fallback only swaps the face behind the text and changes no indicator verdict, so the matrices skip it.
+const references = envs.filter((env) => !env.testOnly);
+
+for (const env of references)
   test(`TH4 focus, rings, strokes and state shapes paint in every theme (${env.name})`, async ({
     page,
   }, info) => {
@@ -223,9 +205,11 @@ for (const env of envs)
     const fails: string[] = [];
     for (const theme of themes)
       for (const scheme of ["light", "dark"] as const) {
-        await setState(page, { theme, scheme, print: false });
         const key = `${theme ?? "absent"}/${scheme}`;
-        matrix[key] = await indicators(page);
+        matrix[key] = await cell(key, async () => {
+          await setState(page, { theme, scheme, print: false });
+          return indicators(page);
+        });
         fails.push(...judge(matrix[key]).map((f) => `${key}: ${f}`));
       }
     await info.attach(`th4-matrix-${env.name}.json`, {
@@ -235,71 +219,85 @@ for (const env of envs)
     expect(fails).toEqual([]);
   });
 
-test("TH4 focus outline computes as 2px solid accent at offset 2px", async ({
-  page,
-}) => {
-  await tabTo(page, "focus");
-  const got = await spec(page, "focus").evaluate((el) => {
-    const s = getComputedStyle(el);
-    const probe = document.createElement("div");
-    probe.style.setProperty("color", "var(--accent)");
-    document.body.append(probe);
-    const accent = getComputedStyle(probe).color;
-    probe.remove();
-    return [
-      s.outlineStyle,
-      s.outlineWidth,
-      s.outlineOffset,
-      s.outlineColor === accent,
-    ];
-  });
-  expect(got).toEqual(["solid", "2px", "2px", true]);
-});
+test(
+  "TH4 focus outline computes as 2px solid accent at offset 2px",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    await tabTo(page, "focus");
+    const got = await spec(page, "focus").evaluate((el) => {
+      const s = getComputedStyle(el);
+      const probe = document.createElement("div");
+      probe.style.setProperty("color", "var(--accent)");
+      document.body.append(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      return [
+        s.outlineStyle,
+        s.outlineWidth,
+        s.outlineOffset,
+        s.outlineColor === accent,
+      ];
+    });
+    expect(got).toEqual(["solid", "2px", "2px", true]);
+  },
+);
 
-test("control: each indicator check fails when its paint is gone, and the rest-state check fails when a visible stroke is present", async ({
-  page,
-}) => {
-  // The tab rule adds a visible rest stroke; it proves neither paint removal nor selection geometry.
-  await page.addStyleTag({
-    content: `@layer overrides {
+// Each engine paints its own outlines and strokes, so each desktop engine shows its measurement can fail.
+test(
+  "control: each indicator check fails when its paint is gone, and the rest-state check fails when a visible stroke is present",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    // The tab rule adds a visible rest stroke; it proves neither paint removal nor selection geometry.
+    await page.addStyleTag({
+      content: `@layer overrides {
   [data-spec] { outline-style: none !important; }
   [data-spec="stroke"] { border-inline-start-color: transparent !important; }
   [data-spec="tab"] { border-block-end: 2px solid currentcolor !important; }
   [data-spec="dst"] { border-style: solid !important; }
   [data-spec="panel"] { padding: 0 !important; }
 }`,
-  });
-  const fails = judge(await indicators(page));
-  for (const key of [
-    "focusOutline",
-    "nestedFocus",
-    "nestedRing",
-    "clippedFocus",
-    "rungRing",
-    "readRing",
-    "stroke",
-    "restBorder",
-    "sourceVsDestination",
-  ])
-    expect(fails.some((f) => f.startsWith(key))).toBe(true);
-});
+    });
+    const fails = judge(await indicators(page));
+    for (const key of [
+      "focusOutline",
+      "nestedFocus",
+      "nestedRing",
+      "clippedFocus",
+      "rungRing",
+      "readRing",
+      "stroke",
+      "restBorder",
+      "sourceVsDestination",
+    ])
+      expect(fails.some((f) => f.startsWith(key))).toBe(true);
+  },
+);
 
-test("control: an outline clipped by its scroll panel fails", async ({
-  page,
-}) => {
-  await page.addStyleTag({
-    content:
-      '@layer overrides { [data-spec="panel"] { padding: 0 !important; } }',
-  });
-  await tabTo(page, "clipped");
-  const clipped = spec(page, "clipped");
-  const box = await clipped.boundingBox();
-  if (box === null) throw new Error("no clipped box");
-  expect(
-    (await paintOf(page, clipped, { "outline-style": "none" })) /
-      perimeter(box, 2, 2),
-  ).toBeLessThan(0.6);
-});
+// Clipping by a scroll panel is each engine's own paint, as for the control above.
+test(
+  "control: an outline clipped by its scroll panel fails",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    await page.addStyleTag({
+      content:
+        '@layer overrides { [data-spec="panel"] { padding: 0 !important; } }',
+    });
+    await tabTo(page, "clipped");
+    const clipped = spec(page, "clipped");
+    const box = await clipped.boundingBox();
+    if (box === null) throw new Error("no clipped box");
+    expect(
+      (await paintOf(page, clipped, { "outline-style": "none" })) /
+        perimeter(box, 2, 2),
+    ).toBeLessThan(0.6);
+  },
+);
 
 /** Every element whose right edge passes the viewport, named so a failure says which. */
 const overflow = (page: Page) =>
@@ -346,7 +344,8 @@ for (const env of envs)
 
 /**
  * Every Group D cell under emulated forced colours: light and dark scheme, each theme attribute,
- * at 1920 and 390. Null when the engine does not detect the emulation (recorded per engine).
+ * at 390, and at 1920 on desktop. Null when the engine does not detect the emulation (recorded
+ * per engine).
  */
 async function forcedMatrix(page: Page, info: TestInfo) {
   const engine = engineOf(info);
@@ -359,26 +358,30 @@ async function forcedMatrix(page: Page, info: TestInfo) {
   if (!active) return null;
   const matrix: Record<string, Indicators> = {};
   const fails: string[] = [];
-  for (const width of [1920, 390]) {
+  // A 1920-wide phone is not a device.
+  const widths = info.project.use.isMobile === true ? [390] : [1920, 390];
+  for (const width of widths) {
     await resize(page, { width, height: width === 390 ? 844 : 1080 });
     for (const theme of themes)
       for (const scheme of ["light", "dark"] as const) {
-        await page.emulateMedia({
-          forcedColors: "active",
-          colorScheme: scheme,
-          media: "screen",
-        });
-        await setTheme(page, theme);
         const key = `${String(width)}/${theme ?? "absent"}/${scheme}`;
-        matrix[key] = await indicators(page);
+        matrix[key] = await cell(key, async () => {
+          await page.emulateMedia({
+            forcedColors: "active",
+            colorScheme: scheme,
+            media: "screen",
+          });
+          await setTheme(page, theme);
+          return indicators(page);
+        });
         fails.push(...judge(matrix[key]).map((f) => `${key}: ${f}`));
       }
   }
   return { matrix, fails };
 }
 
-for (const env of envs)
-  test(`Group D forced colours: every indicator stays visible, light and dark, all themes, 1920 and 390 (${env.name})`, async ({
+for (const env of references)
+  test(`Group D forced colours: every indicator stays visible, light and dark, all themes, 390 and desktop 1920 (${env.name})`, async ({
     page,
   }, info) => {
     await inEnvironment(page, env);
@@ -475,44 +478,53 @@ for (const env of envs)
     }
   });
 
-test("control: under forced colours a shadow-only state and a hue-only state vanish", async ({
-  page,
-}, info) => {
-  await page.emulateMedia({ forcedColors: "active" });
-  await settle(page);
-  if (
-    !(await page.evaluate(() => matchMedia("(forced-colors: active)").matches))
-  ) {
-    expect(forcedEmulation[engineOf(info)]).toBe(false);
-    info.annotations.push({
-      type: "unsupported",
-      description: "forced-colours emulation not detected",
+// Each engine implements forced colours itself, and WebKit's missing remap is pinned here.
+test(
+  "control: under forced colours a shadow-only state and a hue-only state vanish",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }, info) => {
+    await page.emulateMedia({ forcedColors: "active" });
+    await settle(page);
+    if (
+      !(await page.evaluate(
+        () => matchMedia("(forced-colors: active)").matches,
+      ))
+    ) {
+      expect(forcedEmulation[engineOf(info)]).toBe(false);
+      info.annotations.push({
+        type: "unsupported",
+        description: "forced-colours emulation not detected",
+      });
+      return;
+    }
+    // The state is switched on by a shadow alone, or by a border hue alone.
+    await page.addStyleTag({
+      content: '@layer overrides { [data-spec="rung"] { outline: none; } }',
     });
-    return;
-  }
-  // The state is switched on by a shadow alone, or by a border hue alone.
-  await page.addStyleTag({
-    content: '@layer overrides { [data-spec="rung"] { outline: none; } }',
-  });
-  await settle(page);
-  const shadowOn = { "box-shadow": "0 0 0 4px #286773" };
-  // WebKit matches the emulated query but repaints nothing, so its cells are unsupported.
-  if (!forcedRemap[engineOf(info)]) {
+    await settle(page);
+    const shadowOn = { "box-shadow": "0 0 0 4px #286773" };
+    // WebKit matches the emulated query but repaints nothing, so its cells are unsupported.
+    if (!forcedRemap[engineOf(info)]) {
+      expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBeGreaterThan(
+        0,
+      );
+      info.annotations.push({
+        type: "unsupported",
+        description: "forced-colours emulation detected without remapping",
+      });
+      return;
+    }
+    const hueOn = { "border-color": "#95533f" };
+    expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBe(0);
+    expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBe(0);
+    // The same two changes are visible without forced colours, so the zero is the mode's doing.
+    await page.emulateMedia({ forcedColors: "none" });
+    await settle(page);
     expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBeGreaterThan(
       0,
     );
-    info.annotations.push({
-      type: "unsupported",
-      description: "forced-colours emulation detected without remapping",
-    });
-    return;
-  }
-  const hueOn = { "border-color": "#95533f" };
-  expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBe(0);
-  expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBe(0);
-  // The same two changes are visible without forced colours, so the zero is the mode's doing.
-  await page.emulateMedia({ forcedColors: "none" });
-  await settle(page);
-  expect(await paintOf(page, spec(page, "rung"), shadowOn)).toBeGreaterThan(0);
-  expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBeGreaterThan(0);
-});
+    expect(await paintOf(page, spec(page, "dst"), hueOn, 0)).toBeGreaterThan(0);
+  },
+);

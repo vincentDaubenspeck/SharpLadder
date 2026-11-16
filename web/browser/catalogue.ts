@@ -1,10 +1,12 @@
-// The per-context token catalogue from the shipped tokens.css, and the contrast pairs the browser tests measure.
+// The per-context token catalogue from the shipped tokens.css, and the contrast pairs measured on it.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import postcss, { type Declaration } from "postcss";
 import { productionRegistry } from "../stylelint/registry.js";
 
 const web = join(import.meta.dirname, "..");
+const tokensSheet = (): string =>
+  readFileSync(join(web, "src", "theme", "tokens.css"), "utf8");
 
 /** One emulated page state: see expectedTokens. */
 export interface PageState {
@@ -41,9 +43,7 @@ const contextOf = new Map([
 ]);
 
 /** Token declarations per context, read from the sheet the build ships. */
-export function contexts(
-  css: string = readFileSync(join(web, "src", "theme", "tokens.css"), "utf8"),
-): Sets {
+export function contexts(css: string = tokensSheet()): Sets {
   const found: Sets = {};
   postcss.parse(css).walkRules((rule) => {
     const parent = rule.parent;
@@ -203,4 +203,46 @@ export function luminance(computed: string): number {
 export function ratio(a: string, b: string): number {
   const [x, y] = [luminance(a), luminance(b)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** A catalogue colour as the rgb() an engine computes; any form but #rrggbb fails, so nothing translucent passes. */
+function rgbOf(value: string): string {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(value);
+  if (m === null) throw new Error(`not a #rrggbb colour: ${value}`);
+  return `rgb(${[m[1], m[2], m[3]].map((h) => String(parseInt(h ?? "", 16))).join(", ")})`;
+}
+
+/** The contrast ratio of two tokens in one page state, from the catalogue. */
+export function pairRatio(
+  state: PageState,
+  fg: string,
+  bg: string,
+  sets: Sets = contexts(),
+): number {
+  const tokens = expectedTokens(state, sets);
+  return ratio(rgbOf(tokens[fg] ?? ""), rgbOf(tokens[bg] ?? ""));
+}
+
+/** Pairs below their minimum in one state, from the catalogue. */
+export function belowMinimum(
+  state: PageState,
+  pairs: Pair[],
+  sets: Sets = contexts(),
+): string[] {
+  return pairs
+    .map((p) => ({ ...p, ratio: pairRatio(state, p.fg, p.bg, sets) }))
+    .filter((p) => p.ratio < p.min)
+    .map(
+      (p) =>
+        `${p.kind} ${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)} < ${String(p.min)}`,
+    );
+}
+
+/** The sheet's media queries that read the viewport width. */
+export function widthQueries(css: string = tokensSheet()): string[] {
+  const found: string[] = [];
+  postcss.parse(css).walkAtRules("media", (rule) => {
+    if (rule.params.includes("width")) found.push(rule.params);
+  });
+  return found;
 }

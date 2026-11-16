@@ -83,7 +83,6 @@ idat
 idents
 iend
 ihdr
-iidfile
 isexe
 isinstance
 jstf
@@ -95,9 +94,7 @@ labelledby
 LASTEXITCODE
 lcar
 lede
-libatomic
 libc
-libicu
 liga
 lightningcss
 loca
@@ -125,7 +122,6 @@ nologo
 NONBLOCK
 noncharacter
 noninteractive
-NOPASSWD
 norc
 NOSYSTEM
 notcontains
@@ -145,7 +141,6 @@ openat
 OPTOUT
 ossf
 paragrph
-PATHCONV
 PATHEXT
 pathspec
 pclt

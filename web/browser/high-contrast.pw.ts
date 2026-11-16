@@ -1,7 +1,9 @@
 // Real Windows high contrast, turned on through SPI on the hosted runner only (brief section 6).
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { cell as matrixCell } from "./evidence.ts";
+import { test } from "./fixture.ts";
 import { base64, host } from "./fonts.ts";
 import {
   postRestoreDeadlineMs,
@@ -36,7 +38,7 @@ import {
   type Verdict,
 } from "./high-contrast.ts";
 import { indicators, judge, resize, setTheme } from "./indicators.ts";
-import { settle, shot } from "./probe.ts";
+import { settle, SettleTimeout, shot } from "./probe.ts";
 
 /** The engine's resolved system colours, recorded as its own forced-colours palette. */
 const palette = (page: Page) =>
@@ -97,6 +99,8 @@ async function swatch(page: Page): Promise<[number, number, number]> {
       return [r ?? -1, g ?? -1, b ?? -1] as [number, number, number];
     }, base64(bytes));
   } catch (error: unknown) {
+    // A wait that ran out leaves the page unfit for the cleanup below.
+    if (error instanceof SettleTimeout) throw error;
     measurementFailed = true;
     measurementError = error;
   }
@@ -251,33 +255,34 @@ test("real Windows high contrast: Group D matrix per scheme, theme and width, th
             });
             save();
           } else
-            for (const cell of groupDCells()) {
-              await resize(page, viewportAt(cell.width));
-              await setTheme(page, cell.theme);
-              const measured = await indicators(page);
-              const pixel = await swatch(page);
-              const fails = judge(measured);
-              // Compared with the palette read back in this run, never with fixed constants.
-              const want = channels(on.colours["window"] ?? "");
-              if (
-                capability[engine].followsOs &&
-                pixel.join(",") !== want.join(",")
-              )
-                fails.push(
-                  `Canvas pixel ${pixel.join(",")} is not the OS window colour ${want.join(",")}`,
-                );
-              record.cells[place(cell)] = {
-                scheme,
-                key: cell.key,
-                width: cell.width,
-                theme: cell.theme ?? "absent",
-                verdict: verdictOf(engine, detected, fails),
-                indicators: measured,
-                pixel,
-                fails,
-              };
-              save();
-            }
+            for (const cell of groupDCells())
+              await matrixCell(`${scheme}/${cell.key}`, async () => {
+                await resize(page, viewportAt(cell.width));
+                await setTheme(page, cell.theme);
+                const measured = await indicators(page);
+                const pixel = await swatch(page);
+                const fails = judge(measured);
+                // Compared with the palette read back in this run, never with fixed constants.
+                const want = channels(on.colours["window"] ?? "");
+                if (
+                  capability[engine].followsOs &&
+                  pixel.join(",") !== want.join(",")
+                )
+                  fails.push(
+                    `Canvas pixel ${pixel.join(",")} is not the OS window colour ${want.join(",")}`,
+                  );
+                record.cells[place(cell)] = {
+                  scheme,
+                  key: cell.key,
+                  width: cell.width,
+                  theme: cell.theme ?? "absent",
+                  verdict: verdictOf(engine, detected, fails),
+                  indicators: measured,
+                  pixel,
+                  fails,
+                };
+                save();
+              });
         } finally {
           await browser.close();
         }

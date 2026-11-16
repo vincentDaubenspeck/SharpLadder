@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
+import { test } from "./fixture.ts";
 import { perimeter } from "./indicators.ts";
 import { focused, harnessUrl, paintOf, setState, settle } from "./probe.ts";
 
@@ -94,39 +95,26 @@ async function focusPaint(page: Page) {
   return { link, paint, floor: perimeter(box, 0, 2) / 2 };
 }
 
-test("the page carries the digest its compiler preflight accepted", async ({
-  page,
-}) => {
-  expect(await page.locator("main").getAttribute("data-preflight")).toMatch(
-    /^[0-9a-f]{64}$/u,
-  );
-});
-
-test("the rendered fixture keeps heading order, anchors, labels and link text", async ({
-  page,
-}) => {
-  expect(
-    await page.getByRole("heading", { level: 1 }).allTextContents(),
-  ).toEqual(["Fixture Basics"]);
-  expect(await page.getByRole("heading").count()).toBeGreaterThan(3);
-  expect(await page.locator('a[href^="#"]').count()).toBeGreaterThan(0);
-  expect(await page.locator("pre[aria-labelledby]").count()).toBeGreaterThan(0);
-  expect(
-    await page.locator("pre:not([aria-labelledby])").count(),
-  ).toBeGreaterThan(0);
-  expect(await structureProblems(page)).toEqual([]);
-});
-
-test("every link's accessible name is its own text", async ({ page }) => {
-  const links = await page.getByRole("link").all();
-  expect(links.length).toBeGreaterThan(0);
-  for (const link of links) {
-    const name = ((await link.textContent()) ?? "").trim();
+test(
+  "the rendered fixture keeps heading order, anchors, labels and link text",
+  {
+    tag: "@single",
+  },
+  async ({ page }) => {
     expect(
-      await link.and(page.getByRole("link", { name, exact: true })).count(),
-    ).toBe(1);
-  }
-});
+      await page.getByRole("heading", { level: 1 }).allTextContents(),
+    ).toEqual(["Fixture Basics"]);
+    expect(await page.getByRole("heading").count()).toBeGreaterThan(3);
+    expect(await page.locator('a[href^="#"]').count()).toBeGreaterThan(0);
+    expect(await page.locator("pre[aria-labelledby]").count()).toBeGreaterThan(
+      0,
+    );
+    expect(
+      await page.locator("pre:not([aria-labelledby])").count(),
+    ).toBeGreaterThan(0);
+    expect(await structureProblems(page)).toEqual([]);
+  },
+);
 
 // The box of a rendered part, which must lie inside the page width at every project's size.
 async function insidePage(page: Page, part: Locator): Promise<void> {
@@ -233,16 +221,25 @@ const controls: [string, string, string][] = [
   ],
 ];
 
-for (const [name, script, problem] of controls)
-  test(`control: ${name} fails the structure check`, async ({ page }) => {
-    await page.evaluate(script);
-    await settle(page);
-    const problems = await structureProblems(page);
-    expect(
-      problems.some((p) => p.includes(problem)),
-      problems.join("; "),
-    ).toBe(true);
-  });
+// The check reads only the DOM, so one engine proves it is not vacuous.
+test(
+  "control: each structure fault fails the structure check",
+  {
+    tag: "@single",
+  },
+  async ({ page }) => {
+    for (const [name, script, problem] of controls) {
+      await openHarness(page);
+      await page.evaluate(script);
+      await settle(page);
+      const problems = await structureProblems(page);
+      expect(
+        problems.some((p) => p.includes(problem)),
+        `${name}: ${problems.join("; ")}`,
+      ).toBe(true);
+    }
+  },
+);
 
 for (const theme of ["light", "dark"] as const)
   test(`a focused link paints a visible outline in the ${theme} theme`, async ({
@@ -282,19 +279,26 @@ test("forced colours keep link text and its focus outline visible", async ({
   );
 });
 
-test("control: a focused link without an outline fails the paint check", async ({
-  page,
-}) => {
-  expect(
-    await plainLinkFocusVisible(page),
-    "a plain link matches :focus-visible",
-  ).toBe(true);
-  await openHarness(page);
-  await page.addStyleTag({ content: "a { outline-style: none !important; }" });
-  await settle(page);
-  const { paint, floor } = await focusPaint(page);
-  expect(paint).toBeLessThan(floor);
-});
+// Each desktop engine paints its own ring, so the check must fail without one in each.
+test(
+  "control: a focused link without an outline fails the paint check",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    expect(
+      await plainLinkFocusVisible(page),
+      "a plain link matches :focus-visible",
+    ).toBe(true);
+    await openHarness(page);
+    await page.addStyleTag({
+      content: "a { outline-style: none !important; }",
+    });
+    await settle(page);
+    const { paint, floor } = await focusPaint(page);
+    expect(paint).toBeLessThan(floor);
+  },
+);
 
 const buildSection = (page: Page, id: string): Locator =>
   page.locator(`section[data-section-id="${id}"]`);
@@ -305,38 +309,46 @@ const approachButton = (section: Locator, name: string): Locator =>
     .locator('[role="group"][aria-label="Build approaches"] > button')
     .filter({ hasText: new RegExp(`^${name}$`, "u") });
 
-test("an approach picker mounts the chosen approach and keeps focus on its button", async ({
-  page,
-}) => {
-  const section = buildSection(page, "build-fix-total");
-  const other = buildSection(page, "build-fix-three");
-  const library = approachButton(section, "the library");
-  const loop = approachButton(section, "a loop");
-  expect(await section.getByRole("button").count()).toBe(2);
-  expect(await other.getByRole("button").count()).toBe(3);
-  expect(await section.locator("h4").count()).toBe(0);
-  for (const button of [library, loop]) {
-    expect(await button.getAttribute("aria-pressed")).toBe("false");
-    await insidePage(page, button);
-  }
-  await library.focus();
-  await page.keyboard.press("Enter");
-  expect(await focused(library)).toBe(true);
-  await expect(library).toHaveAttribute("aria-pressed", "true");
-  expect(await section.locator("h4").getAttribute("id")).toBe("build-fix-sum");
-  await settle(page);
-  await insidePage(page, section.locator("h4"));
-  await loop.focus();
-  await page.keyboard.press("Space");
-  expect(await focused(loop)).toBe(true);
-  await expect(loop).toHaveAttribute("aria-pressed", "true");
-  expect(await library.getAttribute("aria-pressed")).toBe("false");
-  expect(await section.locator("h4").count()).toBe(1);
-  expect(await section.locator("h4").getAttribute("id")).toBe("build-fix-loop");
-  expect(await other.locator("h4").count()).toBe(0);
-  await settle(page);
-  expect(await structureProblems(page)).toEqual([]);
-});
+test(
+  "an approach picker mounts the chosen approach and keeps focus on its button",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }) => {
+    const section = buildSection(page, "build-fix-total");
+    const other = buildSection(page, "build-fix-three");
+    const library = approachButton(section, "the library");
+    const loop = approachButton(section, "a loop");
+    expect(await section.getByRole("button").count()).toBe(2);
+    expect(await other.getByRole("button").count()).toBe(3);
+    expect(await section.locator("h4").count()).toBe(0);
+    for (const button of [library, loop]) {
+      expect(await button.getAttribute("aria-pressed")).toBe("false");
+      await insidePage(page, button);
+    }
+    await library.focus();
+    await page.keyboard.press("Enter");
+    expect(await focused(library)).toBe(true);
+    await expect(library).toHaveAttribute("aria-pressed", "true");
+    expect(await section.locator("h4").getAttribute("id")).toBe(
+      "build-fix-sum",
+    );
+    await settle(page);
+    await insidePage(page, section.locator("h4"));
+    await loop.focus();
+    await page.keyboard.press("Space");
+    expect(await focused(loop)).toBe(true);
+    await expect(loop).toHaveAttribute("aria-pressed", "true");
+    expect(await library.getAttribute("aria-pressed")).toBe("false");
+    expect(await section.locator("h4").count()).toBe(1);
+    expect(await section.locator("h4").getAttribute("id")).toBe(
+      "build-fix-loop",
+    );
+    expect(await other.locator("h4").count()).toBe(0);
+    await settle(page);
+    expect(await structureProblems(page)).toEqual([]);
+  },
+);
 
 test("forced colours tell the pressed approach apart without colour", async ({
   page,

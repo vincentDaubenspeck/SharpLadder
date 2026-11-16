@@ -2,11 +2,15 @@
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import {
+  authenticate,
+  environments,
   loadBaselines,
   mergeObserved,
   observedText,
   parseBaselines,
   review,
+  shippedFaces,
+  systemFace,
   writeObserved,
   type Baseline,
   type BaselineIdentity,
@@ -350,5 +354,17 @@ describe("observed entries", () => {
     expect(parseBaselines(merged)).toHaveLength(2);
     expect(() => mergeObserved([observedText([entry()]), "{}"])).toThrow();
     expect(parseBaselines(mergeObserved([]))).toEqual([]);
+  });
+});
+
+describe("font references", () => {
+  it("control: unauthenticated bytes, an absent system face and an unknown platform are refused", () => {
+    const [first] = shippedFaces();
+    if (first === undefined) throw new Error("no shipped face");
+    // The recorded length with other content, so only the digest can refuse it.
+    const tampered = new Uint8Array(first.byteLength);
+    expect(() => authenticate(first, tampered)).toThrow(/font bytes/);
+    expect(() => systemFace("absent-face.ttf")).toThrow(/absent/);
+    expect(() => environments("darwin")).toThrow(/no environment/);
   });
 });

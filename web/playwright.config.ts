@@ -18,16 +18,22 @@ const engines = {
 const realHighContrast = process.env["SHARPLADDER_REAL_HIGH_CONTRAST"] === "1";
 const highContrastSpec = /high-contrast\.pw\.ts$/u;
 
+// A test tagged @desktop never runs on a phone; one tagged @single runs on desktop Chromium alone.
+const notOnPhones = /@desktop|@single/u;
+const chromiumOnly = /@single/u;
+
 function project(
   name: string,
   engine: keyof typeof engines,
   size: typeof desktop,
   mobile: boolean,
+  grepInvert?: RegExp,
 ): Project {
   return {
     name,
     metadata: { engine, version: versions[engine] },
     testIgnore: highContrastSpec,
+    ...(grepInvert ? { grepInvert } : {}),
     use: {
       ...engines[engine],
       viewport: size,
@@ -74,10 +80,10 @@ export default defineConfig({
       }))
     : [
         project("desktop-chromium", "chromium", desktop, false),
-        project("desktop-firefox", "firefox", desktop, false),
-        project("desktop-webkit", "webkit", desktop, false),
-        project("phone-chromium", "chromium", phone, true),
-        project("phone-webkit", "webkit", phone, true),
+        project("desktop-firefox", "firefox", desktop, false, chromiumOnly),
+        project("desktop-webkit", "webkit", desktop, false, chromiumOnly),
+        project("phone-chromium", "chromium", phone, true, notOnPhones),
+        project("phone-webkit", "webkit", phone, true, notOnPhones),
       ],
   webServer: [
     {

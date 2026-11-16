@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import type { PageState } from "./catalogue.ts";
+import { begin, evidence, timed } from "./evidence.ts";
 import { sha256, type Environment } from "./fonts.ts";
 import { ports } from "./pins.ts";
 
@@ -94,7 +95,10 @@ const base64 = (bytes: Uint8Array) => {
 };
 
 /** Pixels that differ between two screenshots, counted by the engine under test. */
-export async function differing(page: Page, a: Uint8Array, b: Uint8Array) {
+export const differing = (page: Page, a: Uint8Array, b: Uint8Array) =>
+  timed("pixelDiff", () => pixelCount(page, a, b));
+
+async function pixelCount(page: Page, a: Uint8Array, b: Uint8Array) {
   return page.evaluate(
     async ([a, b]) => {
       const load = async (data: string) => {
@@ -132,15 +136,19 @@ export async function differing(page: Page, a: Uint8Array, b: Uint8Array) {
 }
 
 // Widened from Playwright's Buffer, so callers see the plain byte array they compare.
-export const shot = async (
+export const shot = (
   page: Page,
   clip: { x: number; y: number; width: number; height: number },
 ) =>
-  (await page.screenshot({
-    clip,
-    animations: "disabled",
-    caret: "hide",
-  })) as Uint8Array;
+  timed(
+    "screenshot",
+    async () =>
+      (await page.screenshot({
+        clip,
+        animations: "disabled",
+        caret: "hide",
+      })) as Uint8Array,
+  );
 
 /** The element's box grown by a margin, so an outline outside the border box is in the shot. */
 async function around(target: Locator, margin: number) {
@@ -182,24 +190,117 @@ export async function paintOf(
   return (await differing(page, before, after)) / (scale * scale);
 }
 
+// Provisional containment limits, not readiness thresholds: no per-call timing distribution exists yet.
+const pageDeadlineMs = 10_000;
+const watchdogMs = 12_000;
+
+/** Where the in-page wait stood when its deadline expired. */
+interface Stall {
+  stage: string;
+  iteration: number;
+  fontsStatus: string;
+  loadingFaces: number;
+  visibility: string;
+  elapsedMs: number;
+}
+
+/** A bounded wait that ran out; the page it ran on is not used again. */
+export class SettleTimeout extends Error {}
+
 // Readiness only covers loads already started, so layout is forced first and settling repeats until idle.
 export async function settle(page: Page) {
-  await page.evaluate(async () => {
-    const frame = () =>
-      new Promise<void>((done) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            done();
+  const call = begin("settle");
+  let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let settled = false;
+  try {
+    const stall = await Promise.race([
+      page.evaluate(async (deadline) => {
+        const started = performance.now();
+        let stage = "layout";
+        let iteration = 0;
+        let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const frames = new Set<number>();
+        const stop = () => {
+          stopped = true;
+          clearTimeout(timer);
+          for (const id of frames) cancelAnimationFrame(id);
+          frames.clear();
+        };
+        const frame = () =>
+          new Promise<void>((done) => {
+            const first = requestAnimationFrame(() => {
+              frames.delete(first);
+              // A callback the engine had already queued must not schedule more work.
+              if (stopped) return;
+              const second = requestAnimationFrame(() => {
+                frames.delete(second);
+                if (!stopped) done();
+              });
+              frames.add(second);
+            });
+            frames.add(first);
           });
+        const wait = async () => {
+          do {
+            iteration += 1;
+            stage = "layout";
+            void document.body.getBoundingClientRect();
+            stage = "first frame pair";
+            await frame();
+            stage = "fonts.ready";
+            await document.fonts.ready;
+            // The font promise cannot be cancelled, so its late continuation ends here.
+            if (stopped) return;
+            stage = "second frame pair";
+            await frame();
+            stage = "status re-check";
+          } while (document.fonts.status !== "loaded");
+        };
+        // The deadline settles the result itself, since the wait it bounds may never return.
+        const expired = new Promise<Stall>((report) => {
+          timer = setTimeout(() => {
+            stop();
+            report({
+              stage,
+              iteration,
+              fontsStatus: document.fonts.status,
+              loadingFaces: Array.from(document.fonts).filter(
+                (face) => face.status === "loading",
+              ).length,
+              visibility: document.visibilityState,
+              elapsedMs: Math.round(performance.now() - started),
+            });
+          }, deadline);
         });
-      });
-    do {
-      void document.body.getBoundingClientRect();
-      await frame();
-      await document.fonts.ready;
-      await frame();
-    } while (document.fonts.status !== "loaded");
-  });
+        try {
+          return await Promise.race([wait().then(() => null), expired]);
+        } finally {
+          stop();
+        }
+      }, pageDeadlineMs),
+      // Page timers can be throttled and a page can stop answering, so Node bounds the call too.
+      new Promise<never>((_, reject) => {
+        watchdog = setTimeout(() => {
+          reject(
+            new SettleTimeout(
+              `settle: diagnostics unavailable, the page did not answer within ${String(watchdogMs)} ms; evidence ${JSON.stringify(evidence())}`,
+            ),
+          );
+        }, watchdogMs);
+      }),
+    ]);
+    if (stall !== null) {
+      call.stage = stall.stage;
+      throw new SettleTimeout(
+        `settle: the page did not settle within ${String(pageDeadlineMs)} ms: ${JSON.stringify(stall)}; evidence ${JSON.stringify(evidence())}`,
+      );
+    }
+    settled = true;
+  } finally {
+    clearTimeout(watchdog);
+    call.end(settled);
+  }
 }
 
 // One-shot, since a retrying check would accept focus that arrives late.

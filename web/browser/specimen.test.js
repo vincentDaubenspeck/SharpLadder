@@ -21,6 +21,15 @@ const replaced = (css) => ({
   "src/specimen/iso-a.module.css": css,
 });
 
+/** How many distinct classes and distinct declaration blocks the modules' `_box` rules carry. */
+const isolation = (css) => {
+  const rules = [...css.matchAll(/\.([\w-]+_box)\b[^{]*\{([^}]*)\}/gu)];
+  return {
+    classes: new Set(rules.map(([, name]) => name)).size,
+    styles: new Set(rules.map(([, , body]) => body)).size,
+  };
+};
+
 afterEach(() => cleanUp());
 
 describe("theme specimen sheets", () => {
@@ -47,7 +56,7 @@ describe("theme specimen sheets", () => {
   });
 
   it(
-    "build through the release guard with distinct local classes",
+    "build through the release guard with distinct local classes and styles",
     slow,
     async () => {
       const { built } = await buildSpecimen();
@@ -57,10 +66,16 @@ describe("theme specimen sheets", () => {
       const sheets = [...files.keys()].filter((p) => p.endsWith(".css"));
       expect(sheets).toHaveLength(1);
       const css = files.get(sheets[0]).bytes.toString("utf8");
-      const boxes = new Set(css.match(/\.[\w-]+_box\b/gu));
-      expect(boxes.size).toBe(2);
+      expect(isolation(css)).toEqual({ classes: 2, styles: 2 });
     },
   );
+
+  it("refuse one class shared by both modules, as an unscoped sheet gives", () => {
+    expect(isolation(".a_box{color:#286773}.a_box{color:#95533f}")).toEqual({
+      classes: 1,
+      styles: 2,
+    });
+  });
 
   it(
     "fail the build on a bare element selector in a module",

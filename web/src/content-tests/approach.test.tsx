@@ -244,6 +244,37 @@ describe("the approach picker under a controller", () => {
     expect(button).toHaveFocus();
   });
 
+  // Opening and closing the popover is the engine's, so the browser tests own that part.
+  it("shows a Term in a build approach's table cell once that approach is picked", () => {
+    const { container } = render(<Controller initial={none} />);
+    const root = sectionRoot(container, two);
+    const termsIn = (element: Element) => [
+      ...element.querySelectorAll("button[popovertarget]"),
+    ];
+    expect(termsIn(root)).toEqual([]);
+    fireEvent.click(within(root).getByRole("button", { name: "the library" }));
+    const [term, ...rest] = termsIn(root);
+    expect(rest).toEqual([]);
+    const targets = termsIn(container).map((b) =>
+      b.getAttribute("popovertarget"),
+    );
+    expect(new Set(targets).size).toBe(targets.length);
+    expect(term?.parentElement?.tagName).toBe("TD");
+    expect(within(root).getByRole("button", { name: "loop" })).toBe(term);
+    const definition = [...container.querySelectorAll("[popover]")].find(
+      (d) => d.id === term?.getAttribute("popovertarget"),
+    );
+    expect(definition?.getAttribute("popover")).toBe("auto");
+    expect(definition?.textContent).toContain(
+      "Code that runs the same statements again while a condition holds.",
+    );
+    expect(
+      [...(definition?.querySelectorAll("a[href]") ?? [])].map((a) =>
+        a.getAttribute("href"),
+      ),
+    ).toEqual(["/glossary#term-fixture-loop"]);
+  });
+
   it("swaps one approach for another and never shows two", () => {
     const { container } = render(<Controller initial={none} />);
     const root = sectionRoot(container, three);

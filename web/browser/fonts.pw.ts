@@ -1,4 +1,5 @@
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
+import { test } from "./fixture.ts";
 import {
   authenticate,
   base64,
@@ -737,60 +738,65 @@ const shippedEnv = environments(platform).find((env) =>
   roleNames.every((role) => env.expect[role].kind === "shipped"),
 );
 
-test("served fonts are exactly the recorded build faces", async ({
-  page,
-}, info) => {
-  const served = watchFonts(page);
-  await page.goto(distUrl);
-  await settle(page);
-  const declared = await page.evaluate(async () =>
-    Promise.all(
-      Array.from(document.fonts, async (face) => {
-        await face.load().catch(() => undefined);
-        return {
-          family: face.family.replace(/^"|"$/g, ""),
-          status: face.status,
-          weight: face.weight,
-          style: face.style,
-          stretch: face.stretch,
-        };
-      }),
-    ),
-  );
-  // A response can still be arriving once the faces have loaded, so the set is polled.
-  let got: Awaited<ReturnType<typeof served>> = [];
-  await expect
-    .poll(async () => {
-      got = await served();
-      return got.map((entry) => entry.path);
-    }, "the served font responses")
-    .toEqual(faces.map((face) => face.distPath).sort());
-  const record = {
-    project: info.project.name,
-    engine: engineOf(info),
-    engineVersion: versionOf(info),
-    host: host(),
-    declared,
-    served: got,
-  };
-  writeEvidence(info.outputPath("font-served.json"), record);
-  expect(declared.map((face) => face.family).sort()).toEqual(
-    faces.map((face) => face.family).sort(),
-  );
-  expect(got.map((entry) => entry.path)).toEqual(
-    faces.map((face) => face.distPath).sort(),
-  );
-  for (const face of faces) {
-    const entry = got.find((item) => item.path === face.distPath);
-    expect({ sha256: entry?.sha256, bytes: entry?.bytes }, face.family).toEqual(
-      { sha256: face.sha256, bytes: face.byteLength },
+test(
+  "served fonts are exactly the recorded build faces",
+  {
+    tag: "@desktop",
+  },
+  async ({ page }, info) => {
+    const served = watchFonts(page);
+    await page.goto(distUrl);
+    await settle(page);
+    const declared = await page.evaluate(async () =>
+      Promise.all(
+        Array.from(document.fonts, async (face) => {
+          await face.load().catch(() => undefined);
+          return {
+            family: face.family.replace(/^"|"$/g, ""),
+            status: face.status,
+            weight: face.weight,
+            style: face.style,
+            stretch: face.stretch,
+          };
+        }),
+      ),
     );
-    expect(
-      declared.find((item) => item.family === face.family)?.status,
-      face.family,
-    ).toBe("loaded");
-  }
-});
+    // A response can still be arriving once the faces have loaded, so the set is polled.
+    let got: Awaited<ReturnType<typeof served>> = [];
+    await expect
+      .poll(async () => {
+        got = await served();
+        return got.map((entry) => entry.path);
+      }, "the served font responses")
+      .toEqual(faces.map((face) => face.distPath).sort());
+    const record = {
+      project: info.project.name,
+      engine: engineOf(info),
+      engineVersion: versionOf(info),
+      host: host(),
+      declared,
+      served: got,
+    };
+    writeEvidence(info.outputPath("font-served.json"), record);
+    expect(declared.map((face) => face.family).sort()).toEqual(
+      faces.map((face) => face.family).sort(),
+    );
+    expect(got.map((entry) => entry.path)).toEqual(
+      faces.map((face) => face.distPath).sort(),
+    );
+    for (const face of faces) {
+      const entry = got.find((item) => item.path === face.distPath);
+      expect(
+        { sha256: entry?.sha256, bytes: entry?.bytes },
+        face.family,
+      ).toEqual({ sha256: face.sha256, bytes: face.byteLength });
+      expect(
+        declared.find((item) => item.family === face.family)?.status,
+        face.family,
+      ).toBe("loaded");
+    }
+  },
+);
 
 // Face status while its request is held or aborted, observed per engine at the pinned versions.
 const loading: Record<string, { failed: string; delayed: string }> = {
@@ -1057,38 +1063,40 @@ test("code: ligatures stay off and synthetic styles are recorded", async ({
   expect(widths["role"]).toBe(widths["ref-on"]);
 });
 
-test("control: unauthenticated, broken, circular and absent references are refused", async ({
-  page,
-}) => {
-  await page.goto(distUrl);
-  await settle(page);
-  const [first] = faces;
-  if (first === undefined) throw new Error("no shipped face");
-  const response = await page.request.get(`${distUrl}${first.distPath}`);
-  const bytes = Uint8Array.from(await response.body());
-  const tampered = Uint8Array.from(bytes);
-  tampered[tampered.length - 1] = (tampered[tampered.length - 1] ?? 0) ^ 1;
-  expect(() => authenticate(first, tampered)).toThrow(/font bytes/);
-  await expect(
-    register(page, [
-      {
-        alias: "sl-ref-broken",
-        face: first,
-        data: base64(bytes.subarray(0, 1024)),
-      },
-    ]),
-  ).rejects.toThrow(/not loaded/);
-  await expect(
-    register(page, [{ alias: first.family, face: first, data: base64(bytes) }]),
-  ).rejects.toThrow(/independent alias/);
-  await register(page, [
-    { alias: "sl-ref-once", face: first, data: base64(bytes) },
-  ]);
-  await expect(
-    register(page, [
+// Refused bytes, system faces and platforms need no page, so fonts.test.ts holds those controls.
+test(
+  "control: broken and circular references are refused",
+  {
+    tag: "@single",
+  },
+  async ({ page }) => {
+    await page.goto(distUrl);
+    await settle(page);
+    const [first] = faces;
+    if (first === undefined) throw new Error("no shipped face");
+    const response = await page.request.get(`${distUrl}${first.distPath}`);
+    const bytes = Uint8Array.from(await response.body());
+    await expect(
+      register(page, [
+        {
+          alias: "sl-ref-broken",
+          face: first,
+          data: base64(bytes.subarray(0, 1024)),
+        },
+      ]),
+    ).rejects.toThrow(/not loaded/);
+    await expect(
+      register(page, [
+        { alias: first.family, face: first, data: base64(bytes) },
+      ]),
+    ).rejects.toThrow(/independent alias/);
+    await register(page, [
       { alias: "sl-ref-once", face: first, data: base64(bytes) },
-    ]),
-  ).rejects.toThrow(/independent alias/);
-  expect(() => systemFace("absent-face.ttf")).toThrow(/absent/);
-  expect(() => environments("darwin")).toThrow(/no environment/);
-});
+    ]);
+    await expect(
+      register(page, [
+        { alias: "sl-ref-once", face: first, data: base64(bytes) },
+      ]),
+    ).rejects.toThrow(/independent alias/);
+  },
+);
