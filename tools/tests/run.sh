@@ -3,8 +3,8 @@
 # Builds a throwaway git repository, installs the tracked hooks there and checks:
 #   a. Bad commit subjects are rejected by tools/hooks/commit-msg
 #   b. Good commit subjects pass
-#   c. CRLF line endings and a missing final newline fail the encoding check; lock files and
-#      asset licence texts (web/assets/licences/<id>/OFL.txt) are exempt; .ttf and .woff2 are binary
+#   c. Text check cases P, F1-F6 and E: every tracked file not declared -text is checked, names
+#      are data, a missing tracked file fails; F6 runs on Linux only
 #   d. Suppression-reason fixtures from tools/tests/fixtures.mjs, per language
 #   e. Missing tools fail and failures reach check.sh; pre-push blocks unless the working tree is clean
 #   f. Licence allowlist and override record cases, and a disallowed licence through check.sh
@@ -102,90 +102,90 @@ try_commit reject "body" 'Add a subject with a body below\n\nThe body line.\n'
 try_commit reject "trailer" 'Add a subject with a trailer below\n\nSigned-off-by: Test\n'
 try_commit reject "too short" 'Fix it\n'
 
-# run_checks <label> <expected exit code>: runs text.sh, keeping its output for the cases that read it.
-run_checks() {
+# text_case <label> <expected exit code> <required line>...: one verdict per case, so a case
+# passes only when the exit code and every required line, matched as data, are right.
+text_case() {
+  case_label=$1
+  case_rc=$2
+  shift 2
   rc=0
   sh tools/checks/text.sh > "$tmp/out.sh" 2>&1 || rc=$?
-  if [ "$rc" -eq "$2" ]; then pass "text.sh $1 (exit $rc)"; else fail "text.sh $1 (exit $rc)"; fi
+  case_ok=1
+  [ "$rc" -eq "$case_rc" ] || case_ok=0
+  for need in "$@"; do
+    grep -qxF -e "$need" "$tmp/out.sh" || case_ok=0
+  done
+  if [ "$case_ok" -eq 1 ]; then
+    pass "text.sh $case_label (exit $rc)"
+  else
+    fail "text.sh $case_label (exit $rc)"
+    cat "$tmp/out.sh"
+  fi
 }
 
-run_checks "clean tree" 0
-
-printf 'one\r\ntwo\r\n' > crlf.txt
-git add crlf.txt 2> /dev/null
-run_checks "CRLF file" 1
-if grep -q '^  crlf.txt: CRLF line endings$' "$tmp/out.sh"; then
-  pass "text.sh names the CRLF file"
-else
-  fail "text.sh names the CRLF file"
-fi
-git rm -q --cached crlf.txt && rm crlf.txt
-
-printf 'no final newline' > tail.txt
-git add tail.txt
-run_checks "missing final newline" 1
-if grep -q '^  tail.txt: no final newline$' "$tmp/out.sh"; then
-  pass "text.sh names the file without a final newline"
-else
-  fail "text.sh names the file without a final newline"
-fi
-git rm -q --cached tail.txt && rm tail.txt
-
-# Only a file named exactly packages.lock.json may end without a newline.
-mkdir lock
+# P keeps every allowance in one tree; the failing cases below run beside it.
+odd='- odd & é.txt'
+: > empty.txt
+mkdir -p lock fonts web/assets/licences/sample
 printf '{}' > lock/packages.lock.json
-git add lock/packages.lock.json
-run_checks "lock file without a final newline" 0
+printf 'one\r\ntwo\r\n' > web/assets/licences/sample/OFL.txt
+printf '\000\001\000\000\r\n\377' > fonts/sample.ttf
+printf 'odd name\n' > "./$odd"
+git add -- empty.txt lock web fonts "./$odd"
+text_case "P passing tree with every allowance" 0 'PASS phrase scan' \
+  'PASS encoding, line endings and final newline'
+
+# The phrase comes from the list, so this file never holds one.
+phrase=$(sed -e '/^[#~=]/d' -e '/^$/d' -e q tools/forbidden-phrases.txt)
+printf '%s\n' "$phrase" > phrase.txt
+git add phrase.txt
+text_case "F1 forbidden phrase" 1 "  phrase.txt:1:$phrase" 'FAIL phrase scan (1 file(s))'
+git rm -q --cached phrase.txt && rm phrase.txt
+
+# Git normalises the index to LF, so only the worktree CRLF can fail.
+printf 'one\r\ntwo\r\n' > "./$odd"
+git add -- "./$odd" 2> /dev/null
+text_case "F2 CRLF under an odd name" 1 "  $odd: CRLF line endings"
+printf 'odd name\n' > "./$odd"
+git add -- "./$odd"
+
+# Beside the exempt lock file, a near name gets no exemption.
 printf '{}' > lock/other.lock.json
 git add lock/other.lock.json
-run_checks "other name without a final newline" 1
-if grep -q '^  lock/other.lock.json: no final newline$' "$tmp/out.sh"; then
-  pass "text.sh exempts only packages.lock.json"
-else
-  fail "text.sh exempts only packages.lock.json"
-fi
-git rm -q -r --cached lock && rm -r lock
+text_case "F3 no final newline" 1 '  lock/other.lock.json: no final newline'
+git rm -q --cached lock/other.lock.json && rm lock/other.lock.json
 
-# Only an OFL.txt in an asset licence folder may keep upstream CRLF bytes.
-mkdir -p web/assets/licences/sample
-printf 'one\r\ntwo\r\n' > web/assets/licences/sample/OFL.txt
-git add web/assets/licences/sample/OFL.txt 2> /dev/null
-run_checks "verbatim licence text with CRLF" 0
-printf 'one\r\ntwo\r\n' > web/assets/licences/sample/NOTES.txt
-git add web/assets/licences/sample/NOTES.txt 2> /dev/null
-run_checks "other name in the licence folder with CRLF" 1
-if grep -q '^  web/assets/licences/sample/NOTES.txt: CRLF line endings$' "$tmp/out.sh"; then
-  pass "text.sh exempts only licence-folder OFL.txt"
-else
-  fail "text.sh exempts only licence-folder OFL.txt"
-fi
-git rm -q --cached web/assets/licences/sample/NOTES.txt && rm web/assets/licences/sample/NOTES.txt
-mkdir -p web/assets/licences/sample/extra
-printf 'one\r\ntwo\r\n' > web/assets/licences/sample/extra/OFL.txt
-git add web/assets/licences/sample/extra/OFL.txt 2> /dev/null
-run_checks "nested licence text with CRLF" 1
-if grep -q '^  web/assets/licences/sample/extra/OFL.txt: CRLF line endings$' "$tmp/out.sh" &&
-  [ "$(git check-attr text -- web/assets/licences/sample/extra/OFL.txt)" = \
-    'web/assets/licences/sample/extra/OFL.txt: text: auto' ]; then
-  pass "the licence text exemption covers one folder level only"
-else
-  fail "the licence text exemption covers one folder level only"
-fi
-git rm -q -r --cached web && rm -r web
+# The printable bytes keep Git's guess at text, so only the UTF-8 rule can fail.
+printf 'a line of text with one invalid byte \377 inside it\n' > utf8.txt
+git add utf8.txt
+text_case "F4 invalid UTF-8" 1 '  utf8.txt: not valid UTF-8'
+git rm -q --cached utf8.txt && rm utf8.txt
 
-# Font files are binary: CR bytes, invalid UTF-8 and no final newline are not text faults.
-mkdir fonts
-printf '\000\001\000\000\r\n\377' > fonts/sample.ttf
-printf 'wOF2\000\001\r\n\377' > fonts/sample.woff2
-git add fonts
-run_checks "font files with CR and non-UTF-8 bytes" 0
-if [ "$(git check-attr text -- fonts/sample.ttf fonts/sample.woff2)" = "$(printf '%s\n' \
-  'fonts/sample.ttf: text: unset' 'fonts/sample.woff2: text: unset')" ]; then
-  pass "font files are marked binary"
+# A lone CR makes Git guess binary content.
+printf 'one\rtwo\n' > lone-cr.txt
+git add lone-cr.txt
+text_case "F5 lone CR without a declaration" 1 \
+  '  lone-cr.txt: binary content without a no-text declaration; declare it in .gitattributes or fix its bytes'
+git rm -q --cached lone-cr.txt && rm lone-cr.txt
+
+# Windows cannot create the name, so the case is reported as not run there, never as passed.
+if [ "$(uname -s)" = Linux ]; then
+  nl_name=$(printf 'new\nline.txt')
+  printf 'x\n' > "./$nl_name"
+  git add -- "./$nl_name"
+  text_case "F6 newline in a tracked name" 1 'FAIL unsupported tracked filename: contains a newline'
+  git rm -q --cached -- "./$nl_name" && rm -- "./$nl_name"
 else
-  fail "font files are marked binary"
+  echo "NOT RUN text.sh F6 newline in a tracked name (Linux only)"
 fi
-git rm -q -r --cached fonts && rm -r fonts
+
+printf 'gone\n' > gone.txt
+git add gone.txt
+rm gone.txt
+text_case "E tracked file missing from the worktree" 1 'FAIL gone.txt is missing or not a regular file'
+git rm -q --cached gone.txt
+git rm -q -r --cached -- empty.txt lock web fonts "./$odd"
+rm -r -- empty.txt lock web fonts "./$odd"
 
 # Shell and PowerShell report a named stage; ESLint reports by exit code.
 if [ -z "$node" ]; then
