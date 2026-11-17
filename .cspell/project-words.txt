@@ -18,7 +18,9 @@ cbtn
 ccent
 CDAT
 cdetail
+cfghjmpqrvwx
 cgrep
+CISA
 cmap
 codehead
 colr
@@ -212,6 +214,7 @@ venv
 vhea
 Vite
 vitest
+vjpf
 vmax
 vmin
 vmtx

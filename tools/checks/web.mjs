@@ -2,6 +2,14 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative } from "node:path";
+import {
+  findingProblems,
+  policyFile,
+  policyProblems,
+  recordProblems,
+  registryProblems,
+  severities,
+} from "./audit-exceptions.mjs";
 import { env, exec, notApplicable, npmCli, report } from "./lib.mjs";
 
 // Printed by web/stylelint/lint-production.js while web/src has no stylesheet.
@@ -68,7 +76,6 @@ const workspaceKey = /^npm_config_workspaces?$/iu;
 const auditEnv = Object.fromEntries(Object.entries(env).filter(([k]) => !workspaceKey.test(k)));
 // A healthy audit takes seconds. The limit ends the npm process started here, not every process under it.
 const auditTimeoutMs = 5 * 60 * 1000;
-const severities = ["info", "low", "moderate", "high", "critical"];
 
 const isRecord = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isCount = (v) => Number.isSafeInteger(v) && v >= 0;
@@ -109,45 +116,85 @@ async function auditBody(web) {
   if (!isRecord(body) || !Object.values(body).every(versions)) {
     throw new Error("the audit request body has an unexpected shape");
   }
-  return body;
+  return { body, tree };
 }
 
-// Refuses an inventory the audit could not cover in full, before any request is made.
-async function inventoryProblems(web) {
+// Refuses an inventory the audit could not cover in full, before any request is made. The loaded
+// tree is kept, since exception records are judged against its installed versions.
+async function inventory(web) {
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(join(web, "package.json"), "utf8"));
   } catch (e) {
-    return [`package.json could not be read: ${String(e.message)}`];
+    return { problems: [`package.json could not be read: ${String(e.message)}`] };
   }
-  if (!isRecord(manifest)) return ["package.json is not an object"];
-  if (Object.hasOwn(manifest, "workspaces")) return ["package.json declares workspaces"];
+  if (!isRecord(manifest)) return { problems: ["package.json is not an object"] };
+  if (Object.hasOwn(manifest, "workspaces")) return { problems: ["package.json declares workspaces"] };
   if (existsSync(join(web, "npm-shrinkwrap.json"))) {
-    return ["npm-shrinkwrap.json exists, and npm would audit it instead of package-lock.json"];
+    return { problems: ["npm-shrinkwrap.json exists, and npm would audit it instead of package-lock.json"] };
   }
-  let body;
+  let prepared;
   try {
-    body = await auditBody(web);
+    prepared = await auditBody(web);
   } catch (e) {
     const code = typeof e?.code === "string" ? `${e.code}: ` : "";
-    return [`npm audit inventory could not be prepared from the lockfile: ${code}${String(e?.message ?? e)}`];
+    return { problems: [`npm audit inventory could not be prepared from the lockfile: ${code}${String(e?.message ?? e)}`] };
   }
-  if (Object.keys(body).length === 0) {
-    return ["the lockfile lists no package npm audit would send the registry"];
+  if (Object.keys(prepared.body).length === 0) {
+    return { problems: ["the lockfile lists no package npm audit would send the registry"] };
   }
-  return [];
+  return { problems: [], tree: prepared.tree };
 }
 
-// The report's problems, none for a valid report with nothing found. It only judges the report;
-// what is shown on a failure never depends on it.
-function reportVerdict(stdout) {
+// Every installation the lockfile gives, named by its own package data and never by its folder.
+function installations(tree) {
+  const installs = [];
+  const problems = [];
+  for (const node of tree.inventory.values()) {
+    if (node === tree) continue;
+    const { location } = node;
+    const name = node.package?.name;
+    const version = node.package?.version;
+    if (typeof location !== "string" || typeof name !== "string" || typeof version !== "string") {
+      problems.push(`the lockfile gives ${String(location)} no package name and version`);
+    } else installs.push({ location, name, version });
+  }
+  return { problems, installs };
+}
+
+// The pinned npm's own version library, loaded only when a record needs it.
+function versionLibrary() {
+  if (!npmCli) throw new Error("npm not found next to node");
+  const root = join(dirname(dirname(npmCli)), "node_modules", "semver");
+  const semver = npmModule(createRequire(npmCli), root, "semver");
+  const used = ["valid", "validRange", "satisfies", "prerelease", "gt", "compare"];
+  if (!used.every((name) => typeof semver?.[name] === "function")) {
+    throw new Error("semver has an unexpected shape");
+  }
+  return semver;
+}
+
+// The policy file, read before any npm run; anything but the exact shape refuses the stage.
+function readPolicy(web) {
+  let policy;
+  try {
+    policy = JSON.parse(readFileSync(join(web, policyFile), "utf8"));
+  } catch (e) {
+    return { problems: [`${policyFile} could not be read: ${String(e?.message ?? e)}`] };
+  }
+  const problems = policyProblems(policy);
+  return problems.length > 0 ? { problems } : { problems, exceptions: policy.exceptions };
+}
+
+// The report's shape problems, or the report itself with the number of entries it lists.
+function readReport(stdout) {
   let data;
   try {
     data = JSON.parse(stdout);
   } catch {
-    return ["npm audit did not print a JSON report"];
+    return { problems: ["npm audit did not print a JSON report"] };
   }
-  const bad = (problem) => [`npm audit report ${problem}`];
+  const bad = (problem) => ({ problems: [`npm audit report ${problem}`] });
   if (!isRecord(data)) return bad("is not an object");
   if (data.auditReportVersion !== 2) return bad(`version is ${JSON.stringify(data.auditReportVersion)}, not 2`);
   const { vulnerabilities: found, metadata } = data;
@@ -165,11 +212,21 @@ function reportVerdict(stdout) {
   }
   const dependencies = isRecord(metadata.dependencies) ? metadata.dependencies.total : undefined;
   if (!Number.isSafeInteger(dependencies) || dependencies < 1) return bad("lists no dependencies");
-  if (sum > 0) {
-    const named = severities.map((k) => `${k} ${String(counts[k])}`).join(", ");
-    return [`npm audit found ${named}, in ${Object.keys(found).join(", ")}`];
-  }
-  return [];
+  return { problems: [], data, sum };
+}
+
+const foundLine = (data) => {
+  const counts = data.metadata.vulnerabilities;
+  const named = severities.map((k) => `${k} ${String(counts[k])}`).join(", ");
+  return `npm audit found ${named}, in ${Object.keys(data.vulnerabilities).join(", ")}`;
+};
+
+// The report's problems, none for a valid report with nothing found. It only judges the report;
+// what is shown on a failure never depends on it.
+function reportVerdict(stdout) {
+  const { problems, data, sum } = readReport(stdout);
+  if (problems.length > 0) return problems;
+  return sum > 0 ? [foundLine(data)] : [];
 }
 
 const lines = (text) => (text ?? "").replace(/\r/gu, "").replace(/\s+$/u, "");
@@ -193,16 +250,44 @@ function auditFailure(reasons, result) {
 // For a failure found before the stage, such as a missing npm.
 export const npmAuditNotRun = (reasons) => auditFailure(reasons, null);
 
-// The same script CI runs, so its threshold lives in web/package.json alone. A PASS needs the
-// inventory check, exit 0 and a valid report with nothing found at any severity, info included.
-export async function npmAuditStage(web, run = exec) {
-  const refused = await inventoryProblems(web);
-  if (refused.length > 0) {
-    auditFailure(refused, null);
-    return null;
+const refuse = (reasons) => {
+  auditFailure(reasons, null);
+  return null;
+};
+const fail = (reasons, result) => {
+  auditFailure(reasons, result);
+  return result;
+};
+// npm's warnings stay visible beside a PASS.
+const showStderr = (r) => {
+  for (const line of lines(r.stderr).split("\n").filter((l) => l.trim() !== "")) console.log(`  ${line}`);
+};
+
+const auditCommand = ["run", "--silent", "audit", "--", "--json"];
+// With both given npm includes dev, so the production run drops that override instead.
+const productionOverrides = [...auditOverrides.filter((flag) => flag !== "--include=dev"), "--omit=dev"];
+// Asked online every time, so a release published since the cache was filled is seen.
+const registryOverrides = ["--offline=false", "--prefer-offline=false", "--prefer-online=true", "--workspaces=false"];
+
+const errorReport = (stdout) => {
+  try {
+    const data = JSON.parse(stdout ?? "");
+    return isRecord(data) && Object.hasOwn(data, "error");
+  } catch {
+    return false;
   }
-  const opts = { cwd: web, env: auditEnv, timeout: auditTimeoutMs };
-  const r = run("npm", ["run", "--silent", "audit", "--", "--json", ...auditOverrides], opts);
+};
+// A run that did not finish or that reports an error is refused, whatever else it printed.
+function runProblems(label, r) {
+  if (r.code === null || (r.signal ?? null) !== null || (r.error ?? null) !== null) {
+    const why = [r.signal ? `killed by ${r.signal}` : "", lines(String(r.error ?? ""))].filter((p) => p !== "");
+    return [`${label} did not complete${why.length > 0 ? ` (${why.join("; ")})` : ""}`];
+  }
+  return errorReport(r.stdout) ? [`${label} reported an error`] : [];
+}
+
+function plainAudit(run, opts) {
+  const r = run("npm", [...auditCommand, ...auditOverrides], opts);
   const problems = [];
   if (r.code === null) {
     const why = [r.signal ? `killed by ${r.signal}` : "", lines(r.error)].filter((p) => p !== "");
@@ -211,12 +296,89 @@ export async function npmAuditStage(web, run = exec) {
     problems.push(`npm audit exited ${String(r.code)}`);
   }
   problems.push(...reportVerdict(r.stdout ?? ""));
-  if (problems.length > 0) {
-    auditFailure(problems, r);
-    return r;
-  }
-  // npm's warnings stay visible beside a PASS.
-  for (const line of lines(r.stderr).split("\n").filter((l) => l.trim() !== "")) console.log(`  ${line}`);
+  if (problems.length > 0) return fail(problems, r);
+  showStderr(r);
   report("npm audit", []);
   return r;
+}
+
+// Stops at the first refusal, so no run follows one and only the failing run's output is shown.
+function exceptionAudit(run, opts, tree, exceptions) {
+  const listed = installations(tree);
+  if (listed.problems.length > 0) return refuse(listed.problems);
+  let semver;
+  try {
+    semver = versionLibrary();
+  } catch (e) {
+    return refuse([`the version library could not be loaded from the pinned npm: ${String(e?.message ?? e)}`]);
+  }
+  const refused = recordProblems(exceptions, listed.installs, semver);
+  if (refused.length > 0) return refuse(refused);
+
+  const full = run("npm", [...auditCommand, ...auditOverrides], opts);
+  const done = [full];
+  let problems = runProblems("npm audit", full);
+  if (problems.length > 0) return fail(problems, full);
+  if (full.code !== 0 && full.code !== 1) return fail([`npm audit exited ${String(full.code)}`], full);
+  const exited = full.code === 1 ? ["npm audit exited 1"] : [];
+  const read = readReport(full.stdout ?? "");
+  if (read.problems.length > 0) return fail([...exited, ...read.problems], full);
+  if (read.sum === 0) {
+    if (exited.length > 0) return fail(exited, full);
+    const unused = exceptions.map((x) => `${policyFile}: ${x.advisoryId} in ${x.package} matches no finding`);
+    return fail(unused, full);
+  }
+  let judged;
+  try {
+    judged = findingProblems(read.data, listed.installs, exceptions, semver);
+  } catch (e) {
+    judged = { problems: [`the npm audit report could not be judged: ${String(e?.message ?? e)}`] };
+  }
+  if (judged.problems.length > 0) return fail([...exited, foundLine(read.data), ...judged.problems], full);
+
+  const production = run("npm", [...auditCommand, ...productionOverrides], opts);
+  done.push(production);
+  problems = runProblems("npm audit of the production tree", production);
+  if (problems.length === 0) {
+    if (production.code !== 0) problems.push(`npm audit of the production tree exited ${String(production.code)}`);
+    problems.push(...reportVerdict(production.stdout ?? "").map((p) => `production tree: ${p}`));
+  }
+  if (problems.length > 0) return fail(problems, production);
+
+  for (const record of exceptions) {
+    const label = `npm view ${record.package} versions`;
+    const view = run("npm", ["view", record.package, "versions", "--json", ...registryOverrides], opts);
+    done.push(view);
+    problems = runProblems(label, view);
+    if (problems.length === 0 && view.code !== 0) problems.push(`${label} exited ${String(view.code)}`);
+    if (problems.length === 0) {
+      try {
+        problems = registryProblems(record, judged.ranges.get(record), view.stdout ?? "", semver);
+      } catch (e) {
+        problems = [`${label} could not be judged: ${String(e?.message ?? e)}`];
+      }
+    }
+    if (problems.length > 0) return fail(problems, view);
+  }
+
+  for (const r of done) showStderr(r);
+  for (const x of exceptions) {
+    console.log(`  exception in force: ${x.advisoryId} ${x.package} ${x.versions.join(", ")}`);
+  }
+  report("npm audit", []);
+  return done.at(-1);
+}
+
+// Only this stage applies the exception records in web/dependency-audit-policy.json; the audit
+// script's threshold lives in web/package.json alone. With no record a PASS needs exit 0 and
+// nothing found at any severity, info included. With records every finding must be covered
+// exactly, the production tree must report nothing, and no newer release may leave a range.
+export async function npmAuditStage(web, run = exec) {
+  const checked = await inventory(web);
+  if (checked.problems.length > 0) return refuse(checked.problems);
+  const policy = readPolicy(web);
+  if (policy.problems.length > 0) return refuse(policy.problems);
+  const opts = { cwd: web, env: auditEnv, timeout: auditTimeoutMs };
+  if (policy.exceptions.length === 0) return plainAudit(run, opts);
+  return exceptionAudit(run, opts, checked.tree, policy.exceptions);
 }

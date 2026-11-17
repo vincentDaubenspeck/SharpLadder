@@ -107,6 +107,8 @@ function fixtureProject(name, opts = {}) {
     "package-lock.json": lockText === undefined ? `${JSON.stringify(lock("1.0.0"), null, 2)}\n` : lockText,
     "npm-shrinkwrap.json": shrinkwrap === undefined ? null : `${JSON.stringify(lock(shrinkwrap), null, 2)}\n`,
     ".npmrc": npmrc ?? null,
+    // No exception record, so the stage judges the report alone unless a case writes its own.
+    "dependency-audit-policy.json": `${JSON.stringify({ exceptions: [] })}\n`,
     ...opts.files,
   };
   for (const [file, text] of Object.entries(files)) {
@@ -711,6 +713,170 @@ setTimeout(() => process.${name}.write("x".repeat(65536)), 500); ${hang}`;
     show(r),
   );
 }
+
+// Exception records. One runner answers each call by its exact arguments and records every call,
+// so a case sees which npm runs the stage made, in order; an unexpected call gets no answer.
+const recording = `(() => {
+  const calls = [];
+  return (cmd, args, opts) => {
+    calls.push({ cmd, args, cwd: opts.cwd, timeout: opts.timeout });
+    writeFileSync(\`\${process.argv[3]}.calls\`, JSON.stringify(calls));
+    const answer = data.find((a) => JSON.stringify(a.args) === JSON.stringify(args));
+    if (answer === undefined) return { code: null, signal: null, stdout: "", stderr: "", out: "", error: "unexpected call" };
+    return { ...answer.result, out: \`\${answer.result.stdout}\${answer.result.stderr}\` };
+  };
+})()`;
+const auditArgs = [
+  ...["run", "--silent", "audit", "--", "--json", "--offline=false", "--prefer-offline=false"],
+  ...["--include=dev", "--include=optional", "--include=peer", "--package-lock=true", "--package-lock-only=true"],
+  "--workspaces=false",
+];
+const productionArgs = [...auditArgs.filter((a) => a !== "--include=dev"), "--omit=dev"];
+const online = ["--offline=false", "--prefer-offline=false", "--prefer-online=true"];
+const viewArgs = (name) => ["view", name, "versions", "--json", ...online, "--workspaces=false"];
+const answer = (args, { code = 0, stdout, stderr = "" }) => ({ args, result: { code, signal: null, stdout, stderr } });
+
+// What is wrong with the calls of the last stage run: the sequence, and what each call carries.
+function callProblems(dir, expected) {
+  const file = join(work, `data-${String(stageRuns)}.json.calls`);
+  const calls = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
+  const problems = [];
+  if (JSON.stringify(calls.map((c) => c.args)) !== JSON.stringify(expected)) {
+    problems.push(`calls ${JSON.stringify(calls.map((c) => c.args.join(" ")))}`);
+  }
+  for (const { cmd, args, cwd, timeout } of calls) {
+    if (cmd !== "npm" || cwd !== dir || timeout !== 5 * 60 * 1000) problems.push(`call ${cmd} in ${cwd} limited to ${timeout}`);
+    if (args.includes("--omit=dev") && args.includes("--include=dev")) problems.push("a production call includes dev");
+    const auditOnly = args.some((a) => /^--(?:include|omit|package-lock|audit-level)/u.test(a));
+    if (args[0] === "view" && (auditOnly || !online.every((flag) => args.includes(flag)))) {
+      problems.push(`registry call ${args.join(" ")}`);
+    }
+  }
+  return problems;
+}
+
+// A dev-only package installed at two versions, reached from fx-top through fx-mid.
+const fxId = "GHSA-2345-6789-2345";
+const fxRange = ">=1.0.0 <1.2.0";
+const fxRecord = (fields = {}) => ({
+  advisoryId: fxId,
+  package: "fx-pkg",
+  versions: ["1.0.0", "1.1.0"],
+  reason: "Fixture exception.",
+  removeWhen: "The fixture advisory is withdrawn.",
+  addedOn: "2026-11-17",
+  references: [`https://github.com/advisories/${fxId}`],
+  ...fields,
+});
+let exceptionCount = 0;
+function exceptionProject(policy) {
+  const dev = (name, version, more = {}) => ({ version, resolved: `${base}/${name}-${version}.tgz`, dev: true, ...more });
+  const devDependencies = { "fx-top": "1.0.0", "fx-pkg": "1.0.0" };
+  return fixtureProject(`fx-exception-${String(++exceptionCount)}`, {
+    manifest: { dependencies: {}, devDependencies },
+    packages: {
+      "": { name: "fx", version: "1.0.0", devDependencies },
+      "node_modules/fx-top": dev("fx-top", "1.0.0", { dependencies: { "fx-mid": "1.0.0" } }),
+      "node_modules/fx-mid": dev("fx-mid", "1.0.0", { dependencies: { "fx-pkg": "1.1.0" } }),
+      "node_modules/fx-mid/node_modules/fx-pkg": dev("fx-pkg", "1.1.0"),
+      "node_modules/fx-pkg": dev("fx-pkg", "1.0.0"),
+    },
+    files: { "dependency-audit-policy.json": typeof policy === "string" ? policy : `${JSON.stringify(policy)}\n` },
+  });
+}
+const fxAdvisory = (id) => ({
+  source: 9,
+  name: "fx-pkg",
+  dependency: "fx-pkg",
+  title: "Fixture advisory",
+  url: `https://github.com/advisories/${id}`,
+  severity: "high",
+  cwe: [],
+  cvss: { score: 0, vectorString: null },
+  range: fxRange,
+});
+const chainReport = (...ids) =>
+  reportText((d) => {
+    const entry = (name, via, nodes) => ({ name, severity: "high", isDirect: false, via, effects: [], range: "*", nodes, fixAvailable: false });
+    d.vulnerabilities["fx-pkg"] = entry("fx-pkg", ids.map(fxAdvisory), ["node_modules/fx-mid/node_modules/fx-pkg", "node_modules/fx-pkg"]);
+    d.vulnerabilities["fx-mid"] = entry("fx-mid", ["fx-pkg"], ["node_modules/fx-mid"]);
+    d.vulnerabilities["fx-top"] = entry("fx-top", ["fx-mid"], ["node_modules/fx-top"]);
+    counts(d, { high: 3, total: 3 });
+  });
+const fullAnswer = (...ids) => answer(auditArgs, { code: 1, stdout: chainReport(...ids), stderr: "npm warn fixture full tree\n" });
+const productionAnswer = answer(productionArgs, { stdout: reportText(), stderr: "npm warn fixture production tree\n" });
+const viewAnswer = (versions) => answer(viewArgs("fx-pkg"), { stdout: `${JSON.stringify(versions)}\n`, stderr: "npm warn fixture view\n" });
+const listed = ["0.9.0", "1.0.0", "1.1.0", "2.0.0-beta.1"];
+const highFound = /^ {2}npm audit found info 0, low 0, moderate 0, high 3, critical 0, in fx-pkg, fx-mid, fx-top$/mu;
+
+let dir = exceptionProject({ exceptions: [fxRecord()] });
+r = await stage({ runner: recording, data: [fullAnswer(fxId), productionAnswer, viewAnswer(listed)], dir });
+let calls = callProblems(dir, [auditArgs, productionArgs, viewArgs("fx-pkg")]);
+check(
+  "npm audit stage passes findings that one exact exception record covers",
+  stagePasses(r) &&
+    calls.length === 0 &&
+    r.reasons.includes(
+      "  npm warn fixture full tree\n  npm warn fixture production tree\n  npm warn fixture view\n" +
+        `  exception in force: ${fxId} fx-pkg 1.0.0, 1.1.0\nPASS npm audit`,
+    ),
+  `${show(r)}\n${calls.join("\n")}`,
+);
+
+const otherId = "GHSA-3456-7892-3456";
+dir = exceptionProject({ exceptions: [fxRecord()] });
+r = await stage({ runner: recording, data: [fullAnswer(fxId, otherId), productionAnswer, viewAnswer(listed)], dir });
+calls = callProblems(dir, [auditArgs]);
+check(
+  "npm audit stage fails an advisory no record covers beside a covered one (rule a)",
+  stageFails(r, new RegExp(`^ {2}advisory "${otherId}" in "fx-pkg" is not covered: no exception records it$`, "mu")) &&
+    exited.test(r.reasons) &&
+    highFound.test(r.reasons) &&
+    calls.length === 0,
+  `${show(r)}\n${calls.join("\n")}`,
+);
+
+dir = exceptionProject({ exceptions: [fxRecord()] });
+const productionFinds = answer(productionArgs, { code: 1, stdout: chainReport(fxId) });
+r = await stage({ runner: recording, data: [fullAnswer(fxId), productionFinds, viewAnswer(listed)], dir });
+calls = callProblems(dir, [auditArgs, productionArgs]);
+check(
+  "npm audit stage fails a covered advisory the production tree also reports (rule b)",
+  stageFails(r, /^ {2}production tree: npm audit found info 0, low 0, moderate 0, high 3, critical 0, in fx-pkg, /mu) &&
+    calls.length === 0,
+  `${show(r)}\n${calls.join("\n")}`,
+);
+
+const goneId = "GHSA-4567-8923-4567";
+dir = exceptionProject({ exceptions: [fxRecord(), fxRecord({ advisoryId: goneId, package: "fx-mid", versions: ["1.0.0"] })] });
+r = await stage({ runner: recording, data: [fullAnswer(fxId), productionAnswer, viewAnswer(listed)], dir });
+calls = callProblems(dir, [auditArgs]);
+check(
+  "npm audit stage fails a record whose advisory is not in the report (rule c)",
+  stageFails(r, new RegExp(`^ {2}dependency-audit-policy\\.json: ${goneId} in fx-mid matches no advisory in the report$`, "mu")) &&
+    calls.length === 0,
+  `${show(r)}\n${calls.join("\n")}`,
+);
+
+dir = exceptionProject({ exceptions: [fxRecord()] });
+r = await stage({ runner: recording, data: [fullAnswer(fxId), productionAnswer, viewAnswer([...listed, "1.2.0"])], dir });
+calls = callProblems(dir, [auditArgs, productionArgs, viewArgs("fx-pkg")]);
+check(
+  "npm audit stage fails a record once a newer stable release is outside the range (rule d)",
+  stageFails(r, new RegExp(`^ {2}${fxId} in fx-pkg is out of date: 1\\.2\\.0 is published, outside `, "mu")) &&
+    parsed(r.exec?.stdout ?? "")?.includes("1.2.0") === true &&
+    calls.length === 0,
+  `${show(r)}\n${calls.join("\n")}`,
+);
+
+dir = exceptionProject("{ not json\n");
+r = await stage({ runner: recording, data: [fullAnswer(fxId), productionAnswer, viewAnswer(listed)], dir });
+calls = callProblems(dir, []);
+check(
+  "npm audit stage refuses a policy file that is not JSON (rule e)",
+  stageRefuses(r, /^ {2}dependency-audit-policy\.json could not be read: /mu) && calls.length === 0,
+  `${show(r)}\n${calls.join("\n")}`,
+);
 
 decoy.close();
 server.close();
