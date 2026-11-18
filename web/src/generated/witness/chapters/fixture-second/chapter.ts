@@ -9,8 +9,8 @@ export const witness = {
   title: "Fixture Second",
   order: 2,
   targets: {
-    csharp: 12,
-    dotnet: 8,
+    csharp: 14,
+    dotnet: 10,
   },
   intro: [
     {

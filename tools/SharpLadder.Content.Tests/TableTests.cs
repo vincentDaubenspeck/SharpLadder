@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Tables: the one admitted written form, what is refused beside it, and the spoken sentence rule.
 public sealed class TableTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n";
     private const string Rule = "write a table as one header row, one row of dashes and one or more data rows, each line starting and ending with |, with a blank line or a heading above it and a blank line or the end of the file below it";
 

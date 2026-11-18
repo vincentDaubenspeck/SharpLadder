@@ -6,7 +6,7 @@
   "order": 1,
   "targets": {
     "csharp": 11,
-    "dotnet": 8
+    "dotnet": 10
   },
   "intro": [
     {

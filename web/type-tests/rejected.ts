@@ -5,7 +5,7 @@ export const row01 = {
   id: "ch-matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -40,7 +40,7 @@ export const row02 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -77,7 +77,7 @@ export const row03 = {
   title: "Matrix",
   order: 1,
   // @ts-expect-error Row 3: No extra properties in a nested object (targets).
-  targets: { csharp: 12, dotnet: 8, java: 21 },
+  targets: { csharp: 14, dotnet: 10, java: 21 },
   intro: [
     {
       type: "paragraph",
@@ -112,7 +112,7 @@ export const row04 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -146,8 +146,8 @@ export const row05 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  // @ts-expect-error Row 5: Fixed number value (csharp 12).
-  targets: { csharp: 11, dotnet: 8 },
+  // @ts-expect-error Row 5: Fixed number value (csharp 14).
+  targets: { csharp: 11, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -353,7 +353,7 @@ export const row13 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   // @ts-expect-error Row 13: Reference into the other schema file (chapter intro).
   intro: [{ type: "paragraph", blockId: "intro/b1", content: "Text." }],
   sections: [

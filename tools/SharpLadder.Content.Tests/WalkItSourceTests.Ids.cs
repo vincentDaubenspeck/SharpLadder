@@ -10,7 +10,7 @@ namespace SharpLadder.Content.Tests;
 /// </content>
 public sealed partial class WalkItSourceTests
 {
-    private const string Other = "---\nid: ch-other\nslug: other\ntitle: Other\norder: 2\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n\n";
+    private const string Other = "---\nid: ch-other\nslug: other\ntitle: Other\norder: 2\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n\n";
     private const string OtherPart = "---\nkind: syntax\nchapter: ch-other\norder: 1\n---\n\n## Title {#syn-b}\n\nText.\n";
     private const string Build = "---\nkind: build\nchapter: ch-test\norder: 2\n---\n\n## Build {#build-a}\n\n";
     private const string SecondWay = "### Second way {#build-two approach=\"two\"}\n\nTwo text.\n\n";

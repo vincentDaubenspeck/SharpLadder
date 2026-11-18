@@ -82,8 +82,8 @@ export type ChapterFile = {
   title: string;
   order: Order;
   targets: {
-    csharp: 12;
-    dotnet: 8;
+    csharp: 14;
+    dotnet: 10;
   };
   intro: Body;
   sections: ChapterSection[];

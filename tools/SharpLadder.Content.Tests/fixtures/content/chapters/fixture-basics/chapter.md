@@ -3,7 +3,7 @@ id: ch-fixture
 slug: fixture-basics
 title: Fixture Basics
 order: 1
-targets: { csharp: 12, dotnet: 8 }
+targets: { csharp: 14, dotnet: 10 }
 ---
 
 This fixture chapter exercises every rule of the content compiler. It is

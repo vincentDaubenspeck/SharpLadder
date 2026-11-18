@@ -6,7 +6,7 @@ namespace SharpLadder.Content.Tests;
 // Root allowlist and raw-byte text admission; every case runs through the real filesystem reader.
 public sealed class AdmissionTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string LinkRefused = "links and reparse points are not accepted at or below a root folder";
     private const string RootRefusal = "the content root holds only chapters/, errors/, glossary/, schema/, aliases.yml and patterns.yml";
 

@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Hints: ladders whose cues alone are public, and a catalogue that holds nothing they hide.
 public sealed class HintsTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string Patterns = "patterns:\n  - id: pat-hidden-tally\n    title: Hidden Tally Title\n    summary: Hidden summary.\n  - id: pat-other\n    title: Other title\n    summary: Other summary.\n";
     private const string Head = "---\nkind: hints\nchapter: ch-test\norder: 2\n---\n\n";
     private const string Alpha = "## Hidden heading {#ladder-alpha}\n\ncue: Public cue one.\npattern: pat-hidden-tally\napproach: secret approach\n\n1. {#r1} First *hidden* rung.\n2. {#r2} Second `code` **rung**.\n";

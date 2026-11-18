@@ -10,7 +10,7 @@ namespace SharpLadder.Content.Tests;
 /// </summary>
 public sealed class WalkItSpeechTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string SyntaxHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n";
     private const string BuildHead = "---\nkind: build\nchapter: ch-test\norder: 1\n---\n\n## Build {#build-a}\n\n";
     private const string CardsHead = "---\nkind: cards\nchapter: ch-test\norder: 1\n---\n\n## Cards {#cards-a}\n\n";

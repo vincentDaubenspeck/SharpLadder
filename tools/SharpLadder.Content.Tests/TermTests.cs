@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Term: a link to a live glossary entry, resolved at compilation, holding its entry's short text.
 public sealed class TermTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n## Title {#syn-a}\n\n";
     private const string Glossary = "---\nid: term-a\nterm: A term\nshort: What it means.\n---\n";
     private const string Part = "chapters/c/part.md";

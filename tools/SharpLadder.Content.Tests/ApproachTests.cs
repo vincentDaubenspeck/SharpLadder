@@ -8,7 +8,7 @@ namespace SharpLadder.Content.Tests;
 // approach, code groups kept inside one approach, and what compiler and schema refuse.
 public sealed class ApproachTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string Front = "---\nkind: build\nchapter: ch-test\norder: 1\n---\n\n";
     private const string Head = Front + "## Build {#build-a}\n\n";
     private const string One = "### First way {#build-one approach=\"one\"}\n\nOne text.\n\n";

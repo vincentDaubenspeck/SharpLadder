@@ -48,7 +48,7 @@ export const p2a = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [],
   sections: [],
 } satisfies ContentDoc;

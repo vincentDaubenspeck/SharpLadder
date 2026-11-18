@@ -8,7 +8,7 @@ namespace SharpLadder.Content.Tests;
 // what is refused by the compiler and by the schema.
 public sealed class CardTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string Front = "---\nkind: cards\nchapter: ch-test\norder: 1\n---\n\n";
     private const string Head = Front + "## Cards {#cards-a}\n\n";
     private const string Fields = "- reach: R.\n- build: B.\n- why: W.\n";

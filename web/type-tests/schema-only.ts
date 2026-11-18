@@ -61,7 +61,7 @@ export const row21 = {
   slug: "two words",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -96,7 +96,7 @@ export const row22 = {
   slug: "matrix",
   title: "",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -162,7 +162,7 @@ export const row24 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",
@@ -197,7 +197,7 @@ export const row25 = {
   slug: "matrix",
   title: "Matrix",
   order: 1,
-  targets: { csharp: 12, dotnet: 8 },
+  targets: { csharp: 14, dotnet: 10 },
   intro: [
     {
       type: "paragraph",

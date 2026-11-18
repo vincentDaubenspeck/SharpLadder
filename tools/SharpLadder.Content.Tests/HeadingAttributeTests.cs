@@ -5,7 +5,7 @@ namespace SharpLadder.Content.Tests;
 
 public sealed class HeadingAttributeTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n";
 
     [Theory]

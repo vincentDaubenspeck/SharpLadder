@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Glossary and error entries: closed front matter, labelled fields, entry identity and links.
 public sealed class EntryTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n## Title {#syn-a}\n\n";
     private const string TermHead = "---\nid: term-a\nterm: A term\nshort: What it means.\n---\n";
     private const string ErrorHead = "---\nid: err-a\nkind: compiler\ncode: CS0001\nwrote: A thing\ngot: A message\n---\n\n";

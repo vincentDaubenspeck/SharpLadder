@@ -8,8 +8,8 @@ namespace SharpLadder.Content.Tests;
 // The alias and pattern registries, compiled from real files beside two small chapters.
 public sealed class RegistryTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n\n## Start {#start}\n\nText.\n";
-    private const string Other = "---\nid: ch-other\nslug: other\ntitle: Other\norder: 2\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n\n## Other start {#other-start}\n\nText.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n\n## Start {#start}\n\nText.\n";
+    private const string Other = "---\nid: ch-other\nslug: other\ntitle: Other\norder: 2\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n\n## Other start {#other-start}\n\nText.\n";
     private const string Part = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n## One {#syn-one}\n\n```csharp {#syn-code group=g spoken=\"Runs it\"}\nint x = 1;\n```\n\n## Two {#syn-two}\n\nText.\n";
     private const string NoAliases = "slugs: {}\nids: {}\n";
     private const string NoPatterns = "patterns: []\n";

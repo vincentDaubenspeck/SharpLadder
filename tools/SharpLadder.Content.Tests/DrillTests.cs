@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Drill: one section per ramp rung, its prose, then the labelled drills in recommended order.
 public sealed class DrillTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string Head = "---\nkind: drill\nchapter: ch-test\norder: 2\n---\n\n";
     private const string Warm = "## One idea {#ramp-warm rung=warm-up}\n\nEach drill uses one idea.\n\n1. [Count the letters](#drill-count)\n2. [Find a first pair](#drill-pair)\n";
     private const string Easy = "\n## Two ideas {#ramp-easy rung=easy}\n\nFirst paragraph.\n\nSecond paragraph.\n\n1. [Join two lists](#drill-join)\n";

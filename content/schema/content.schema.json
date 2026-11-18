@@ -129,8 +129,8 @@
           "additionalProperties": false,
           "required": ["csharp", "dotnet"],
           "properties": {
-            "csharp": { "const": 12 },
-            "dotnet": { "const": 8 }
+            "csharp": { "const": 14 },
+            "dotnet": { "const": 10 }
           }
         },
         "intro": { "$ref": "body.schema.json#/definitions/body" },

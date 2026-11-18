@@ -7,7 +7,7 @@ namespace SharpLadder.Content.Tests;
 // Spoken segments and the audio slot, read back from the compiled output of real source files.
 public sealed class SpeechTests
 {
-    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 12, dotnet: 8 }\n---\n\nIntro text.\n";
+    private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n";
     private const string EmptySlot = "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 

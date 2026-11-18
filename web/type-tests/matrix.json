@@ -96,18 +96,18 @@
     },
     {
       "name": "row05",
-      "rule": "Fixed number value (csharp 12)",
+      "rule": "Fixed number value (csharp 14)",
       "module": "rejected.ts",
       "json": "json/row05.json",
       "typescript": {
         "code": 2322,
-        "text": "Type '11' is not assignable to type '12'"
+        "text": "Type '11' is not assignable to type '14'"
       },
       "validator": "refused",
       "repair": {
         "op": "set",
         "path": ["targets", "csharp"],
-        "value": 12
+        "value": 14
       }
     },
     {
