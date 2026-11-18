@@ -1,5 +1,5 @@
-// Editor feedback for the source policy; the build guard applies the same engine to the same
-// parser output and ignores disable comments, so silencing this rule never silences the build.
+// The source policy in ESLint. Inline configuration is off in application source, so no comment
+// there can silence it, and the build guard applies the same engine to the same parser output.
 import { fileURLToPath } from "node:url";
 import { checkProgram } from "../source-policy/index.js";
 import { sourceIdentity } from "../source-policy/unit.js";

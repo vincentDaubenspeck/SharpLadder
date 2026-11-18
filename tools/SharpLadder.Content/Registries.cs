@@ -76,7 +76,7 @@ internal static class Registries
     }
 
     // Null after reporting. Every alias is followed to its end, so the result names live targets
-    // only: slugs end at a chapter slug, ids at a section id.
+    // only: slugs end at a chapter slug, walk ids at a walk id, other ids at a section id.
     public static AliasesFile? ReadAliases(InputTree tree, LiveNames live, List<Diagnostic> diagnostics)
     {
         var before = diagnostics.Count;
@@ -86,10 +86,14 @@ internal static class Registries
             return null;
         }
 
-        var slugs = Namespace(root, new Rules("slugs", "slug", ContentIds.IsSlug, SlugRule, live.Slugs, live.Slugs, "a chapter slug"), display, diagnostics);
-        var ids = Namespace(root, new Rules("ids", "id", ContentIds.IsValid, ContentIds.FormatRule, live.Ids, live.SectionIds, "a section id"), display, diagnostics);
+        var slugs = Namespace(root, new Rules("slugs", "slug", ContentIds.IsSlug, SlugRule, live.Slugs, _ => (live.Slugs, "a chapter slug")), display, diagnostics);
+        var ids = Namespace(root, new Rules("ids", "id", ContentIds.IsValid, ContentIds.FormatRule, live.Ids, key => IdEnds(key, live)), display, diagnostics);
         return diagnostics.Count == before && slugs is not null && ids is not null ? new AliasesFile { Slugs = slugs, Ids = ids } : null;
     }
+
+    // The walk prefix names one kind, so a retired walk id keeps naming a walk-it block.
+    private static (IReadOnlySet<string> Ends, string What) IdEnds(string key, LiveNames live) =>
+        key.StartsWith(SourceFile.WalkPrefix, StringComparison.Ordinal) ? (live.WalkIds, "a walk id") : (live.SectionIds, "a section id");
 
     private static (PlainYaml.Map? Root, string Display) Root(InputTree tree, string name, List<Diagnostic> diagnostics)
     {
@@ -227,9 +231,9 @@ internal static class Registries
             {
                 diagnostics.Add(new Diagnostic(display, line, $"{PlainYaml.Shown(key)} leads back to {PlainYaml.Shown(end)}; an alias chain must end"));
             }
-            else if (!rules.Ends.Contains(end))
+            else if (rules.End(key) is var (ends, what) && !ends.Contains(end))
             {
-                diagnostics.Add(new Diagnostic(display, line, $"{PlainYaml.Shown(key)} ends at {PlainYaml.Shown(end)}, which is not {rules.EndWhat}"));
+                diagnostics.Add(new Diagnostic(display, line, $"{PlainYaml.Shown(key)} ends at {PlainYaml.Shown(end)}, which is not {what}"));
             }
             else
             {
@@ -240,6 +244,7 @@ internal static class Registries
         return diagnostics.Count == before ? flat : null;
     }
 
-    // Live holds every name a key may not take; Ends holds the names a chain may end at.
-    private sealed record Rules(string Name, string What, Func<string, bool> IsValid, string Grammar, IReadOnlySet<string> Live, IReadOnlySet<string> Ends, string EndWhat);
+    // Live holds every name a key may not take; End gives, for a key, the names its chain may end
+    // at and how they are described.
+    private sealed record Rules(string Name, string What, Func<string, bool> IsValid, string Grammar, IReadOnlySet<string> Live, Func<string, (IReadOnlySet<string> Ends, string What)> End);
 }

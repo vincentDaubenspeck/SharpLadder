@@ -106,7 +106,9 @@ function deny(path) {
 }
 
 function allow(path) {
-  permissions([path, "/remove:d", "*S-1-1-0"], ["755", path]);
+  const r = permissions([path, "/remove:d", "*S-1-1-0"], ["755", path]);
+  if (r.status !== 0)
+    throw new Error(`cannot allow ${path}: ${r.stdout}${r.stderr}`);
 }
 
 beforeAll(() => {

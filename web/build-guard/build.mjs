@@ -190,7 +190,16 @@ export function terminalProvenance(terminal, manifest) {
  */
 export async function terminalAdmission(record, terminal) {
   admitStartup();
-  const admission = await assetAdmission({ root: join(record.root, "..") });
+  return admitTerminal(
+    record,
+    terminal,
+    await assetAdmission({ root: join(record.root, "..") }),
+  );
+}
+
+/** The same admission over an inventory already read, which callers may share. */
+export function admitTerminal(record, terminal, admission) {
+  admitStartup();
   if (admission.problems.length > 0)
     fail(`assets: ${admission.problems.join("; ")}`);
   const actual = new Map([...terminal].map(([path, f]) => [path, f.bytes]));

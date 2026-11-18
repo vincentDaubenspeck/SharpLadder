@@ -12,9 +12,29 @@ This fixture chapter exercises every rule of the content compiler. It is
 - Intro blocks take the reserved `intro` prefix.
 - Part files sit beside this file.
 
+```walk-it {#walk-fix-intro}
+title: Change one cell
+cells: [1]
+sequences:
+  - name: once
+    intro: Write a new value over the old one.
+    steps:
+      - { dst: 0, value: 2, note: The cell now holds two. }
+```
+
 ## How the parts fit {#fix-parts}
 
 Each part file compiles to its own JSON file, at the same relative path.
+
+```walk-it {#walk-fix-parts}
+title: Fill an empty cell
+cells: [null]
+sequences:
+  - name: once
+    intro: Start with nothing in the cell.
+    steps:
+      - { dst: 0, value: 3, note: The cell now holds three. }
+```
 
 ## Links between ids {#fix-links}
 

@@ -8,13 +8,14 @@ namespace SharpLadder.Content;
 
 /// <summary>
 /// Writes one compiled JSON file as a TypeScript module holding the same value as a literal checked
-/// with satisfies against the generated root type. Only objects, arrays, strings, booleans and safe
-/// integers are admitted; every string is JSON-encoded, never interpolated.
+/// with satisfies against the generated root type. Only objects, arrays, strings, booleans, null and
+/// safe integers are admitted, with an object at the root; every string is JSON-encoded, never
+/// interpolated.
 /// </summary>
 internal static class WitnessEmitter
 {
     // Raised whenever the admitted value forms or the emitted module shape change.
-    public const int GrammarVersion = 1;
+    public const int GrammarVersion = 2;
 
     public const string Folder = "witness";
     public const string ExportName = "witness";
@@ -91,7 +92,7 @@ internal static class WitnessEmitter
         switch (node)
         {
             case null:
-                throw Fail(at, "null is not an admitted witness value");
+                return new Atom("null", IsNumber: false);
             case JsonObject obj:
                 var members = new List<(string, Value)>();
                 foreach (var (key, value) in obj)

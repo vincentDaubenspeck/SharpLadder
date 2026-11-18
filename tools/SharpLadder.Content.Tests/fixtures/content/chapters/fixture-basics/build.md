@@ -8,6 +8,16 @@ order: 3
 
 Spans nest: *outer **middle *inner* middle** outer*.
 
+```walk-it {#walk-fix-nest}
+title: Replace a word
+cells: ["old"]
+sequences:
+  - name: once
+    intro: The cell holds a word.
+    steps:
+      - { dst: 0, value: "new", note: A new word takes its place. }
+```
+
 ## Two ways to total {#build-fix-total}
 
 Both ways add the same numbers; pick one to read.
@@ -29,6 +39,16 @@ foreach (var n in numbers) total += n;
 | ---- | ------------------------------ |
 | Sum  | 74                             |
 | Each | one [loop](#term-fixture-loop) |
+
+```walk-it {#walk-fix-sum}
+title: Store the total
+cells: [0]
+sequences:
+  - name: once
+    intro: The total starts at zero.
+    steps:
+      - { dst: 0, value: 74, note: The call stores the whole total at once. }
+```
 
 ## Three ways with no lead {#build-fix-three}
 

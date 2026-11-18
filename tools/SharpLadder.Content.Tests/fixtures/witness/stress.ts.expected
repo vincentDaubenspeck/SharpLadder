@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -94,4 +94,34 @@ export const witness = {
       second: 2,
     },
   ],
+  spare: null,
+  cells: [7, "seven", null],
+  blanks: [null, null],
+  n1: {
+    n2: {
+      n3: {
+        n4: {
+          n5: {
+            n6: {
+              n7: {
+                n8: {
+                  n9: {
+                    n10: {
+                      n11: {
+                        n12: {
+                          aPropertyNameLongEnoughToPushANullPastTheWidthXy:
+                            null,
+                          nil: null,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
 } satisfies ContentDoc;

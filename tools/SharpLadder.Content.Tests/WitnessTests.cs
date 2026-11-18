@@ -13,7 +13,7 @@ namespace SharpLadder.Content.Tests;
 /// </summary>
 public sealed partial class WitnessTests
 {
-    private const string Header = "// SharpLadder.Content witness emitter output, grammar 1. Do not edit.";
+    private const string Header = "// SharpLadder.Content witness emitter output, grammar 2. Do not edit.";
     private const string Import = "import type { ContentDoc } from \"../../../content.ts\";";
     private const string Part = "chapters/fixture-basics/syntax.json";
 
@@ -54,6 +54,38 @@ public sealed partial class WitnessTests
         var (text, _) = Emit(bytes);
 
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(bytes), Decode(text!)));
+    }
+
+    // The type check of these against the forms fixture types lives in the web grammar tests.
+    [Theory]
+    [InlineData("accepted")]
+    [InlineData("both")]
+    [InlineData("neither")]
+    [InlineData("null-value")]
+    [InlineData("boolean-cell")]
+    [InlineData("label-number")]
+    public void NewFormWitnessesEmitTheRecordedModules(string name)
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(Folder, "forms", name + ".json"));
+
+        var (text, problems) = WitnessEmitter.Emit($"chapters/forms/{name}.json", bytes);
+
+        Assert.Empty(problems);
+        Assert.Equal(File.ReadAllText(Path.Combine(Folder, "forms", name + ".ts.expected")), text);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(bytes), Decode(text!)));
+    }
+
+    [Theory]
+    [InlineData("""{"a":null}""", "  a: null,\n")]
+    [InlineData("""{"a":[1,null]}""", "  a: [1, null],\n")]
+    [InlineData("""{"a":{"b":[[null]]}}""", "    b: [[null]],\n")]
+    public void NullValuesAreEmittedBelowTheRoot(string json, string line)
+    {
+        var (text, problems) = Emit(Encoding.UTF8.GetBytes(json));
+
+        Assert.Empty(problems);
+        Assert.Contains(line, text, StringComparison.Ordinal);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(json), Decode(text!)));
     }
 
     [Fact]
@@ -163,9 +195,7 @@ public sealed partial class WitnessTests
         AssertRefused(json, expected);
 
     [Theory]
-    [InlineData("""{"a":null}""", "#/a: null is not an admitted witness value")]
-    [InlineData("""{"a":[1,null]}""", "#/a/1: null is not an admitted witness value")]
-    [InlineData("""{"a":{"b":[[null]]}}""", "#/a/b/0/0: null is not an admitted witness value")]
+    [InlineData("""{"a":[null,1.5]}""", "#/a/1: a number must be an integer token")]
     [InlineData("""{"a":1.5}""", "#/a: a number must be an integer token")]
     [InlineData("""{"a":1e2}""", "#/a: a number must be an integer token")]
     [InlineData("""{"a":1E2}""", "#/a: a number must be an integer token")]
@@ -182,7 +212,7 @@ public sealed partial class WitnessTests
     [InlineData("\"part\"", "#: the witness value must be a JSON object")]
     [InlineData("1", "#: the witness value must be a JSON object")]
     [InlineData("true", "#: the witness value must be a JSON object")]
-    [InlineData("null", "#: null is not an admitted witness value")]
+    [InlineData("null", "#: the witness value must be a JSON object")]
     [InlineData("""{"type":1,"\u0074ype":2}""", "#: not UTF-8 JSON without duplicate names")]
     [InlineData("""{"a":{"b":{"c":1,"c":2}}}""", "#: not UTF-8 JSON without duplicate names")]
     [InlineData("""{"a":1""", "#: not UTF-8 JSON without duplicate names")]

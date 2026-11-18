@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -385,6 +385,134 @@ export const witness = {
             },
           ],
         },
+        {
+          type: "walk-it",
+          blockId: "syn-fix-sizes/b5",
+          id: "walk-fix-shift",
+          title: [
+            {
+              type: "text",
+              text: "Shift a value with a ",
+            },
+            {
+              type: "term",
+              id: "term-fixture-loop",
+              short:
+                "Code that runs the same statements again while a condition holds.",
+              content: [
+                {
+                  type: "em",
+                  content: [
+                    {
+                      type: "text",
+                      text: "loop",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          cells: [4, "ab", null],
+          sequences: [
+            {
+              name: "safe",
+              introBlockId: "syn-fix-sizes/b5.1.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "Copy first, as ",
+                },
+                {
+                  type: "link",
+                  kind: "anchor",
+                  id: "syn-fix-sizes",
+                  content: [
+                    {
+                      type: "text",
+                      text: "the sizes",
+                    },
+                  ],
+                },
+                {
+                  type: "text",
+                  text: " allow.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "syn-fix-sizes/b5.1.s1",
+                  dst: 2,
+                  src: 1,
+                  note: [
+                    {
+                      type: "text",
+                      text: "Copy the text to the spare cell.",
+                    },
+                  ],
+                },
+                {
+                  blockId: "syn-fix-sizes/b5.1.s2",
+                  dst: 1,
+                  value: 7,
+                  note: [
+                    {
+                      type: "text",
+                      text: "Write over the text.",
+                    },
+                  ],
+                  lost: true,
+                },
+              ],
+            },
+            {
+              name: "risky",
+              introBlockId: "syn-fix-sizes/b5.2.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "Write first.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "syn-fix-sizes/b5.2.s1",
+                  dst: 1,
+                  value: 8,
+                  note: [
+                    {
+                      type: "text",
+                      text: "The text is gone.",
+                    },
+                  ],
+                  lost: true,
+                },
+              ],
+            },
+            {
+              name: "spare",
+              introBlockId: "syn-fix-sizes/b5.3.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "Copy the spare.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "syn-fix-sizes/b5.3.s1",
+                  dst: 0,
+                  src: 2,
+                  note: [
+                    {
+                      type: "text",
+                      text: "Copy the empty cell.",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
       spoken: {
         segments: [
@@ -416,9 +544,65 @@ export const witness = {
             },
             text: "Reading a variable before it has a value gives an unassigned variable error.",
           },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5",
+            },
+            text: "Shift a value with a loop",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.1.s0",
+            },
+            text: "Copy first, as the sizes allow.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.1.s1",
+            },
+            text: "Copy the text to the spare cell.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.1.s2",
+            },
+            text: "Write over the text.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.2.s0",
+            },
+            text: "Write first.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.2.s1",
+            },
+            text: "The text is gone.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.3.s0",
+            },
+            text: "Copy the spare.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "syn-fix-sizes/b5.3.s1",
+            },
+            text: "Copy the empty cell.",
+          },
         ],
         audio:
-          "sha256:3d67cbab1cc015cf994feacba56a108273c3ea41d761ab96eeae918be182211f",
+          "sha256:54ce06f51bba06f8b1b6602247654a7a1bf998551aa1cdf7dcfdd0553285e412",
       },
     },
   ],

@@ -2,10 +2,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assetAdmission, generateFaces } from "../asset-licence-check.js";
 import { limits, measure, releaseRecheck } from "./build.mjs";
 import { cleanUp, fixture, inventoryFile, releaseRoot } from "./fixture.js";
+import { entriesOf, shareAdmission } from "./shared-admission.js";
 import { walkDist } from "./output.js";
 
 const web = join(import.meta.dirname, "..");
@@ -205,18 +206,28 @@ describe("asset admission: emitted stylesheet", () => {
   const emitted = (slice = faces, rest = "") =>
     `@layer base{a{color:red}${slice}}${rest}`;
 
-  async function admission() {
+  async function freshAdmission() {
     const { base } = fixture(fontFiles(), { modules: false });
     const admitted = await assetAdmission({ root: base });
     expect(admitted.problems).toEqual([]);
     return admitted;
   }
+  let shared;
+  let view;
+  let initial;
+  beforeAll(async () => {
+    shared = await freshAdmission();
+    view = shareAdmission(shared);
+    initial = view();
+  }, 20_000);
+  const admission = () => Promise.resolve(shared);
 
+  // Each call gets its own buffers, so no row can change the bytes another reads.
   const outputs = (css, font = fontBytes) =>
     new Map([
       [sheet, Buffer.from(css)],
-      [`assets/${fontName}`, font],
-      ["assets/licences/cascadia-code/OFL.txt", licence],
+      [`assets/${fontName}`, Buffer.from(font)],
+      ["assets/licences/cascadia-code/OFL.txt", Buffer.from(licence)],
     ]);
   // The guard owns the stylesheet, so its hash is whatever the fixture emitted.
   const owned = (css) =>
@@ -377,6 +388,32 @@ describe("asset admission: emitted stylesheet", () => {
       expect(await problemsOf(css)).toMatch(pattern);
     },
   );
+
+  // Last, so it sees every row above.
+  it("gives a fresh admission's outcomes in either order and leaves the caller's maps", async () => {
+    const fresh = await freshAdmission();
+    const inputs = [
+      emitted(),
+      emitted(faces.replace("font-display:swap", "font-display:block")),
+      emitted(faces, "a{}"),
+      `@layer base{${faces}}`,
+      "",
+    ];
+    const outcome = (a, css) => {
+      const actual = outputs(css);
+      const own = owned(css);
+      const before = [entriesOf(actual), entriesOf(own)];
+      const result = [a.check(actual, own), a.admit(actual, own)];
+      expect([entriesOf(actual), entriesOf(own)]).toEqual(before);
+      return result;
+    };
+    const expected = inputs.map((css) => outcome(fresh, css));
+    expect(inputs.map((css) => outcome(shared, css))).toEqual(expected);
+    expect([...inputs].reverse().map((css) => outcome(shared, css))).toEqual(
+      [...expected].reverse(),
+    );
+    expect(view()).toEqual(initial);
+  });
 });
 
 describe("asset admission: measurement", () => {

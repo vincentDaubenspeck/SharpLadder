@@ -8,6 +8,12 @@ import globals from "globals";
 import { readFileSync } from "node:fs";
 import tseslint from "typescript-eslint";
 import { commentPolicy } from "./eslint.comments.config.js";
+import {
+  applicationSource,
+  exactUnits,
+  typedSource,
+  untypedSource,
+} from "./eslint-rules/application-source.js";
 import appCapabilities from "./eslint-rules/app-capabilities.js";
 import cssModuleAccess from "./eslint-rules/css-module-access.js";
 import sourceExtension from "./eslint-rules/source-extension.js";
@@ -193,22 +199,28 @@ export default defineConfig([
     files: ["browser/indicators.ts"],
     rules: { "no-restricted-syntax": browserTiming({ viewport: "resize" }) },
   },
+  // A file must not choose which checks it meets, so no comment in application source can
+  // disable or reconfigure any lint rule. The blocks below select a file by where the shared
+  // mapper places it, so another spelling of the same file meets the same policy, and a name the
+  // mapper cannot place meets it too; directives outside src keep their effect.
   {
-    files: ["src/**"],
+    files: [applicationSource],
+    linterOptions: { noInlineConfig: true },
     rules: {
       "no-eval": "error",
       "no-new-func": "error",
       "sharpladder/app-capabilities": "error",
     },
   },
-  // The type emitter's grammar admits only type aliases, so it never emits an interface.
+  // The type emitter's grammar admits only type aliases, so it never emits an interface. An
+  // exemption names the exact files on disk, so no other name or letter case shares it.
   {
-    files: ["src/generated/body.ts", "src/generated/content.ts"],
+    files: [exactUnits("generated/body.ts", "generated/content.ts")],
     rules: { "@typescript-eslint/consistent-type-definitions": "off" },
   },
   // A default that calls assertNever is kept, but never counts as covering a missing case.
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: [typedSource],
     rules: {
       "@typescript-eslint/switch-exhaustiveness-check": [
         "error",
@@ -219,13 +231,17 @@ export default defineConfig([
       ],
     },
   },
-  // Any other code extension in src would skip the type-aware lint, so it is
-  // parsed without type information only to be rejected.
+  // Any other script name, a capital extension included, would skip the type-aware lint, so it
+  // is parsed with the TypeScript parser, without type information, only to be rejected.
   {
-    files: ["src/**/*.{js,jsx,mjs,cjs,mts,cts}"],
+    files: [untypedSource],
     languageOptions: {
       parser: tseslint.parser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      // The root is named, since the parser cannot choose one when two projects share a process.
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: { "sharpladder/source-extension": "error" },
   },

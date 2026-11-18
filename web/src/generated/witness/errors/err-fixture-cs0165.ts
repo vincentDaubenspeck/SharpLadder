@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../content.ts";
 
@@ -61,6 +61,43 @@ export const witness = {
       label: "Shape",
       spoken: "A declaration with a starting value",
       source: "type name = start;",
+    },
+    {
+      type: "walk-it",
+      blockId: "err-fixture-cs0165/b4",
+      id: "walk-fix-shape",
+      title: [
+        {
+          type: "text",
+          text: "Give a starting value",
+        },
+      ],
+      cells: [null],
+      sequences: [
+        {
+          name: "once",
+          introBlockId: "err-fixture-cs0165/b4.1.s0",
+          intro: [
+            {
+              type: "text",
+              text: "The variable has no value yet.",
+            },
+          ],
+          steps: [
+            {
+              blockId: "err-fixture-cs0165/b4.1.s1",
+              dst: 0,
+              value: 0,
+              note: [
+                {
+                  type: "text",
+                  text: "It starts at zero.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     },
   ],
 } satisfies ContentDoc;

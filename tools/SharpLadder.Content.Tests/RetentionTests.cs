@@ -77,6 +77,18 @@ public sealed class RetentionTests
         Assert.EndsWith("FAIL content retain\n", result.Output, StringComparison.Ordinal);
     }
 
+    // The reader allows one value, so it stops at the trailing value before decoding any of its text.
+    [Theory]
+    [InlineData("", "\"a\\uD800\"")]
+    [InlineData(" \t\n", "{\"\\uD800\":1}")]
+    public void ReadRefusesTrailingTextAsSyntax(string space, string trailing)
+    {
+        var (record, refusal) = Retention.Read(Encoding.UTF8.GetBytes("{}" + space + trailing), Repository.Schema);
+
+        Assert.Null(record);
+        Assert.StartsWith("schema: not JSON without duplicate names: ", refusal, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(new byte[] { 0xEF, 0xBB, 0xBF, (byte)'{', (byte)'}' }, "standard input: starts with a byte-order mark")]
     [InlineData(new byte[] { (byte)'{', 0xFF, (byte)'}' }, "standard input: not UTF-8")]

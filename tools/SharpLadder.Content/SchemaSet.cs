@@ -24,6 +24,7 @@ internal sealed class SchemaSet : IContentSchema
     // The registry schemas describe records no browser code reads yet, so no types come from them.
     public static readonly IReadOnlyList<string> RegistryFiles = [AliasesFile, PatternsFile];
 
+    private const string NotJson = "not JSON without duplicate names: ";
     private const string Draft07 = "http://json-schema.org/draft-07/schema#";
 
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -112,6 +113,11 @@ internal sealed class SchemaSet : IContentSchema
     // type is the value the record's own type property must hold, when the kind fixes one.
     private static string? Validate(string json, JsonValidator validator, string? type)
     {
+        if (ReadEveryText(json) is { } refused)
+        {
+            return refused;
+        }
+
         JsonNode? node;
         try
         {
@@ -119,7 +125,7 @@ internal sealed class SchemaSet : IContentSchema
         }
         catch (JsonException e)
         {
-            return "not JSON without duplicate names: " + e.Message;
+            return NotJson + e.Message;
         }
 
         if (type is not null && !(node is JsonObject record && record["type"] is JsonValue value && value.TryGetValue<string>(out var found) && string.Equals(found, type, StringComparison.Ordinal)))
@@ -135,6 +141,35 @@ internal sealed class SchemaSet : IContentSchema
 
         var error = result.ValidationErrors.FirstOrDefault();
         return error is null ? "invalid" : $"{error.InstanceLocation}: {error.ErrorMessage} ({error.Keyword})";
+    }
+
+    // Decodes every name and string before any other reader sees the text, so a lone surrogate, or a
+    // pair in the wrong order, is refused even where no keyword reads that string. The strict encoder
+    // throws on one held in the string itself, and GetString, called only on names and strings,
+    // throws on one written as an escape.
+    private static string? ReadEveryText(string json)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(StrictUtf8.GetBytes(json));
+            while (reader.Read())
+            {
+                if (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.String)
+                {
+                    _ = reader.GetString();
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException e)
+        {
+            return NotJson + e.Message;
+        }
+        catch (Exception e) when (e is EncoderFallbackException or InvalidOperationException)
+        {
+            return "a name or string that is not Unicode text: " + e.Message;
+        }
     }
 
     private static JsonValidator Build(SortedDictionary<string, string> texts, string rootFile)

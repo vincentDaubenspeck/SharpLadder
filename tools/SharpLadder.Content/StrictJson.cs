@@ -9,6 +9,7 @@ internal static class StrictJson
 {
     private static readonly JsonDocumentOptions Options = new() { AllowDuplicateProperties = false };
 
-    // Throws JsonException on malformed JSON and on any object holding one name twice.
+    // Unicode validation must precede parsing so lone surrogates cannot escape callers' JsonException
+    // handlers as other exceptions, such as InvalidOperationException or ArgumentException.
     public static JsonNode? Parse(string text) => JsonNode.Parse(text, nodeOptions: null, documentOptions: Options);
 }

@@ -68,7 +68,7 @@ describe("termHref", () => {
     const term: TermSpan = { type: "term", id: "term-a", short: "s", content };
     expect(termHref(term)).toBe("/glossary#term-a");
     const compiled = termsOf(syntax);
-    expect(compiled).toHaveLength(3);
+    expect(compiled).toHaveLength(4);
     for (const span of compiled)
       expect(termHref(span)).toBe("/glossary#term-fixture-loop");
   });

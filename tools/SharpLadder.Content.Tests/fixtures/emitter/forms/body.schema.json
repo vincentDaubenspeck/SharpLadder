@@ -1,0 +1,254 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sharpladder.com/schema/body.schema.json",
+  "definitions": {
+    "cell": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "string", "maxLength": 12 },
+        { "type": "null" }
+      ]
+    },
+    "value": {
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "integer" }]
+    },
+    "copy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dst", "src", "note"],
+      "properties": {
+        "dst": { "type": "integer", "minimum": 0 },
+        "src": { "type": "integer", "minimum": 0 },
+        "note": { "type": "string" },
+        "lost": { "const": true }
+      }
+    },
+    "write": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dst", "value", "note"],
+      "properties": {
+        "dst": { "type": "integer", "minimum": 0 },
+        "value": { "$ref": "#/definitions/value" },
+        "note": { "type": "string" },
+        "lost": { "const": true }
+      }
+    },
+    "step": {
+      "oneOf": [
+        { "$ref": "#/definitions/copy" },
+        { "$ref": "#/definitions/write" }
+      ]
+    },
+    "mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "mark" } }
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "flag" } }
+    },
+    "literal": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        { "type": "string", "maxLength": 12 }
+      ]
+    },
+    "slot": {
+      "oneOf": [{ "$ref": "#/definitions/literal" }, { "type": "null" }]
+    },
+    "label": {
+      "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+    },
+    "index": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "markOrNone": {
+      "oneOf": [
+        { "$ref": "#/definitions/mark" },
+        { "type": "null" },
+        { "$ref": "#/definitions/flag" }
+      ]
+    },
+    "single": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/definitions/value" }
+    },
+    "few": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": { "$ref": "#/definitions/value" }
+    },
+    "textOrNone": {
+      "oneOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "noneOrText": {
+      "oneOf": [{ "type": "null" }, { "type": "string" }]
+    },
+    "countOrNone": {
+      "oneOf": [{ "type": "integer" }, { "type": "null" }]
+    },
+    "noneOrCount": {
+      "oneOf": [{ "type": "null" }, { "type": "integer" }]
+    },
+    "toggleOrNone": {
+      "oneOf": [{ "type": "boolean" }, { "type": "null" }]
+    },
+    "noneOrToggle": {
+      "oneOf": [{ "type": "null" }, { "type": "boolean" }]
+    },
+    "tagOrNone": {
+      "oneOf": [{ "const": "tag" }, { "type": "null" }]
+    },
+    "noneOrTag": {
+      "oneOf": [{ "type": "null" }, { "const": "tag" }]
+    },
+    "sevenOrNone": {
+      "oneOf": [{ "const": 7 }, { "type": "null" }]
+    },
+    "noneOrSeven": {
+      "oneOf": [{ "type": "null" }, { "const": 7 }]
+    },
+    "trueOrNone": {
+      "oneOf": [{ "const": true }, { "type": "null" }]
+    },
+    "noneOrTrue": {
+      "oneOf": [{ "type": "null" }, { "const": true }]
+    },
+    "falseOrNone": {
+      "oneOf": [{ "const": false }, { "type": "null" }]
+    },
+    "noneOrFalse": {
+      "oneOf": [{ "type": "null" }, { "const": false }]
+    },
+    "okOrNone": {
+      "oneOf": [{ "enum": ["ok"] }, { "type": "null" }]
+    },
+    "noneOrOk": {
+      "oneOf": [{ "type": "null" }, { "enum": ["ok"] }]
+    },
+    "valuesOrNone": {
+      "oneOf": [
+        { "type": "array", "items": { "$ref": "#/definitions/value" } },
+        { "type": "null" }
+      ]
+    },
+    "noneOrValues": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "array", "items": { "$ref": "#/definitions/value" } }
+      ]
+    },
+    "someOrNone": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/value" }
+        },
+        { "type": "null" }
+      ]
+    },
+    "noneOrSome": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/value" }
+        }
+      ]
+    },
+    "manyOrNone": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/value" }
+        },
+        { "type": "null" }
+      ]
+    },
+    "noneOrMany": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/value" }
+        }
+      ]
+    },
+    "stepOrNone": {
+      "oneOf": [{ "$ref": "#/definitions/step" }, { "type": "null" }]
+    },
+    "noneOrStep": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/step" }]
+    },
+    "wordOrNone": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/definitions/value" },
+            { "pattern": "^[a-z]+$" }
+          ]
+        },
+        { "type": "null" }
+      ]
+    },
+    "noneOrWord": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "allOf": [
+            { "$ref": "#/definitions/value" },
+            { "pattern": "^[a-z]+$" }
+          ]
+        }
+      ]
+    },
+    "keyOrNone": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/definitions/value" },
+            { "not": { "const": "all" } }
+          ]
+        },
+        { "type": "null" }
+      ]
+    },
+    "noneOrKey": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "allOf": [
+            { "$ref": "#/definitions/value" },
+            { "not": { "const": "all" } }
+          ]
+        }
+      ]
+    },
+    "singleOrNone": {
+      "oneOf": [{ "$ref": "#/definitions/single" }, { "type": "null" }]
+    },
+    "noneOrSingle": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/single" }]
+    },
+    "fewOrNone": {
+      "oneOf": [{ "$ref": "#/definitions/few" }, { "type": "null" }]
+    },
+    "noneOrFew": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/definitions/few" }]
+    }
+  }
+}

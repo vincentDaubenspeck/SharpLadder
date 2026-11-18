@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../content.ts";
 
@@ -159,6 +159,43 @@ export const witness = {
         {
           type: "text",
           text: ".",
+        },
+      ],
+    },
+    {
+      type: "walk-it",
+      blockId: "term-fixture-set/b6",
+      id: "walk-fix-set",
+      title: [
+        {
+          type: "text",
+          text: "Add a first value",
+        },
+      ],
+      cells: [null],
+      sequences: [
+        {
+          name: "once",
+          introBlockId: "term-fixture-set/b6.1.s0",
+          intro: [
+            {
+              type: "text",
+              text: "The set starts empty.",
+            },
+          ],
+          steps: [
+            {
+              blockId: "term-fixture-set/b6.1.s1",
+              dst: 0,
+              value: 7,
+              note: [
+                {
+                  type: "text",
+                  text: "The set now holds seven.",
+                },
+              ],
+            },
+          ],
         },
       ],
     },

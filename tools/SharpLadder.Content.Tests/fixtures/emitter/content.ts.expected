@@ -1,4 +1,4 @@
-// SharpLadder.Content type emitter output, grammar 2. Do not edit.
+// SharpLadder.Content type emitter output, grammar 3. Do not edit.
 
 import type {
   AnchoredTextBlock,

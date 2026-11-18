@@ -4,9 +4,14 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { parse, walk } from "css-tree";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cssString, generateFaces } from "../asset-licence-check.js";
-import { releaseRecheck, terminalAdmission } from "./build.mjs";
+import {
+  assetAdmission,
+  cssString,
+  generateFaces,
+} from "../asset-licence-check.js";
+import { admitTerminal, releaseRecheck, terminalAdmission } from "./build.mjs";
 import { publicBase } from "./contract.js";
+import { shareAdmission } from "./shared-admission.js";
 import {
   cleanUp,
   fixture,
@@ -539,19 +544,63 @@ describe("font slice: the real bundle", () => {
     expect(expected.bytes.toString("utf8")).not.toMatch(/unicode-range/iu);
   });
 
+  // Its own admission, so no shared admission state decides the verdict.
+  it("refuses the built bundle once the snapshot owns no files", async () => {
+    const admission = await assetAdmission({ root: join(built.root, "..") });
+    const terminal = walkDist(built.outDir);
+    const admit = (record) =>
+      failure(
+        Promise.resolve().then(() =>
+          admitTerminal(record, terminal, admission),
+        ),
+      );
+    expect(await admit(built)).toBe(null);
+    expect(admitTerminal(built, terminal, admission)).toEqual(built.fontSlice);
+    const unowned = [...terminal.keys()]
+      .filter((path) => !built.assets.has(path))
+      .sort();
+    expect(unowned.length).toBeGreaterThan(0);
+    const error = await admit({
+      ...built,
+      files: new Map(
+        [...built.files].filter(([path]) => built.assets.has(path)),
+      ),
+    });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toMatch(/^build guard: terminal asset admission: /u);
+    const named = [
+      ...error.message.matchAll(/output has an unowned file ([^;]+)/gu),
+    ].map((match) => match[1]);
+    expect(named.sort()).toEqual(unowned);
+  }, 20_000);
+
   describe("on-disk mutation after the terminal step", () => {
+    let shared;
+    let view;
+    let initial;
+    const root = () => join(built.root, "..");
+    beforeAll(async () => {
+      shared = await assetAdmission({ root: root() });
+      view = shareAdmission(shared);
+      initial = view();
+    }, 20_000);
+
     const sheet = () =>
       [...walkDist(built.outDir).keys()].find((p) => p.endsWith(".css"));
+    const sheetFile = () => join(built.outDir, ...sheet().split("/"));
+    const forged = () => {
+      const terminal = walkDist(built.outDir);
+      return [{ ...built, files: terminal }, terminal];
+    };
+    const failed = (admit) => failure(Promise.resolve().then(admit));
     // The snapshot is forged to match, so only the face admission can refuse the bytes.
     async function admitOnDisk(mutate) {
       const file = join(built.outDir, ...sheet().split("/"));
       const original = readFileSync(file);
       writeFileSync(file, mutate(original.toString("utf8")));
       try {
-        const terminal = walkDist(built.outDir);
-        return await failure(
-          terminalAdmission({ ...built, files: terminal }, terminal),
-        );
+        const [record, terminal] = forged();
+        return await failed(() => admitTerminal(record, terminal, shared));
       } finally {
         writeFileSync(file, original);
       }
@@ -610,6 +659,76 @@ describe("font slice: the real bundle", () => {
         );
       } finally {
         renameSync(to, from);
+      }
+    });
+
+    it("re-reads the inventory and refuses a changed source after a success", async () => {
+      const shipped = production.assets.find((a) => a.shipped);
+      const text = join(root(), shipped.licenceText.sourcePath);
+      const original = readFileSync(text);
+      expect(await failure(terminalAdmission(...forged()))).toBe(null);
+      writeFileSync(text, Buffer.concat([original, Buffer.from("x")]));
+      try {
+        const error = await failure(terminalAdmission(...forged()));
+        expect(error?.message).toMatch(/build guard: assets: /u);
+      } finally {
+        writeFileSync(text, original);
+      }
+    });
+
+    it("keeps the owned-hash refusal in the shared path", async () => {
+      const original = readFileSync(sheetFile());
+      writeFileSync(sheetFile(), Buffer.concat([original, Buffer.from("a{}")]));
+      try {
+        const terminal = walkDist(built.outDir);
+        const error = await failed(() =>
+          admitTerminal(built, terminal, shared),
+        );
+        expect(error?.message).toMatch(/differs from its hash/u);
+      } finally {
+        writeFileSync(sheetFile(), original);
+      }
+    });
+
+    it("refuses an admission that has problems", async () => {
+      const [record, terminal] = forged();
+      const error = await failed(() =>
+        admitTerminal(record, terminal, {
+          ...shared,
+          problems: ["a stand-in problem"],
+        }),
+      );
+      expect(error?.message).toMatch(
+        /build guard: assets: a stand-in problem/u,
+      );
+    });
+
+    // Last, so it sees every row above.
+    it("leaves the shared admission as a fresh one would be", async () => {
+      expect(view()).toEqual(initial);
+      const fresh = await assetAdmission({ root: root() });
+      const [record, terminal] = forged();
+      expect(admitTerminal(record, terminal, shared)).toEqual(
+        admitTerminal(record, terminal, fresh),
+      );
+      const original = readFileSync(sheetFile());
+      writeFileSync(
+        sheetFile(),
+        original
+          .toString("utf8")
+          .replace("font-display:swap", "font-display:block"),
+      );
+      try {
+        const [changed, onDisk] = forged();
+        const errors = await Promise.all(
+          [shared, fresh].map((a) =>
+            failed(() => admitTerminal(changed, onDisk, a)),
+          ),
+        );
+        expect(errors[0]?.message).toMatch(/terminal asset admission: /u);
+        expect(errors[0]?.message).toBe(errors[1]?.message);
+      } finally {
+        writeFileSync(sheetFile(), original);
       }
     });
   });

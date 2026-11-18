@@ -41,5 +41,34 @@
       ]
     }
   },
-  "objects": [{ "only": 1 }, { "first": 1, "second": 2 }]
+  "objects": [{ "only": 1 }, { "first": 1, "second": 2 }],
+  "spare": null,
+  "cells": [7, "seven", null],
+  "blanks": [null, null],
+  "n1": {
+    "n2": {
+      "n3": {
+        "n4": {
+          "n5": {
+            "n6": {
+              "n7": {
+                "n8": {
+                  "n9": {
+                    "n10": {
+                      "n11": {
+                        "n12": {
+                          "aPropertyNameLongEnoughToPushANullPastTheWidthXy": null,
+                          "nil": null
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

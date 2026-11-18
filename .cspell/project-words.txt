@@ -33,6 +33,7 @@ currentcolor
 cyclonedx
 Daubenspeck
 dcode
+destructures
 docopt
 domcontentloaded
 dvmax
@@ -60,11 +61,13 @@ fsutil
 fvar
 gdef
 gethighcontrast
+getpgrp
 glat
 globalconfig
 gloc
 glyf
 gnueabihf
+goldens
 gpgsign
 gpos
 Grüße
@@ -132,6 +135,7 @@ noto
 notosansdisplay
 ntdll
 ntwo
+nums
 nvmrc
 OIDF
 OIDL
@@ -178,6 +182,7 @@ Segoe
 serialiser's
 Setext
 sethighcontrast
+setpgrp
 setpriv
 sfnt
 SharpLadder
@@ -204,6 +209,9 @@ topo
 trak
 ttcf
 UAPI
+udbff
+udfff
+unadmitted
 unhinted
 unlayered
 unlinkat

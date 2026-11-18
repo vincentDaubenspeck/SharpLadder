@@ -8,9 +8,9 @@ const loop = {
 };
 type Entry = typeof loop;
 
-// Terms shown before an approach is picked: three in the syntax part, one in a card field and two
+// Terms shown before an approach is picked: four in the syntax part, one in a card field and two
 // in drill prose. Each is the same component, so one of them stands for all in the browser.
-const shownTerms = 6;
+const shownTerms = 7;
 
 test.beforeEach(async ({ page }) => {
   await page.goto(harnessUrl);
@@ -309,7 +309,8 @@ test("opening one Term closes another and never opens its definition", async ({
     throw new Error("the fixture needs two Terms");
   await first.click();
   await expectOpen(first, loop, await shownBy(first));
-  await expect(await definitionOf(second)).toBeHidden();
+  // Read once: a retrying assertion would wait out a wrong opening instead of failing on it.
+  expect(await (await definitionOf(second)).isHidden()).toBe(true);
   await second.click();
   const opened = await shownBy(second);
   const closed = await shownBy(first);

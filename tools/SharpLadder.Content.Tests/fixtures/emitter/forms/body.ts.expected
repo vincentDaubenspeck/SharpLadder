@@ -1,0 +1,109 @@
+// SharpLadder.Content type emitter output, grammar 3. Do not edit.
+
+export type Cell = number | string | null;
+
+export type Value = string | number;
+
+export type Copy = {
+  dst: number;
+  src: number;
+  note: string;
+  lost?: true;
+  value?: never;
+};
+
+export type Write = {
+  dst: number;
+  value: Value;
+  note: string;
+  lost?: true;
+  src?: never;
+};
+
+export type Step = Copy | Write;
+
+export type Mark = {
+  type: "mark";
+};
+
+export type Flag = {
+  type: "flag";
+};
+
+export type Literal = number | string;
+
+export type Slot = Literal | null;
+
+export type Label = null | string;
+
+export type Index = number;
+
+export type MarkOrNone = Mark | null | Flag;
+
+export type Single = [Value];
+
+export type Few = [Value] | [Value, Value] | [Value, Value, Value];
+
+export type TextOrNone = string | null;
+
+export type NoneOrText = null | string;
+
+export type CountOrNone = number | null;
+
+export type NoneOrCount = null | number;
+
+export type ToggleOrNone = boolean | null;
+
+export type NoneOrToggle = null | boolean;
+
+export type TagOrNone = "tag" | null;
+
+export type NoneOrTag = null | "tag";
+
+export type SevenOrNone = 7 | null;
+
+export type NoneOrSeven = null | 7;
+
+export type TrueOrNone = true | null;
+
+export type NoneOrTrue = null | true;
+
+export type FalseOrNone = false | null;
+
+export type NoneOrFalse = null | false;
+
+export type OkOrNone = "ok" | null;
+
+export type NoneOrOk = null | "ok";
+
+export type ValuesOrNone = Value[] | null;
+
+export type NoneOrValues = null | Value[];
+
+export type SomeOrNone = [Value, ...Value[]] | null;
+
+export type NoneOrSome = null | [Value, ...Value[]];
+
+export type ManyOrNone = [Value, Value, ...Value[]] | null;
+
+export type NoneOrMany = null | [Value, Value, ...Value[]];
+
+export type StepOrNone = Step | null;
+
+export type NoneOrStep = null | Step;
+
+export type WordOrNone = Value | null;
+
+export type NoneOrWord = null | Value;
+
+export type KeyOrNone = Value | null;
+
+export type NoneOrKey = null | Value;
+
+export type SingleOrNone = Single | null;
+
+export type NoneOrSingle = null | Single;
+
+export type FewOrNone = Few | null;
+
+export type NoneOrFew = null | Few;

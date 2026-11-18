@@ -1,5 +1,4 @@
 // @vitest-environment node
-import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -9,24 +8,31 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as joinPath } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { acceptEnvelope } from "./envelope.ts";
 import setup from "./global-setup.ts";
 import { recordInventory } from "./inventory.ts";
-import { runTestRecords } from "./records.ts";
+import { type Run, recordsBudget, runTestRecords } from "./records.ts";
+import { supervise } from "./supervise.ts";
 
 // Safe: the Vitest global setup builds the compiler before any test file of the same run starts.
 const prebuilt = { builtByGlobalSetup: true } as const;
+// A policy ceiling on a hook's own work around its one prebuilt records run.
+const hookWork = 8_000;
+const recordSetupBound = recordsBudget + hookWork;
 
 // A child process writes the given bytes to its stdout, which the parent receives through a
 // pipe, so every case crosses the same redirected transport as the compiler's output.
-function redirected(bytes: Uint8Array, exit = 0) {
-  const r = spawnSync(
+// The slowest transport child seen took 52 ms; the run and grace are ceilings far above it.
+async function redirected(bytes: Uint8Array, exit = 0) {
+  const r = await supervise(
+    "transport child",
     process.execPath,
     [
       "-e",
       "process.stdout.write(Buffer.from(process.env.PAYLOAD, 'base64'), () => { process.exitCode = Number(process.env.EXIT); });",
     ],
+    { run: 3_000, grace: 1_000 },
     {
       env: {
         ...process.env,
@@ -35,7 +41,6 @@ function redirected(bytes: Uint8Array, exit = 0) {
       },
     },
   );
-  if (r.error) throw r.error;
   return { stdout: new Uint8Array(r.stdout), exit: r.status };
 }
 
@@ -66,21 +71,21 @@ const validPaths = [
   "compiled/chapters/a/syntax.json",
 ];
 
-const refuses = (
+const refuses = async (
   bytes: Uint8Array,
   exit: number,
   reason: RegExp,
   expected = validPaths,
 ) => {
-  const run = redirected(bytes, exit);
+  const run = await redirected(bytes, exit);
   expect(run.exit).toBe(exit);
   expect(() => acceptEnvelope(run.stdout, run.exit, expected)).toThrow(reason);
 };
 
 describe("the test-records transport", () => {
-  it("accepts non-ASCII payload text through redirected stdout", () => {
+  it("accepts non-ASCII payload text through redirected stdout", async () => {
     const text = '{"t":"café 中 \u{1f600}     ${ */"}';
-    const run = redirected(
+    const run = await redirected(
       utf8(envelope([record("compiled/chapters/a/chapter.json", text)])),
     );
     expect(
@@ -97,8 +102,8 @@ describe("the test-records transport", () => {
     ]);
   });
 
-  it("accepts escaped non-ASCII text as the same decoded value", () => {
-    const run = redirected(
+  it("accepts escaped non-ASCII text as the same decoded value", async () => {
+    const run = await redirected(
       utf8(
         '{"version":3,"records":[{"path":"compiled/a.json","kind":"chapter","text":"caf\\u00E9"}]}',
       ),
@@ -308,12 +313,12 @@ describe("the test-records transport", () => {
       ),
       /key text is repeated/u,
     ],
-  ])("refuses %s", (_name, bytes, reason) => {
-    refuses(bytes, 0, reason);
+  ])("refuses %s", async (_name, bytes, reason) => {
+    await refuses(bytes, 0, reason);
   });
 
-  it("accepts the valid envelope against its exact path set", () => {
-    const run = redirected(utf8(valid));
+  it("accepts the valid envelope against its exact path set", async () => {
+    const run = await redirected(utf8(valid));
     expect(
       acceptEnvelope(run.stdout, run.exit, [...validPaths].reverse()),
     ).toHaveLength(2);
@@ -328,22 +333,22 @@ describe("the test-records transport", () => {
       [...validPaths.slice(0, 1), "compiled/chapters/a/build.json"],
     ],
     ["an empty expected set", []],
-  ])("refuses %s against the expected set", (_name, expected) => {
-    refuses(utf8(valid), 0, membership, expected);
+  ])("refuses %s against the expected set", async (_name, expected) => {
+    await refuses(utf8(valid), 0, membership, expected);
   });
 
-  it("discards complete output on a failure exit", () => {
-    refuses(utf8(valid), 1, /exit 1; stdout discarded/u);
+  it("discards complete output on a failure exit", async () => {
+    await refuses(utf8(valid), 1, /exit 1; stdout discarded/u);
   });
 
-  it("discards partial output on a failure exit", () => {
-    refuses(utf8(valid.slice(0, 25)), 2, /exit 2; stdout discarded/u);
+  it("discards partial output on a failure exit", async () => {
+    await refuses(utf8(valid.slice(0, 25)), 2, /exit 2; stdout discarded/u);
   });
 });
 
 describe("the compiler's test-records command", () => {
-  it("passes the committed payload with only diagnostics-free stdout", () => {
-    const run = runTestRecords(prebuilt);
+  it("passes the committed payload with only diagnostics-free stdout", async () => {
+    const run = await runTestRecords(prebuilt);
     expect(run.exit).toBe(0);
     const records = acceptEnvelope(
       run.stdout,
@@ -354,15 +359,18 @@ describe("the compiler's test-records command", () => {
     for (const r of records) expect(r.path).toMatch(/^compiled\/.+\.json$/u);
   });
 
-  it("is refused by the caller when the command fails", () => {
-    const run = runTestRecords({ ...prebuilt, staging: "relative-staging" });
+  it("is refused by the caller when the command fails", async () => {
+    const run = await runTestRecords({
+      ...prebuilt,
+      staging: "relative-staging",
+    });
     expect(run.exit).toBe(2);
     expect(run.stderr).toMatch(/FAIL content test-records/u);
     expect(() => acceptEnvelope(run.stdout, run.exit, [])).toThrow(
       /exit 2; stdout discarded/u,
     );
   });
-}, 300_000);
+}, 40_000);
 
 const web = joinPath(import.meta.dirname, "..");
 const compiled = joinPath(web, "compiled");
@@ -398,13 +406,6 @@ describe("the compiled inventory", () => {
       "compiled/a/a.json",
       "compiled/b/manifest.json",
     ]);
-  });
-
-  it("matches the records of the committed payload", () => {
-    const run = runTestRecords(prebuilt);
-    const expected = recordInventory(compiled);
-    const records = acceptEnvelope(run.stdout, run.exit, expected);
-    expect(records.map((r) => r.path)).toEqual(expected);
   });
 
   it("refuses a missing root", () => {
@@ -450,17 +451,30 @@ describe("the compiled inventory", () => {
   });
 });
 
+describe("the compiled inventory of the committed payload", () => {
+  it("matches the records of the committed payload", async () => {
+    const run = await runTestRecords(prebuilt);
+    const expected = recordInventory(compiled);
+    const records = acceptEnvelope(run.stdout, run.exit, expected);
+    expect(records.map((r) => r.path)).toEqual(expected);
+  });
+}, 40_000);
+
 type Records = { path: string; kind: string; part?: string; text: string }[];
 
 // The global setup's own path, given an envelope the compiler did not write.
-function altered(change: (records: Records) => void) {
-  const run = runTestRecords(prebuilt);
-  const parsed = JSON.parse(new TextDecoder().decode(run.stdout)) as {
+function altered(shared: Run, change: (records: Records) => void) {
+  const parsed = JSON.parse(new TextDecoder().decode(shared.stdout)) as {
     version: number;
     records: Records;
   };
   change(parsed.records);
-  return () => ({ stdout: utf8(JSON.stringify(parsed)), stderr: "", exit: 0 });
+  return () =>
+    Promise.resolve({
+      stdout: utf8(JSON.stringify(parsed)),
+      stderr: "",
+      exit: 0,
+    });
 }
 
 const recordChanges: [string, (records: Records) => void][] = [
@@ -489,21 +503,36 @@ const recordChanges: [string, (records: Records) => void][] = [
 ];
 
 describe("the global setup's record set", () => {
-  const provided: unknown[] = [];
+  let shared: Run = { stdout: new Uint8Array(), stderr: "", exit: 1 };
+  const provided: string[] = [];
   const project = {
-    provide: (_key: string, value: unknown) => {
-      provided.push(value);
+    provide: (key: string) => {
+      provided.push(key);
     },
   };
+  // One records run serves every case; each case gets its own copy of the bytes.
+  const fresh = () =>
+    Promise.resolve({ ...shared, stdout: shared.stdout.slice() });
 
-  it("provides the committed records", () => {
-    setup(project as never);
-    expect(provided).toHaveLength(1);
+  beforeAll(async () => {
+    shared = await runTestRecords(prebuilt);
+    expect(shared.exit).toBe(0);
+  }, recordSetupBound);
+
+  beforeEach(() => {
+    provided.length = 0;
   });
 
-  it.each(recordChanges)("refuses %s", (_name, change) => {
-    expect(() => {
-      setup(project as never, altered(change));
-    }).toThrow(/records are not exactly the \d+ compiled payload files/u);
+  it("provides the committed records and the walk-it vectors", async () => {
+    await setup(project as never, fresh);
+    expect(provided).toStrictEqual(["contentRecords", "walkReplayVectors"]);
+  });
+
+  it.each(recordChanges)("refuses %s", async (_name, change) => {
+    await expect(
+      setup(project as never, altered(await fresh(), change)),
+    ).rejects.toThrow(
+      /records are not exactly the \d+ compiled payload files/u,
+    );
   });
 });

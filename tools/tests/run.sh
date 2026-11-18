@@ -14,9 +14,11 @@
 #      the check run's npm audit stage fails closed
 #   j. Content cases (tools/tests/content-cases.mjs): golden digest, compile errors, empty input,
 #      full-path arguments, output containment, no partial output, schema setup errors, no SDK
+#      and work-directory refusals (tools/tests/work-dir-cases.mjs)
 #   k. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   l. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
 #   m. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
+#   n. Tool installer cases (tools/tests/install-tools-cases.mjs): dropped downloads are retried, a wrong digest installs nothing
 # Usage: sh tools/tests/run.sh
 # Parts g, h and j need the pinned .NET SDK and nuget.org. The PowerShell cases in parts d and e fail without PowerShell.
 set -eu
@@ -428,6 +430,10 @@ else
   rc=0
   "$node" "$src/tools/tests/content-cases.mjs" "$tmp/content" > "$tmp/out" 2>&1 || rc=$?
   count_lines "content cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/work-dir-cases.mjs" "$tmp/workdir" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "work dir cases" "$rc" "$tmp/out"
 fi
 
 if [ -z "$node" ]; then
@@ -448,6 +454,10 @@ else
   rc=0
   "$node" "$src/tools/tests/browser-cases.mjs" "$tmp/browsers" > "$tmp/out" 2>&1 || rc=$?
   count_lines "browser provisioning cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/install-tools-cases.mjs" "$tmp/installer" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "tool installer cases" "$rc" "$tmp/out"
 fi
 
 echo "$passed passed, $failed failed in $(($(date +%s) - started))s"

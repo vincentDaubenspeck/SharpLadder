@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -238,12 +238,49 @@ export const witness = {
             ],
           ],
         },
+        {
+          type: "walk-it",
+          blockId: "ramp-fix-easy/b3",
+          id: "walk-fix-easy",
+          title: [
+            {
+              type: "text",
+              text: "Count one more",
+            },
+          ],
+          cells: [0],
+          sequences: [
+            {
+              name: "once",
+              introBlockId: "ramp-fix-easy/b3.1.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "The count starts at zero.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "ramp-fix-easy/b3.1.s1",
+                  dst: 0,
+                  value: 1,
+                  note: [
+                    {
+                      type: "text",
+                      text: "One item is counted.",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
       drills: {
-        blockId: "ramp-fix-easy/b3",
+        blockId: "ramp-fix-easy/b4",
         items: [
           {
-            blockId: "ramp-fix-easy/b3.i1",
+            blockId: "ramp-fix-easy/b4.i1",
             id: "drill-fix-pair-scores",
             label: "Pair each name with its score",
           },
@@ -268,13 +305,34 @@ export const witness = {
           {
             target: {
               type: "block",
-              blockId: "ramp-fix-easy/b3.i1",
+              blockId: "ramp-fix-easy/b3",
+            },
+            text: "Count one more",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "ramp-fix-easy/b3.1.s0",
+            },
+            text: "The count starts at zero.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "ramp-fix-easy/b3.1.s1",
+            },
+            text: "One item is counted.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "ramp-fix-easy/b4.i1",
             },
             text: "Pair each name with its score",
           },
         ],
         audio:
-          "sha256:ada37a3fa9dd8150decda2e8db0c75dfdf970939de5afd0bcfcf352b31032615",
+          "sha256:09ecc47e24ac30a2497836c9f73fc2cb562663b2ef3adc8851b7df4e355121ae",
       },
     },
   ],

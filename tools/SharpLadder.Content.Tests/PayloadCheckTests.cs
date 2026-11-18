@@ -316,6 +316,20 @@ public sealed class PayloadCheckTests
         Assert.Contains(expected, result.Output, StringComparison.Ordinal);
     }
 
+    // The reader allows one value, so it stops at the trailing value before decoding any of its text.
+    [Theory]
+    [InlineData("", "\"a\\uD800\"")]
+    [InlineData(" \t\n", "{\"\\uD800\":1}")]
+    public void ValidateRefusesTrailingTextAsSyntax(string space, string trailing)
+    {
+        var result = PayloadWorkspace.Invoke(["validate", Repository.SchemaFolder], stdin: Strict.GetBytes("{}" + space + trailing));
+
+        Assert.Equal(1, result.Code);
+        Assert.StartsWith("  standard input: schema: not JSON without duplicate names: ", result.Output, StringComparison.Ordinal);
+        Assert.EndsWith("FAIL content validate\n", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("unexpected error", result.Output, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("validate")]
     [InlineData("compare")]

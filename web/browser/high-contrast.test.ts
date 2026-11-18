@@ -1,4 +1,5 @@
 // @vitest-environment node
+import type { Page } from "@playwright/test";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -12,6 +13,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { groupDCells, themes, viewportAt } from "./group-d.ts";
 import { postRestoreDeadlineMs } from "./high-contrast-cycles.ts";
+import { swatch } from "./high-contrast-swatch.ts";
 import {
   baselineProblems,
   beforeDeadline,
@@ -1672,5 +1674,47 @@ describe("post-restore deadline", () => {
       beforeDeadline(() => Promise.reject(new Error("no page")), deadline),
     ).rejects.toThrow("no page");
     expect(timers).toHaveLength(0);
+  });
+});
+
+describe("swatch cleanup", () => {
+  // Each page call is told apart by its source, as a real page receives it.
+  const stubPage = (insertion: Error, removal: Error | null) => {
+    const calls: string[] = [];
+    const evaluate = (fn: () => unknown) => {
+      const source = String(fn);
+      if (source.includes("setAttribute")) {
+        calls.push("insert");
+        return Promise.reject(insertion);
+      }
+      if (source.includes("querySelector")) {
+        calls.push("remove");
+        return removal === null ? Promise.resolve() : Promise.reject(removal);
+      }
+      calls.push("settle");
+      return Promise.resolve(null);
+    };
+    return { page: { evaluate } as unknown as Page, calls };
+  };
+
+  it("still removes the swatch after a failed insertion and reports the insertion error", async () => {
+    const insertion = new Error("insertion failed");
+    const { page, calls } = stubPage(insertion, null);
+    await expect(swatch(page)).rejects.toBe(insertion);
+    expect(calls).toEqual(["insert", "remove", "settle"]);
+  });
+
+  it("reports a failed insertion and a failed cleanup in one error", async () => {
+    const insertion = new Error("insertion failed");
+    const removal = new Error("removal failed");
+    const { page, calls } = stubPage(insertion, removal);
+    const error: unknown = await swatch(page).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toEqual([insertion, removal]);
+    expect((error as AggregateError).cause).toBe(removal);
+    expect(calls).toEqual(["insert", "remove"]);
   });
 });

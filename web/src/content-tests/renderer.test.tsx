@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type {
   Block,
@@ -13,6 +13,7 @@ import { witness as syntax } from "../generated/witness/chapters/fixture-basics/
 import { witness as second } from "../generated/witness/chapters/fixture-second/chapter.ts";
 import { assertNever } from "../content/assertNever.ts";
 import { Blocks } from "../content/Blocks.tsx";
+import type { WalkControl, WalkControlChange } from "../content/Blocks.tsx";
 import type { StaticPart } from "../content/approach.ts";
 import { ContentView } from "../content/ContentView.tsx";
 import { buildSlugMap } from "../content/href.ts";
@@ -249,5 +250,42 @@ describe("spans", () => {
     expect(() =>
       render(<Spans spans={[term as TermSpan]} slugs={slugs} />),
     ).toThrow(/Unknown content variant/u);
+  });
+});
+
+const atStart = { position: { sequence: 1, step: 0 }, announce: false };
+
+describe("the walk control through the hosts", () => {
+  it("shows what the control holds for the walk's id and hands it the walk id, position and cause", () => {
+    const changes: WalkControlChange[] = [];
+    const shown: string[] = [];
+    const control: WalkControl = {
+      shownOf: (walkId) => {
+        shown.push(walkId);
+        return walkId === "walk-fix-shift"
+          ? { position: { sequence: 1, step: 1 }, announce: true }
+          : atStart;
+      },
+      onWalkChange: (change) => {
+        changes.push(change);
+      },
+    };
+    const { container } = render(
+      <ContentView doc={syntax} slugs={slugs} walkControl={control} />,
+    );
+    const walk = container.querySelector('[id="walk-fix-shift"]');
+    expect(new Set(shown)).toEqual(new Set(["walk-fix-shift"]));
+    expect(walk?.textContent).toContain("Step 1 of");
+    expect(walk?.querySelector("[aria-live]")?.textContent).not.toBe("");
+    fireEvent.click(
+      within(walk as HTMLElement).getByRole("button", { name: "Prev" }),
+    );
+    expect(changes).toEqual([
+      {
+        walkId: "walk-fix-shift",
+        position: { sequence: 1, step: 0 },
+        cause: "prev",
+      },
+    ]);
   });
 });

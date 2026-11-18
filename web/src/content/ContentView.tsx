@@ -8,6 +8,7 @@ import { staticDoc } from "./approach.ts";
 import type { StaticDoc, StaticPart } from "./approach.ts";
 import { assertNever } from "./assertNever.ts";
 import { Blocks } from "./Blocks.tsx";
+import type { WalkControl } from "./Blocks.tsx";
 import { CardsSectionView } from "./Cards.tsx";
 import { DrillSectionView } from "./Drill.tsx";
 import { ErrorEntryView, GlossaryEntryView } from "./Entries.tsx";
@@ -18,30 +19,46 @@ import { Spans } from "./Spans.tsx";
 export function ContentView({
   doc,
   slugs,
+  walkControl,
 }: {
   doc: StaticDoc;
   slugs: SlugMap;
+  walkControl?: WalkControl | undefined;
 }): ReactElement {
-  return <StaticView doc={staticDoc(doc)} slugs={slugs} />;
+  return (
+    <StaticView doc={staticDoc(doc)} slugs={slugs} walkControl={walkControl} />
+  );
 }
 
 // The hosting page owns the single h1, so content headings start at h2.
 function StaticView({
   doc,
   slugs,
+  walkControl,
 }: {
   doc: StaticDoc;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   switch (doc.type) {
     case "chapter":
-      return <ChapterView chapter={doc} slugs={slugs} />;
+      return (
+        <ChapterView chapter={doc} slugs={slugs} walkControl={walkControl} />
+      );
     case "part":
-      return <PartView part={doc} slugs={slugs} />;
+      return <PartView part={doc} slugs={slugs} walkControl={walkControl} />;
     case "glossary":
-      return <GlossaryEntryView entry={doc} slugs={slugs} />;
+      return (
+        <GlossaryEntryView
+          entry={doc}
+          slugs={slugs}
+          walkControl={walkControl}
+        />
+      );
     case "error":
-      return <ErrorEntryView entry={doc} slugs={slugs} />;
+      return (
+        <ErrorEntryView entry={doc} slugs={slugs} walkControl={walkControl} />
+      );
     default:
       return assertNever(doc);
   }
@@ -50,15 +67,22 @@ function StaticView({
 function ChapterView({
   chapter,
   slugs,
+  walkControl,
 }: {
   chapter: ChapterFile;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
-      <Blocks blocks={chapter.intro} slugs={slugs} />
+      <Blocks blocks={chapter.intro} slugs={slugs} walkControl={walkControl} />
       {chapter.sections.map((section) => (
-        <ChapterSectionView key={section.id} section={section} slugs={slugs} />
+        <ChapterSectionView
+          key={section.id}
+          section={section}
+          slugs={slugs}
+          walkControl={walkControl}
+        />
       ))}
     </>
   );
@@ -67,16 +91,18 @@ function ChapterView({
 function ChapterSectionView({
   section,
   slugs,
+  walkControl,
 }: {
   section: ChapterSection;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <section data-section-id={section.id}>
       <h2 id={section.id}>
         <Spans spans={section.title} slugs={slugs} />
       </h2>
-      <Blocks blocks={section.body} slugs={slugs} />
+      <Blocks blocks={section.body} slugs={slugs} walkControl={walkControl} />
     </section>
   );
 }
@@ -85,14 +111,16 @@ function ChapterSectionView({
 function PartView({
   part,
   slugs,
+  walkControl,
 }: {
   part: StaticPart;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
       <h2>{partLabel(part.kind)}</h2>
-      <PartSections part={part} slugs={slugs} />
+      <PartSections part={part} slugs={slugs} walkControl={walkControl} />
     </>
   );
 }
@@ -101,15 +129,22 @@ function PartView({
 function PartSections({
   part,
   slugs,
+  walkControl,
 }: {
   part: StaticPart;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   if (part.kind === "cards") {
     return (
       <>
         {part.sections.map((section) => (
-          <CardsSectionView key={section.id} section={section} slugs={slugs} />
+          <CardsSectionView
+            key={section.id}
+            section={section}
+            slugs={slugs}
+            walkControl={walkControl}
+          />
         ))}
       </>
     );
@@ -118,7 +153,12 @@ function PartSections({
     return (
       <>
         {part.sections.map((section) => (
-          <DrillSectionView key={section.id} section={section} slugs={slugs} />
+          <DrillSectionView
+            key={section.id}
+            section={section}
+            slugs={slugs}
+            walkControl={walkControl}
+          />
         ))}
       </>
     );
@@ -126,7 +166,12 @@ function PartSections({
   return (
     <>
       {part.sections.map((section) => (
-        <PartSectionView key={section.id} section={section} slugs={slugs} />
+        <PartSectionView
+          key={section.id}
+          section={section}
+          slugs={slugs}
+          walkControl={walkControl}
+        />
       ))}
     </>
   );
@@ -154,16 +199,18 @@ function partLabel(kind: StaticPart["kind"]): string {
 function PartSectionView({
   section,
   slugs,
+  walkControl,
 }: {
   section: PartSection;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <section data-section-id={section.id}>
       <h3 id={section.id}>
         {section.number} <Spans spans={section.title} slugs={slugs} />
       </h3>
-      <Blocks blocks={section.body} slugs={slugs} />
+      <Blocks blocks={section.body} slugs={slugs} walkControl={walkControl} />
     </section>
   );
 }

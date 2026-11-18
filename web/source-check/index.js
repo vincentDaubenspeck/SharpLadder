@@ -41,10 +41,7 @@ export async function sourceTreeProblems(webDir, { readdir } = {}) {
     (p) => p.tsconfig === "tsconfig.browser.json",
   );
   problems.push(
-    ...(await browserTreeProblems(web, {
-      ...(readdir ? { readdir } : {}),
-      ...(browser ? { inputs: browser.inputs } : {}),
-    })),
+    ...(await browserTreeProblems(web, { readdir, inputs: browser?.inputs })),
   );
   return problems;
 }

@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import type { ErrorEntry, GlossaryEntry } from "../generated/content.ts";
 import { assertNever } from "./assertNever.ts";
 import { Blocks } from "./Blocks.tsx";
+import type { WalkControl } from "./Blocks.tsx";
 import type { SlugMap } from "./href.ts";
 
 // An entry is reached at its own id, so the heading alone carries it; an entry has no audio slot
@@ -9,15 +10,17 @@ import type { SlugMap } from "./href.ts";
 export function GlossaryEntryView({
   entry,
   slugs,
+  walkControl,
 }: {
   entry: GlossaryEntry;
   slugs: SlugMap;
+  walkControl?: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
       <h2 id={entry.id}>{entry.term}</h2>
       <p>{entry.short}</p>
-      <Blocks blocks={entry.body} slugs={slugs} />
+      <Blocks blocks={entry.body} slugs={slugs} walkControl={walkControl} />
     </>
   );
 }
@@ -25,9 +28,11 @@ export function GlossaryEntryView({
 export function ErrorEntryView({
   entry,
   slugs,
+  walkControl,
 }: {
   entry: ErrorEntry;
   slugs: SlugMap;
+  walkControl?: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
@@ -39,9 +44,9 @@ export function ErrorEntryView({
         <strong>You got</strong> {entry.got}
       </p>
       <h3>Cause</h3>
-      <Blocks blocks={entry.cause} slugs={slugs} />
+      <Blocks blocks={entry.cause} slugs={slugs} walkControl={walkControl} />
       <h3>Hint</h3>
-      <Blocks blocks={entry.hint} slugs={slugs} />
+      <Blocks blocks={entry.hint} slugs={slugs} walkControl={walkControl} />
     </>
   );
 }

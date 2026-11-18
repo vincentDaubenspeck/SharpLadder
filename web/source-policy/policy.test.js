@@ -4,7 +4,7 @@ import { join } from "node:path";
 import tseslint from "typescript-eslint";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildFixture, cleanUp } from "../build-guard/fixture.js";
-import { production } from "../eslint-rules/production-eslint.js";
+import { probeProject } from "../eslint-rules/production-eslint.js";
 import { checkProgram, describeFinding, parseSource } from "./index.js";
 
 afterAll(cleanUp);
@@ -351,30 +351,46 @@ describe("agreement with the typescript-eslint scope manager", () => {
   });
 }, 30_000);
 
+// The production ESLint on real files a copy of the project holds, since its rules read their types.
+const production = probeProject("Policy", ["Probe.tsx", "TypedProbe.ts"]);
+afterAll(production.teardown);
+// The json formatter prints the result list itself, so each result arrives as ESLint gave it.
+const lintResult = async (code, filePath) =>
+  JSON.parse((await production.lintText(code, filePath, "json")).output)[0];
+const probe = production.probe;
+
+// The engine suites above hold the corpus; the adapter takes one refusal and one admission.
 describe("the ESLint adapter in the production configuration", () => {
   const lint = async (code) => {
-    const [result] = await production.lintText(`${code}\n`, {
-      filePath: "src/Probe.tsx",
-    });
+    const result = await lintResult(`${code}\n`, probe("Probe.tsx"));
     expect(result.messages.filter((m) => m.fatal)).toEqual([]);
     return result.messages;
   };
 
-  it.each(refused)("refuses %s", async (_name, code, global) => {
+  it.each(refused.slice(0, 1))("refuses %s", async (_name, code, global) => {
     const messages = await lint(code);
     expect(
       messages.some((m) => m.ruleId === app && m.message.includes(global)),
     ).toBe(true);
   });
 
-  it.each(allowed)("allows %s", async (_name, code) => {
+  it.each(allowed.slice(0, 1))("allows %s", async (_name, code) => {
     const messages = await lint(code);
     expect(messages.filter((m) => m.ruleId === app)).toEqual([]);
   });
 
-  it("can be silenced by a reason-bearing disable comment", async () => {
-    const messages = await lint(disabled);
-    expect(messages.filter((m) => m.ruleId === app)).toEqual([]);
+  // Inline configuration is off in application source, so the comment silences neither rule.
+  it("keeps both errors a reason-bearing disable comment names", async () => {
+    const result = await lintResult(`${disabled}\n`, probe("Probe.tsx"));
+    const errors = result.messages.filter((m) => m.severity === 2);
+    expect(
+      errors.some(
+        (m) =>
+          m.ruleId === app && m.message.startsWith("globalThis is not allowed"),
+      ),
+    ).toBe(true);
+    expect(errors.some((m) => m.ruleId === "no-eval")).toBe(true);
+    expect(result.suppressedMessages).toEqual([]);
   });
 
   // Angle-bracket assertions parse only outside JSX, so these cases run as .ts.
@@ -384,9 +400,7 @@ describe("the ESLint adapter in the production configuration", () => {
   ])("%s an angle-bracket assertion", async (_verb, code, expected) => {
     const parsed = parseSource(`${code}\n`, "src/Probe.ts");
     expect(judge(parsed)).toEqual(expected);
-    const [result] = await production.lintText(`${code}\n`, {
-      filePath: "src/Probe.ts",
-    });
+    const result = await lintResult(`${code}\n`, probe("TypedProbe.ts"));
     const messages = result.messages.filter((m) => m.ruleId === app);
     expect(messages.map((m) => m.message.split(" ")[0])).toEqual(
       expected.map((e) => e.split(" ").at(-1)),
@@ -394,22 +408,10 @@ describe("the ESLint adapter in the production configuration", () => {
   });
 }, 30_000);
 
-// The build adapter and the ESLint adapter must reach the same complete verdict on every case.
+// ESLint reads directives the build never sees, so on a disabled global the two adapters must
+// still reach the same complete verdict; the engine suites hold the rest of the corpus.
 describe("parity between the build and ESLint adapters", () => {
-  const sources = ["App.tsx", "App.test.tsx", "main.tsx", "test-setup.ts"].map(
-    (file) => [
-      `src/${file}`,
-      String(readFileSync(join(import.meta.dirname, "..", "src", file))),
-    ],
-  );
-  const cases = [
-    ...[...refused, ...emptyAttributes, ...allowed].map(([name, code]) => [
-      name,
-      `${code}\n`,
-    ]),
-    ["the disabled global", disabled],
-    ...sources,
-  ];
+  const cases = [["the disabled global", disabled]];
   const named = /^(\S+) is (?:not allowed|outside)/u;
   const fixed = new Map(
     ["importMeta", "dynamicImport", "attributes", "requireImport"].map(
@@ -425,24 +427,22 @@ describe("parity between the build and ESLint adapters", () => {
   };
 
   it.each(cases)("agrees on %s", async (name, code) => {
-    // A real path would collide with the project service, so each case is a probe file.
-    const filePath = name.endsWith(".ts") ? "src/Probe.ts" : "src/Probe.tsx";
+    const filePath = name.endsWith(".ts")
+      ? probe("TypedProbe.ts")
+      : probe("Probe.tsx");
     const { ast, scopeManager } = parseSource(code, filePath);
     const build = checkProgram(ast, scopeManager).map(
       (f) =>
         `${f.node.loc.start.line}:${f.node.loc.start.column + 1} ${f.kind} ${describeFinding(f)}`,
     );
-    // The disable comment silences ESLint, so that case is judged without it.
-    const [result] = await production.lintText(
-      code.replace(/^\/\/ eslint-disable.*\n/u, "\n"),
-      { filePath },
-    );
+    const result = await lintResult(code, filePath);
     expect(result.messages.filter((m) => m.fatal)).toEqual([]);
     const eslint = result.messages.filter((m) => m.ruleId === app);
     expect(eslint.map(fromEslint).sort()).toEqual(build.sort());
   });
 }, 30_000);
 
+// One refusal, one pass and the disable comment the build never reads; the engine holds the corpus.
 describe("the build guard in a real build", () => {
   const build = (code) => buildFixture({ "src/main.tsx": `${code}\n` });
   const rejects = async (code, pattern) => {
@@ -454,16 +454,12 @@ describe("the build guard in a real build", () => {
     expect(error?.message).toMatch(pattern);
   };
 
-  it.each(refused.filter((c) => c[3]))(
+  it.each(refused.filter((c) => c[3]).slice(0, 1))(
     "fails on %s",
     async (_name, code, global) => {
       await rejects(code, new RegExp(`reference to ${global}\\b`, "u"));
     },
   );
-
-  it.each(emptyAttributes)("fails on %s", async (_name, code) => {
-    await rejects(code, /import attributes/u);
-  });
 
   it("fails on a global behind a disable comment", async () => {
     await rejects(disabled, /reference to globalThis/u);

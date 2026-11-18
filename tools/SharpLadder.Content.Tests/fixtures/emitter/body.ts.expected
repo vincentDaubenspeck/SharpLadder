@@ -1,4 +1,4 @@
-// SharpLadder.Content type emitter output, grammar 2. Do not edit.
+// SharpLadder.Content type emitter output, grammar 3. Do not edit.
 
 export type Id = string;
 
@@ -7,6 +7,12 @@ export type SectionId = Id;
 export type BlockId = string;
 
 export type ItemId = string;
+
+export type WalkId = Id;
+
+export type WalkIntroId = string;
+
+export type WalkStepId = string;
 
 export type Spoken = string;
 
@@ -35,7 +41,7 @@ export type Speech = {
 export type Body = Block[];
 
 export type Block =
-  ParagraphBlock | ListBlock | CodeBlock | TextBlock | TableBlock;
+  ParagraphBlock | ListBlock | CodeBlock | TextBlock | TableBlock | WalkItBlock;
 
 export type ParagraphBlock = {
   type: "paragraph";
@@ -121,6 +127,68 @@ export type AnchoredTextBlock = {
   label?: string;
   spoken: Spoken;
   source: string;
+};
+
+export type WalkItBlock = {
+  type: "walk-it";
+  blockId: BlockId;
+  id: WalkId;
+  title: Spans;
+  cells:
+    | [Cell]
+    | [Cell, Cell]
+    | [Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell]
+    | [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
+  sequences:
+    | [WalkSequence]
+    | [WalkSequence, WalkSequence]
+    | [WalkSequence, WalkSequence, WalkSequence]
+    | [WalkSequence, WalkSequence, WalkSequence, WalkSequence];
+};
+
+export type Cell = Literal | null;
+
+export type Literal = number | string;
+
+export type WalkSequence = {
+  name: string;
+  introBlockId: WalkIntroId;
+  intro: Spans;
+  steps:
+    | [Step]
+    | [Step, Step]
+    | [Step, Step, Step]
+    | [Step, Step, Step, Step]
+    | [Step, Step, Step, Step, Step]
+    | [Step, Step, Step, Step, Step, Step]
+    | [Step, Step, Step, Step, Step, Step, Step]
+    | [Step, Step, Step, Step, Step, Step, Step, Step];
+};
+
+export type Step = CopyStep | WriteStep;
+
+export type CopyStep = {
+  blockId: WalkStepId;
+  dst: number;
+  src: number;
+  note: Spans;
+  lost?: true;
+  value?: never;
+};
+
+export type WriteStep = {
+  blockId: WalkStepId;
+  dst: number;
+  value: Literal;
+  note: Spans;
+  lost?: true;
+  src?: never;
 };
 
 export type Spans = [Span, ...Span[]];

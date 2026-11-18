@@ -29,4 +29,14 @@ Each drill here joins two ideas.
 | ----- | ----------- |
 | count | compare     |
 
+```walk-it {#walk-fix-easy}
+title: Count one more
+cells: [0]
+sequences:
+  - name: once
+    intro: The count starts at zero.
+    steps:
+      - { dst: 0, value: 1, note: One item is counted. }
+```
+
 1. [Pair each name with its score](#drill-fix-pair-scores)

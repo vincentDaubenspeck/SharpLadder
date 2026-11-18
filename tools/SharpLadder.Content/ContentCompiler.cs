@@ -128,7 +128,8 @@ internal static class ContentCompiler
     private static LiveNames Live(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns) => new(
         parsed.Select(p => (p.File.Model as ChapterFile)?.Slug).OfType<string>().ToHashSet(StringComparer.Ordinal),
         parsed.SelectMany(p => p.File.Ids.Select(i => i.Id)).Concat(patterns.Select(p => p.Record.Id)).ToHashSet(StringComparer.Ordinal),
-        parsed.SelectMany(p => p.File.SectionIds).ToHashSet(StringComparer.Ordinal));
+        parsed.SelectMany(p => p.File.SectionIds).ToHashSet(StringComparer.Ordinal),
+        parsed.SelectMany(p => p.File.WalkIds).ToHashSet(StringComparer.Ordinal));
 
     private static Parsed? Read(string relative, byte[] bytes, string display, List<Diagnostic> diagnostics)
     {
@@ -237,6 +238,7 @@ internal static class ContentCompiler
             (SourceFile.ErrorPrefix, EntryIds(parsed, RecordKind.Error), "an error entry id"),
             (SourceFile.LadderPrefix, LadderIds(parsed), "a ladder id"),
             (SourceFile.DrillPrefix, [], "a drill file"),
+            (SourceFile.WalkPrefix, parsed.SelectMany(p => p.File.WalkIds).ToHashSet(StringComparer.Ordinal), "a walk-it block"),
         };
         foreach (var (id, display, line) in uses)
         {

@@ -14,7 +14,7 @@ namespace SharpLadder.Content;
 internal static partial class TypeEmitter
 {
     // Raised whenever the accepted forms or the emitted shapes change.
-    public const int GrammarVersion = 2;
+    public const int GrammarVersion = 3;
 
     public const string BodyFile = "body.schema.json";
     public const string ContentFile = SchemaSet.RootFile;
@@ -30,6 +30,8 @@ internal static partial class TypeEmitter
     // check on the generated modules catches a tuple that a deeper position would still break.
     private const int MaxBound = 16;
     private const int TupleWidth = 60;
+
+    private const string NullPlace = "a null type is admitted only as a oneOf member";
 
     private static readonly string Header = $"// SharpLadder.Content type emitter output, grammar {GrammarVersion.ToString(CultureInfo.InvariantCulture)}. Do not edit.";
     private static readonly string[] Files = [BodyFile, ContentFile];
@@ -313,10 +315,13 @@ internal static partial class TypeEmitter
 
     private static Atom IntegerForm(JsonObject node, string at)
     {
-        Keys(node, at, ["type"], ["minimum"]);
-        if (node.ContainsKey("minimum"))
+        Keys(node, at, ["type"], ["minimum", "maximum"]);
+        foreach (var key in new[] { "minimum", "maximum" })
         {
-            _ = SafeInteger(node["minimum"], at, "minimum");
+            if (node.ContainsKey(key))
+            {
+                _ = SafeInteger(node[key], at, key);
+            }
         }
 
         return new Atom("number");
@@ -435,6 +440,37 @@ internal static partial class TypeEmitter
 
         return set;
     }
+
+    // Integer and string are the one primitive pair; JSON never confuses the two.
+    private static List<Ts> Primitives(List<(JsonNode? Member, string At)> others)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var types = new List<Ts>();
+        foreach (var (member, memberAt) in others)
+        {
+            var type = member is JsonObject m && IsString(m["type"], out var text) ? text : null;
+            if (others.Count != 2 || type is not ("integer" or "string") || !seen.Add(type))
+            {
+                throw Fail(memberAt, "a union member must be a $ref to an Object definition, or the members exactly one integer and one string");
+            }
+
+            types.Add(string.Equals(type, "integer", StringComparison.Ordinal) ? IntegerForm((JsonObject)member!, memberAt) : StringForm((JsonObject)member!, memberAt));
+        }
+
+        return types;
+    }
+
+    // A union is untagged only where no member declares type, so a tagged union keeps its refusals.
+    private static bool IsUntaggedObject(JsonNode? definition) =>
+        definition is JsonObject target && IsString(target["type"], out var form) && string.Equals(form, "object", StringComparison.Ordinal)
+        && target["properties"] is JsonObject properties && !properties.ContainsKey("type");
+
+    private static Ts Closed(Ts type, SortedSet<string> absent) => type switch
+    {
+        ObjectOf obj => new ObjectOf([.. obj.Fields, .. absent.Select(n => new Field(n, Optional: true, new Atom("never")))]),
+        UnionOf union => new UnionOf([.. union.Members.Select(m => Closed(m, absent))]),
+        _ => throw new InvalidOperationException("an untagged union member is not an Object"),
+    };
 
     private static string Import(IReadOnlyList<string> names, string module)
     {
@@ -571,6 +607,9 @@ internal static partial class TypeEmitter
         // Edges between definitions that do not pass through an Object property.
         private readonly Dictionary<string, List<string>> _direct = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<(string Alias, Ts Type)>> _aliases = new(StringComparer.Ordinal);
+
+        // Per untagged member Object, the properties its siblings declare and it does not.
+        private readonly Dictionary<string, SortedSet<string>> _absent = new(StringComparer.Ordinal);
         private readonly UnionOf _root;
 
         public Run(Dictionary<string, JsonObject> documents)
@@ -593,7 +632,8 @@ internal static partial class TypeEmitter
                 }
             }
 
-            _root = UnionForm(new JsonObject { ["oneOf"] = documents[ContentFile]["oneOf"]!.DeepClone() }, ContentFile, ContentFile + "#", edges: null);
+            _root = UnionForm(new JsonObject { ["oneOf"] = documents[ContentFile]["oneOf"]!.DeepClone() }, ContentFile, ContentFile + "#", edges: null, root: true);
+            CloseUntaggedMembers();
             CheckCycles();
         }
 
@@ -686,7 +726,8 @@ internal static partial class TypeEmitter
 
             if (!IsString(obj["type"], out var type))
             {
-                throw Fail(at, "type must be a single string");
+                var nullable = obj["type"] is JsonArray list && list.Any(t => IsString(t, out var s) && string.Equals(s, "null", StringComparison.Ordinal));
+                throw Fail(at, nullable ? NullPlace + ", never in a type array" : "type must be a single string");
             }
 
             return type switch
@@ -696,6 +737,7 @@ internal static partial class TypeEmitter
                 "string" => StringForm(obj, at),
                 "integer" => IntegerForm(obj, at),
                 "boolean" => BooleanForm(obj, at),
+                "null" => throw Fail(at, NullPlace),
                 _ => throw Fail(at, $"type {JsonSerializer.Serialize(type)} is not supported"),
             };
         }
@@ -725,10 +767,11 @@ internal static partial class TypeEmitter
             return (new Atom(Alias(name)), target, name);
         }
 
-        // A union is admitted only as members told apart by one required string Const: type, or
-        // kind where every member is an Object holding the same type. Where type tells them apart,
-        // a member may itself be such a kind union, standing for the type its Objects share.
-        private UnionOf UnionForm(JsonObject node, string file, string at, List<string>? edges)
+        // Every admitted union keeps its members disjoint, so oneOf means the same as the TypeScript
+        // union: tagged Objects, untagged closed Objects, exactly integer and string, or null beside
+        // one type that admits no null. Null may join any of them, and never the root, whose members
+        // stay tagged Objects.
+        private UnionOf UnionForm(JsonObject node, string file, string at, List<string>? edges, bool root = false)
         {
             Keys(node, at, ["oneOf"], []);
             if (node["oneOf"] is not JsonArray members || members.Count < 2)
@@ -736,12 +779,175 @@ internal static partial class TypeEmitter
                 throw Fail(at, "oneOf must hold two or more members");
             }
 
-            var types = new List<Ts>();
-            var tags = new List<(string Type, string? Kind, string Name, string At)>();
+            var others = new List<(JsonNode? Member, string At)>();
+            var nullAt = -1;
             for (var i = 0; i < members.Count; i++)
             {
                 var memberAt = $"{at}/oneOf/{Count(i)}";
-                if (members[i] is not JsonObject member || !member.ContainsKey("$ref"))
+                if (members[i] is JsonObject member && IsString(member["type"], out var type) && string.Equals(type, "null", StringComparison.Ordinal))
+                {
+                    Keys(member, memberAt, ["type"], []);
+                    if (root || nullAt >= 0)
+                    {
+                        throw Fail(memberAt, root ? "the root union holds no null" : "null is repeated");
+                    }
+
+                    nullAt = i;
+                }
+                else
+                {
+                    others.Add((members[i], memberAt));
+                }
+            }
+
+            if (nullAt >= 0 && others.Count == 1)
+            {
+                return Nullable(others[0].Member, others[0].At, nullAt, file, edges);
+            }
+
+            var references = others.Count(o => o.Member is JsonObject m && m.ContainsKey("$ref"));
+            var stray = others.Find(o => o.Member is not JsonObject m || !m.ContainsKey("$ref"));
+            if (references > 0 && stray.At is not null)
+            {
+                throw Fail(stray.At, "a union member must be a $ref to an Object definition when another member is one");
+            }
+
+            List<Ts> types;
+            if (references == 0 && !root)
+            {
+                types = Primitives(others);
+            }
+            else if (!root && others.TrueForAll(o => IsUntaggedObject(Resolve(o.Member, file)?.Definition)))
+            {
+                types = Untagged(others, file, edges);
+            }
+            else
+            {
+                types = Tagged(others, file, edges);
+            }
+
+            if (nullAt >= 0)
+            {
+                types.Insert(nullAt, new Atom("null"));
+            }
+
+            return new UnionOf(types);
+        }
+
+        // The lone member goes through the normal forms, so a $ref here never takes the tagged path.
+        private UnionOf Nullable(JsonNode? member, string memberAt, int nullAt, string file, List<string>? edges)
+        {
+            var type = Node(member, file, memberAt, edges);
+            if (AdmitsNull(member, file, new HashSet<string>(StringComparer.Ordinal)))
+            {
+                throw Fail(memberAt, "the member beside a lone null must not admit null itself");
+            }
+
+            // A nested union has no rendering, the formatter hugs an Object beside null and the type
+            // grammar keeps a bounded tuple out of a mixed union; a $ref names any of them, so the
+            // union stays one the layout writes. A one-length tuple emits as an atom, so the
+            // schema's maxItems marks a bounded array.
+            if (type is UnionOf or ObjectOf || (member is JsonObject inline && inline.ContainsKey("maxItems")))
+            {
+                throw Fail(memberAt, "the member beside a lone null must be a $ref when it is an Object, a bounded array or a union");
+            }
+
+            return new UnionOf(nullAt == 0 ? [new Atom("null"), type] : [type, new Atom("null")]);
+        }
+
+        // Follows references and refinements; a reference cycle is refused on its own later.
+        private bool AdmitsNull(JsonNode? node, string file, HashSet<string> seen)
+        {
+            if (node is not JsonObject obj)
+            {
+                return false;
+            }
+
+            if (IsString(obj["type"], out var type))
+            {
+                return string.Equals(type, "null", StringComparison.Ordinal);
+            }
+
+            if (obj["oneOf"] is JsonArray members)
+            {
+                return members.Any(m => AdmitsNull(m, file, seen));
+            }
+
+            // A refinement's pattern or excluded const passes null, so the reference decides.
+            if (obj["allOf"] is JsonArray parts)
+            {
+                return parts.Count > 0 && AdmitsNull(parts[0], file, seen);
+            }
+
+            return Resolve(obj, file) is { } target && seen.Add(Key(target.File, target.Name)) && AdmitsNull(target.Definition, target.File, seen);
+        }
+
+        // The definition a union member names, or null where it names none.
+        private (string File, string Name, JsonNode? Definition)? Resolve(JsonNode? member, string file)
+        {
+            var match = member is JsonObject reference && IsString(reference["$ref"], out var text) ? RefPattern().Match(text) : Match.Empty;
+            var target = match.Success && match.Groups["file"].Success ? match.Groups["file"].Value + ".schema.json" : file;
+            return match.Success && _definitions.TryGetValue(target, out var known) && known.TryGetPropertyValue(match.Groups["name"].Value, out var definition)
+                ? (target, match.Groups["name"].Value, definition)
+                : null;
+        }
+
+        // Closed Objects apart by a property one requires and the other lacks match no value in
+        // common; each member's type then names the others' properties as never, which is exact
+        // because the member is closed, so a literal holding both sides fails.
+        private List<Ts> Untagged(List<(JsonNode? Member, string At)> others, string file, List<string>? edges)
+        {
+            var types = new List<Ts>();
+            var shapes = new List<(string Key, string Name, JsonObject Properties, HashSet<string> Required)>();
+            foreach (var (member, memberAt) in others)
+            {
+                var (type, target, name) = Ref((JsonObject)member!, file, memberAt, edges);
+                var definition = (JsonObject)_definitions[target][name]!;
+                var required = new HashSet<string>(StringComparer.Ordinal);
+                if (definition["required"] is JsonArray list)
+                {
+                    required.UnionWith(list.Select(r => IsString(r, out var s) ? s : null).OfType<string>());
+                }
+
+                shapes.Add((Key(target, name), name, (JsonObject)definition["properties"]!, required));
+                types.Add(type);
+            }
+
+            for (var j = 1; j < shapes.Count; j++)
+            {
+                for (var i = 0; i < j; i++)
+                {
+                    var (a, b) = (shapes[i], shapes[j]);
+                    if (!a.Required.Any(p => !b.Properties.ContainsKey(p)) && !b.Required.Any(p => !a.Properties.ContainsKey(p)))
+                    {
+                        throw Fail(others[j].At, $"union members {a.Name} and {b.Name} are not told apart by a property required in one and absent from the other");
+                    }
+                }
+            }
+
+            foreach (var shape in shapes)
+            {
+                if (!_absent.TryGetValue(shape.Key, out var absent))
+                {
+                    _absent[shape.Key] = absent = new SortedSet<string>(StringComparer.Ordinal);
+                }
+
+                absent.UnionWith(shapes.SelectMany(s => s.Properties.Select(p => p.Key)).Where(p => !shape.Properties.ContainsKey(p)));
+            }
+
+            return types;
+        }
+
+        // A tagged union's members are told apart by one required string Const: type, or kind where
+        // every member is an Object holding the same type. Where type tells them apart, a member may
+        // itself be such a kind union, standing for the type its Objects share.
+        private List<Ts> Tagged(List<(JsonNode? Member, string At)> others, string file, List<string>? edges)
+        {
+            var types = new List<Ts>();
+            var tags = new List<(string Type, string? Kind, string Name, string At)>();
+            foreach (var (node, memberAt) in others)
+            {
+                if (node is not JsonObject member || !member.ContainsKey("$ref"))
                 {
                     throw Fail(memberAt, "a union member must be a $ref to an Object definition");
                 }
@@ -768,7 +974,26 @@ internal static partial class TypeEmitter
                 }
             }
 
-            return new UnionOf(types);
+            return types;
+        }
+
+        // Runs after every union is read, since a union may name an Object defined before it.
+        private void CloseUntaggedMembers()
+        {
+            foreach (var file in Files)
+            {
+                var index = 0;
+                foreach (var (name, _) in _definitions[file])
+                {
+                    if (_absent.TryGetValue(Key(file, name), out var absent) && absent.Count > 0)
+                    {
+                        var (alias, type) = _aliases[file][index];
+                        _aliases[file][index] = (alias, Closed(type, absent));
+                    }
+
+                    index++;
+                }
+            }
         }
 
         // The tags of one member: an Object's own, or for a kind union the type its Objects share.

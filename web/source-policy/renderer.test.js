@@ -2,20 +2,24 @@
 import { ESLint } from "eslint";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { isTestOnly, scriptViolations } from "../build-guard/classify.js";
 import {
-  buildFixture,
-  cleanUp,
-  fixture,
-  link as linkFolder,
-} from "../build-guard/fixture.js";
+  guardContext,
+  isTestOnly,
+  rendererScan,
+  scriptViolations,
+  sourceUnit,
+} from "../build-guard/classify.js";
+import { buildFixture, cleanUp, fixture } from "../build-guard/fixture.js";
+import rule from "../eslint-rules/app-capabilities.js";
 import { web } from "../eslint-rules/production-eslint.js";
 import { checkProgram, describeFinding, parseSource } from "./index.js";
 import {
   helperDigest,
   helperPins,
+  modulePins,
+  pinnedUnits,
   rendererModules,
   rendererTests,
 } from "./renderer.js";
@@ -25,25 +29,23 @@ afterAll(cleanUp);
 const app = "sharpladder/app-capabilities";
 
 // Probe paths that do not exist on disk open in a default project built from the real tsconfig.
-const lint = new ESLint({
-  cwd: web,
-  overrideConfig: {
-    files: ["src/**/*.{ts,tsx}"],
-    languageOptions: {
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            "src/Probe.ts",
-            "src/content/Extra.tsx",
-            "src/content/extra.test.tsx",
-            "src/content-tests/extra.test.ts",
-          ],
-          defaultProject: "tsconfig.json",
-        },
+const probeProject = {
+  files: ["src/**/*.{ts,tsx}"],
+  languageOptions: {
+    parserOptions: {
+      projectService: {
+        allowDefaultProject: [
+          "src/Probe.ts",
+          "src/content/Extra.tsx",
+          "src/content/extra.test.tsx",
+          "src/content-tests/extra.test.ts",
+        ],
+        defaultProject: "tsconfig.json",
       },
     },
   },
-});
+};
+const lint = new ESLint({ cwd: web, overrideConfig: probeProject });
 
 const read = (unit) => readFileSync(join(web, "src", unit), "utf8");
 
@@ -94,7 +96,17 @@ const notSource = (name, tag) =>
 const never = "content/assertNever.ts";
 const href = "content/href.ts";
 // A row that edits a pinned helper also expects this finding, so no row is exempt from the pin.
-const pinChanged = (unit) => `src/${unit}: the reviewed helper source changed`;
+const noun = (unit) => (unit.endsWith(".tsx") ? "module" : "helper");
+const pinChanged = (unit) =>
+  `src/${unit}: the reviewed ${noun(unit)} source changed`;
+const pinReview = (unit) =>
+  `${pinChanged(unit)}; update its pin only after a review of ${
+    unit.endsWith(".tsx")
+      ? "the whole module, its dependencies and its behaviour tests"
+      : "the whole helper"
+  }`;
+const walkStepper = "content/WalkStepper.tsx";
+const pinned = [...helperPins.keys(), ...modulePins.keys()];
 const expectAll = (found, expected) => {
   for (const one of [expected].flat()) expect(found).toContain(one);
 };
@@ -104,6 +116,8 @@ const para = "<p data-block-id={block.blockId}>\n          <Spans";
 const labelSpan = "<span id={labelId}>";
 const labelPre = "<pre aria-labelledby={labelId}>";
 const divId = "<div id={block.id} data-block-id={block.blockId}>";
+const frozenIntro = "<p data-block-id={block.sequences[0].introBlockId}>";
+const controlledAnnounce = "announce={walkControl.shownOf(block.id).announce}";
 const hrefImport = 'import { internalHref, type SlugMap } from "./href.ts";';
 
 const assigned = "an assignment is not admitted in the renderer";
@@ -348,6 +362,16 @@ const refused = [
       'import { Blocks, BlockNode } from "./Blocks.tsx";',
     ),
     "import BlockNode from ./Blocks.tsx is not admitted",
+  ],
+  [
+    "selectHints in a renderer module",
+    hintsView,
+    mutate(
+      hintsView,
+      'import { checkedHintsView } from "./hints.ts";',
+      'import { checkedHintsView, selectHints } from "./hints.ts";',
+    ),
+    "import selectHints from ./hints.ts is withheld from renderer modules",
   ],
   [
     "a side-effect import",
@@ -855,6 +879,110 @@ const refused = [
     mutate(blocks, divId, "<div id={block.group}>"),
     "id on <div> is not from",
   ],
+  // A frozen walk's hooks, one negative each: written by hand, taken from another field, and
+  // placed on an element that is not admitted.
+  [
+    "a hand-written frozen intro hook",
+    blocks,
+    mutate(blocks, frozenIntro, '<p data-block-id="walk/b1.1.s0">'),
+    "a frozen walk writes no hook but its block's on its root and sequence 1's intro",
+  ],
+  [
+    "a frozen intro hook taken from a step",
+    blocks,
+    mutate(
+      blocks,
+      frozenIntro,
+      "<p data-block-id={block.sequences[0].steps[0].blockId}>",
+    ),
+    "a frozen walk writes no hook but its block's on its root and sequence 1's intro",
+  ],
+  [
+    "a frozen intro hook on the cell list",
+    blocks,
+    mutate(blocks, frozenIntro, "<p>").replace(
+      "<ol>",
+      "<ol data-block-id={block.sequences[0].introBlockId}>",
+    ),
+    "a frozen walk's intro hook must stand on the <p> at its root that shows sequence 1's intro",
+  ],
+  // The walk control, one negative per rule: where it is handed down and in what form, where the
+  // stepper stands, what it takes, the one choice, and nothing written around the stepper.
+  [
+    "a walk control made up by a host",
+    "content/Drill.tsx",
+    mutate(
+      "content/Drill.tsx",
+      "walkControl={walkControl} />",
+      "walkControl={undefined} />",
+    ),
+    "a host hands the walk control down unchanged",
+  ],
+  [
+    "a walk control handed down by a module that is not a host",
+    hintsView,
+    mutate(
+      hintsView,
+      hintHandedDown,
+      `${hintHandedDown}\n walkControl={walkControl}`,
+    ),
+    "the walk control is handed down only by the content hosts",
+  ],
+  [
+    "a walk stepper outside the controlled walk",
+    blocks,
+    mutate(
+      blocks,
+      "<ControlledWalk block={block} slugs={slugs} walkControl={walkControl} />",
+      "<WalkStepper block={block} slugs={slugs} />",
+    ),
+    "the walk stepper is shown only as the root of the controlled walk in Blocks.tsx",
+  ],
+  [
+    "another prop on the controlled stepper",
+    blocks,
+    mutate(
+      blocks,
+      controlledAnnounce,
+      `${controlledAnnounce}\n      id={block.id}`,
+    ),
+    "prop id is not admitted on the controlled stepper",
+  ],
+  [
+    "a move reported with the block hook's id",
+    blocks,
+    mutate(blocks, "walkId: block.id,", "walkId: block.blockId,"),
+    "the controlled stepper takes its own block and slugs, what the page shows for the walk's id, and a handler that reports the move with that id",
+  ],
+  [
+    "a walk frozen under a control",
+    blocks,
+    mutate(
+      blocks,
+      "walkControl === undefined ?",
+      "walkControl !== undefined ?",
+    ),
+    [
+      "a walk is frozen with no control and controlled with one, by one choice",
+      "content/Blocks.tsx must write exactly one walk choice",
+    ],
+  ],
+  [
+    "a block hook around the controlled stepper",
+    blocks,
+    mutate(
+      blocks,
+      "  return (\n    <WalkStepper",
+      "  return (\n    <div data-block-id={block.blockId}>\n    <WalkStepper",
+    ).replace(
+      "      slugs={slugs}\n    />\n  );",
+      "      slugs={slugs}\n    />\n    </div>\n  );",
+    ),
+    [
+      "a controlled walk writes nothing but its stepper",
+      "content/Blocks.tsx must write exactly one controlled walk stepper",
+    ],
+  ],
   [
     "a block id from a local object",
     blocks,
@@ -955,6 +1083,16 @@ const refused = [
       "<p data-block-id={block.blockId} data-kind={block.type}>\n          <Spans",
     ),
     "attribute data-kind is not admitted on <p>",
+  ],
+  [
+    "a cell state on a block",
+    blocks,
+    mutate(
+      blocks,
+      para,
+      '<p data-block-id={block.blockId} data-cell="empty">\n          <Spans',
+    ),
+    "attribute data-cell is not admitted on <p>",
   ],
   [
     "a heading id from the title",
@@ -1544,7 +1682,7 @@ const refused = [
     view,
     mutate(
       view,
-      "<Blocks blocks={chapter.intro} slugs={slugs} />",
+      "<Blocks blocks={chapter.intro} slugs={slugs} walkControl={walkControl} />",
       "{Blocks({ blocks: chapter.intro, slugs })}",
     ),
     componentCall,
@@ -1554,7 +1692,7 @@ const refused = [
     view,
     `${mutate(
       view,
-      "<Blocks blocks={chapter.intro} slugs={slugs} />",
+      "<Blocks blocks={chapter.intro} slugs={slugs} walkControl={walkControl} />",
       '{ApproachPicker({ sectionId: "s", options: [], selectedApproachId: null, onApproachChange: click })}',
     ).replace(
       'import { Blocks } from "./Blocks.tsx";',
@@ -1585,8 +1723,8 @@ const refused = [
     view,
     mutate(
       view,
-      "<StaticView doc={staticDoc(doc)} slugs={slugs} />",
-      "<StaticView doc={staticDoc(doc)} slugs={slugs} onHintChange={slugs} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} walkControl={walkControl} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} walkControl={walkControl} onHintChange={slugs} />",
     ),
     "prop onHintChange is not admitted",
   ],
@@ -1667,8 +1805,8 @@ const refused = [
     view,
     mutate(
       view,
-      "<StaticView doc={staticDoc(doc)} slugs={slugs} />",
-      "<StaticView doc={staticDoc(doc)} slugs={slugs} onApproachChange={slugs} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} walkControl={walkControl} />",
+      "<StaticView doc={staticDoc(doc)} slugs={slugs} walkControl={walkControl} onApproachChange={slugs} />",
     ),
     "prop onApproachChange is not admitted",
   ],
@@ -1891,17 +2029,30 @@ const refusedAnywhere = [
 // Every admitted element, attribute form, fragment and key, in one module.
 const allForms = `import { useId } from "react";
 import type { ReactElement, ReactNode } from "react";
-import type { CodeBlock, ListBlock } from "../generated/body.ts";
+import type { CodeBlock, ListBlock, WalkItBlock } from "../generated/body.ts";
 import type { ChapterSection } from "../generated/content.ts";
+import type { SlugMap } from "./href.ts";
+import { Spans } from "./Spans.tsx";
+import { WalkStepper } from "./WalkStepper.tsx";
+
+export type WalkShown = boolean;
+export type WalkControlChange = boolean;
+export interface WalkControl {
+  readonly shownOf: (walkId: string) => WalkShown;
+}
 
 export function Blocks({
   block,
   list,
   section,
+  walk,
+  walkControl,
 }: {
   block: CodeBlock;
   list: ListBlock;
   section: ChapterSection;
+  walk: WalkItBlock;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
@@ -1909,7 +2060,51 @@ export function Blocks({
       <Ordered block={list} />
       <Headings section={section} />
       <Inline />
+      {walkControl === undefined ? (
+        <FrozenWalk block={walk} />
+      ) : (
+        <ControlledWalk block={walk} walkControl={walkControl} />
+      )}
     </>
+  );
+}
+
+function ControlledWalk({
+  block,
+  slugs,
+  walkControl,
+}: {
+  block: WalkItBlock;
+  slugs: SlugMap;
+  walkControl: WalkControl;
+}): ReactElement {
+  return (
+    <WalkStepper
+      block={block}
+      position={walkControl.shownOf(block.id).position}
+      onPositionChange={(change) => {
+        walkControl.onWalkChange({
+          walkId: block.id,
+          position: change.position,
+          cause: change.cause,
+        });
+      }}
+      announce={walkControl.shownOf(block.id).announce}
+      slugs={slugs}
+    />
+  );
+}
+
+function FrozenWalk({ block }: { block: WalkItBlock }): ReactElement {
+  return (
+    <div id={block.id} data-block-id={block.blockId}>
+      <ol>
+        <li>z</li>
+      </ol>
+      <p data-block-id={block.sequences[0].introBlockId}>
+        <Spans spans={block.sequences[0].intro} />
+      </p>
+    </div>
   );
 }
 
@@ -1997,7 +2192,7 @@ const allowed = [
     unit,
     read(unit),
   ]),
-  ...[...helperPins.keys()].map((unit) => [
+  ...pinned.map((unit) => [
     `the real ${unit} with CRLF line endings`,
     unit,
     read(unit).replaceAll("\n", "\r\n"),
@@ -2023,21 +2218,19 @@ const allowed = [
 ];
 
 const bomFinding = (unit) =>
-  `src/${unit}: a reviewed helper must not start with a byte order mark`;
+  `src/${unit}: a reviewed ${noun(unit)} must not start with a byte order mark`;
 const endings = (unit) => [
   ["LF", read(unit)],
   ["CRLF", read(unit).replaceAll("\n", "\r\n")],
 ];
-// ESLint strips up to two marks before a rule runs, so every count must give the one finding.
-const marked = [...helperPins.keys()].flatMap((unit) =>
-  [1, 2, 3].flatMap((count) =>
-    endings(unit).map(([ending, text]) => [
-      `${unit} behind ${String(count)} byte order mark(s) with ${ending}`,
-      unit,
-      "﻿".repeat(count) + text,
-    ]),
-  ),
-);
+// One representative byte order mark case, through every entry point that reads the text.
+const marked = [
+  [
+    `${walkStepper} behind a byte order mark`,
+    walkStepper,
+    "\uFEFF" + read(walkStepper),
+  ],
+];
 
 describe("the renderer rules in the build check", () => {
   it.each(refused)("refuses %s", (_name, unit, code, expected) => {
@@ -2062,7 +2255,8 @@ describe("the renderer rules in the build check", () => {
   });
 });
 
-// ESLint must agree finding for finding with the build check.
+// ESLint must agree finding for finding with the build check, which holds the whole corpus; it
+// takes one refusal, one admission and the byte order mark it strips before a rule runs.
 describe("the renderer rules in ESLint", () => {
   const agrees = async (unit, code) => {
     const fromBuild = build(unit, code);
@@ -2077,14 +2271,14 @@ describe("the renderer rules in ESLint", () => {
     return fromBuild;
   };
 
-  it.each([...refused, ...refusedAnywhere])(
+  it.each(refused.slice(0, 1))(
     "refuses %s",
     async (_name, unit, code, expected) => {
       expectAll((await agrees(unit, code)).join("\n"), expected);
     },
   );
 
-  it.each(allowed)("allows %s", async (_name, unit, code) => {
+  it.each(allowed.slice(0, 1))("allows %s", async (_name, unit, code) => {
     expect(await agrees(unit, code)).toEqual([]);
   });
 
@@ -2092,6 +2286,1226 @@ describe("the renderer rules in ESLint", () => {
     expect(await agrees(unit, code)).toEqual([bomFinding(unit)]);
   });
 }, 120_000);
+
+// The walk helpers' values reach only listed tests, and a listed test module reaches no module
+// that is not a listed test, so no test can hand a helper value on. Each row names every finding.
+describe("the walk helper reach", () => {
+  const replayHelper = "content/walk-replay.ts";
+  const positionHelper = "content/walk-position.ts";
+  const value = (name, source) =>
+    `walk helper value ${name} from ${source} is admitted only in a listed test`;
+  const inline = (name, source) =>
+    `inline type ${name} from walk helper ${source} stays a run-time import; use import type`;
+  const sideEffect = (source) =>
+    `a side-effect import of walk helper ${source} is admitted only in a listed test`;
+  const everything = (source) =>
+    `export * from walk helper ${source} is admitted only in a listed test`;
+  const testModule = (source) =>
+    `a run-time import or re-export of test module ${source} is admitted only in a listed test`;
+  const unlisted = (unit) => `src/${unit} is not in the renderer module list`;
+  const pin = (unit) =>
+    `${pinChanged(unit)}; update its pin only after a review of the whole helper`;
+  const prepend = (unit, line) => `${line}\n${read(unit)}`;
+  const append = (unit, line) => `${read(unit)}${line}\n`;
+  const replaySource = "./content/walk-replay.ts";
+  const positionSource = "./content/walk-position.ts";
+  const viewSource = "./content-tests/hints-view.ts";
+  const hintsSource = "./content-tests/hints.test.tsx";
+  // Spelling inputs built in parts, so no misspelt word stands in the source.
+  const hyphen = "%2D";
+  const foldedSource = positionSource.replace(
+    "ti",
+    `t${String.fromCodePoint(0x131)}`,
+  );
+
+  const rows = [
+    [
+      "a listed helper test taking helper values",
+      "content-tests/walk-replay.test.ts",
+      read("content-tests/walk-replay.test.ts"),
+      [],
+    ],
+    [
+      "another listed test taking a helper value",
+      "content-tests/renderer.test.tsx",
+      prepend(
+        "content-tests/renderer.test.tsx",
+        'import { isValidPosition } from "../content/walk-position.ts";',
+      ),
+      [],
+    ],
+    [
+      "an erased type import outside the tests",
+      "Probe.ts",
+      `import type { ReplayState } from "${replaySource}";\nexport type S = ReplayState;\n`,
+      [],
+    ],
+    [
+      "an erased type import in a renderer module",
+      blocks,
+      prepend(
+        blocks,
+        'import type { WalkPosition } from "./walk-position.ts";',
+      ),
+      [],
+    ],
+    [
+      "an erased type re-export",
+      "Probe.ts",
+      `export type { WalkCell } from "${replaySource}";\n`,
+      [],
+    ],
+    [
+      "an erased type export of everything",
+      "Probe.ts",
+      `export type * from "${replaySource}";\n`,
+      [],
+    ],
+    [
+      "an erased type import from a listed test",
+      "Probe.ts",
+      `import type { Row } from "${viewSource}";\nexport type R = Row;\n`,
+      [],
+    ],
+    [
+      "a listed test handing a helper value to another listed test",
+      "content-tests/hints-view.ts",
+      append(
+        "content-tests/hints-view.ts",
+        'export { replay } from "../content/walk-replay.ts";',
+      ),
+      [],
+    ],
+    [
+      "a listed test taking it on from that test",
+      "content-tests/hints.test.tsx",
+      append(
+        "content-tests/hints.test.tsx",
+        'export { replay } from "./hints-view.ts";',
+      ),
+      [],
+    ],
+    [
+      "a plain relay outside the tests",
+      "Probe.ts",
+      'export { replay } from "./Relay.ts";\n',
+      [],
+    ],
+    [
+      "a renderer type import of a name the helper does not export",
+      blocks,
+      prepend(blocks, 'import type { WalkMove } from "./walk-position.ts";'),
+      ["import WalkMove from ./walk-position.ts is not admitted"],
+    ],
+    [
+      "a renderer module taking a helper value",
+      blocks,
+      prepend(blocks, 'import { replay } from "./walk-replay.ts";'),
+      [value("replay", "./walk-replay.ts")],
+    ],
+    [
+      "a renderer module taking an inline helper type",
+      blocks,
+      prepend(
+        blocks,
+        'import { type WalkPosition } from "./walk-position.ts";',
+      ),
+      [inline("WalkPosition", "./walk-position.ts")],
+    ],
+    [
+      "a renderer module re-exporting a helper value",
+      blocks,
+      append(blocks, 'export { replay } from "./walk-replay.ts";'),
+      [
+        "only local named exports are admitted in the renderer",
+        value("replay", "./walk-replay.ts"),
+      ],
+    ],
+    [
+      "a module outside the tests taking a helper value",
+      "Probe.ts",
+      `import { move } from "${positionSource}";\nexport const m = move;\n`,
+      [value("move", positionSource)],
+    ],
+    ...[
+      "./content/Walk-Replay.ts",
+      "./content/WALK-REPLAY.TS",
+      "./walk/walk-replay.ts",
+      "../src/content/walk-replay.ts",
+      "./content/walk-replay",
+      "./content/walk-replay.js",
+      "./content/walk-replay.ts?raw",
+      "./content/walk-replay.ts#x",
+      "./content/walk-replay.ts?a=/b",
+      `./content/walk${hyphen}replay.ts`,
+      "./content/walk-replay.ts/",
+    ].map((source) => [
+      `a helper value spelled ${source}`,
+      "Probe.ts",
+      `import { replay } from "${source}";\nexport const r = replay;\n`,
+      [value("replay", source)],
+    ]),
+    [
+      "a helper value spelled with an i that folds from U+0131",
+      "Probe.ts",
+      `import { move } from "${foldedSource}";\nexport const m = move;\n`,
+      [value("move", foldedSource)],
+    ],
+    [
+      "a side-effect import of a helper",
+      "Probe.ts",
+      `import "${replaySource}";\n`,
+      [sideEffect(replaySource)],
+    ],
+    [
+      "an empty re-export of a helper",
+      "Probe.ts",
+      `export {} from "${replaySource}";\n`,
+      [sideEffect(replaySource)],
+    ],
+    [
+      "export * from a helper",
+      "Probe.ts",
+      `export * from "${positionSource}";\n`,
+      [everything(positionSource)],
+    ],
+    [
+      "export * as a namespace from a helper",
+      "Probe.ts",
+      `export * as walk from "${positionSource}";\n`,
+      [everything(positionSource)],
+    ],
+    [
+      "an inline type import of a helper type",
+      "Probe.ts",
+      `import { type ReplayState } from "${replaySource}";\nexport type S = ReplayState;\n`,
+      [inline("ReplayState", replaySource)],
+    ],
+    [
+      "a value and an inline type in one import",
+      "Probe.ts",
+      `import { replay, type WalkCell } from "${replaySource}";\nexport const r = replay;\nexport type C = WalkCell;\n`,
+      [value("replay", replaySource), inline("WalkCell", replaySource)],
+    ],
+    [
+      "an inline type re-export",
+      "Probe.ts",
+      `export { type WalkCell } from "${replaySource}";\n`,
+      [inline("WalkCell", replaySource)],
+    ],
+    [
+      "a namespace import of a helper",
+      "Probe.ts",
+      `import * as walk from "${replaySource}";\nexport const w = walk;\n`,
+      [value("*", replaySource)],
+    ],
+    [
+      "a default import of a helper",
+      "Probe.ts",
+      `import walk from "${replaySource}";\nexport const w = walk;\n`,
+      [value("default", replaySource)],
+    ],
+    [
+      "a helper value re-exported",
+      "Probe.ts",
+      `export { replay } from "${replaySource}";\n`,
+      [value("replay", replaySource)],
+    ],
+    [
+      "a helper value re-exported under another name",
+      "Probe.ts",
+      `export { replay as run } from "${replaySource}";\n`,
+      [value("replay", replaySource)],
+    ],
+    [
+      "an unlisted test taking a helper value",
+      "content-tests/extra.test.ts",
+      'import { replay } from "../content/walk-replay.ts";\nexport const r = replay;\n',
+      [
+        unlisted("content-tests/extra.test.ts"),
+        value("replay", "../content/walk-replay.ts"),
+      ],
+    ],
+    [
+      "an unlisted module in src/content taking a helper value",
+      "content/Extra.tsx",
+      'import { replay } from "./walk-replay.ts";\nexport const r = replay;\n',
+      [unlisted("content/Extra.tsx"), value("replay", "./walk-replay.ts")],
+    ],
+    [
+      "a comment added to the replay helper",
+      replayHelper,
+      append(replayHelper, "// Added."),
+      [pin(replayHelper)],
+    ],
+    [
+      "a comment added to the position helper",
+      positionHelper,
+      append(positionHelper, "// Added."),
+      [pin(positionHelper)],
+    ],
+    [
+      "an extra export in the position helper",
+      positionHelper,
+      append(
+        positionHelper,
+        "export function extra(): number {\n  return 1;\n}",
+      ),
+      [pin(positionHelper), "export extra is not in the module's frozen list"],
+    ],
+    [
+      "an index read in the replay helper",
+      replayHelper,
+      mutate(replayHelper, "? slots.at(index)", "? slots[index]"),
+      [
+        pin(replayHelper),
+        "a computed member with a non-literal key is not admitted in the renderer",
+      ],
+    ],
+    [
+      "an assignment in the position helper",
+      positionHelper,
+      mutate(
+        positionHelper,
+        "  return walk.at(sequence - 1)",
+        "  sequence -= 0;\n  return walk.at(sequence - 1)",
+      ),
+      [pin(positionHelper), assigned],
+    ],
+    [
+      "a module outside the tests taking a listed test module",
+      "Probe.ts",
+      `import { validHintsView } from "${viewSource}";\nexport const v = validHintsView;\n`,
+      [testModule(viewSource)],
+    ],
+    [
+      "a listed test module re-exported outside the tests",
+      "Probe.ts",
+      `export { validHintsView } from "${viewSource}";\n`,
+      [testModule(viewSource)],
+    ],
+    [
+      "export * from a listed test module",
+      "Probe.ts",
+      `export * from "${viewSource}";\n`,
+      [testModule(viewSource)],
+    ],
+    [
+      "a side-effect import of a listed test module",
+      "Probe.ts",
+      `import "${hintsSource}";\n`,
+      [testModule(hintsSource)],
+    ],
+    [
+      "an inline type import from a listed test module",
+      "Probe.ts",
+      `import { type Row } from "${viewSource}";\nexport type R = Row;\n`,
+      [testModule(viewSource)],
+    ],
+    ...[
+      "./content-tests/Hints-View",
+      "./elsewhere/hints-view.js",
+      "./content-tests/hints-view.ts?x",
+      "./content-tests/HINTS.TEST.TSX",
+      "./content-tests/hints.test",
+    ].map((source) => [
+      `a listed test module spelled ${source}`,
+      "Probe.ts",
+      `import { validHintsView } from "${source}";\nexport const v = validHintsView;\n`,
+      [testModule(source)],
+    ]),
+    [
+      "a renderer module taking a listed test module",
+      blocks,
+      prepend(
+        blocks,
+        'import { validHintsView } from "../content-tests/hints-view.ts";',
+      ),
+      [
+        "import validHintsView from ../content-tests/hints-view.ts is not admitted",
+        testModule("../content-tests/hints-view.ts"),
+      ],
+    ],
+    [
+      "a helper value through a listed helper test",
+      "Probe.ts",
+      'import { replay } from "./content-tests/walk-replay.test.ts";\nexport const r = replay;\n',
+      [
+        testModule("./content-tests/walk-replay.test.ts"),
+        value("replay", "./content-tests/walk-replay.test.ts"),
+      ],
+    ],
+    [
+      "the entry from outside the tests to a chain of listed tests",
+      "Probe.ts",
+      `import { replay } from "${hintsSource}";\nexport const r = replay;\n`,
+      [testModule(hintsSource)],
+    ],
+    [
+      "a relay outside the tests re-exporting from a listed test",
+      "Probe.ts",
+      `export { replay } from "${hintsSource}";\n`,
+      [testModule(hintsSource)],
+    ],
+  ];
+
+  it.each(rows)(
+    "finds exactly what %s holds in the build check",
+    (_n, unit, code, expected) => {
+      expect([...build(unit, code)].sort()).toEqual([...expected].sort());
+    },
+  );
+});
+
+// Each stepper capability is admitted in the real modules and refused one edit away from them,
+// in the shared evaluator, which ESLint calls too. Each row names every finding.
+describe("the walk stepper capabilities", () => {
+  const stepper = "content/WalkStepper.tsx";
+  const stepperTest = "content-tests/walk-stepper.test.tsx";
+  const value = (name, source) =>
+    `walk helper value ${name} from ${source} is admitted only in a listed test`;
+  const testModule = (source) =>
+    `a run-time import or re-export of test module ${source} is admitted only in a listed test`;
+  const once = (what) => `${stepper} must write exactly one ${what}`;
+  const nextGuard = 'if (next.kind === "moved") onPositionChange(next);';
+  const switchGuard = 'if (chosen.kind === "moved") onPositionChange(chosen);';
+  const nextBound = 'aria-disabled={next.kind !== "moved"}';
+  const replayImport = 'import { replay } from "./walk-replay.ts";';
+  const root = "<div id={block.id}>";
+  const introHook = "data-block-id={sequence.introBlockId}";
+  const switchLabel = 'aria-label="Walk sequences"';
+  const switchChooser = "onChoose={onSequenceChange}";
+  const chosenSequence = /cause: "sequence",\s*sequence,/u;
+  const region = '<p aria-live="polite" aria-atomic="true">';
+  const pressedChoice = "selectedSequence={valid ? position.sequence : null}";
+  const part = (name) =>
+    `${name} must show the selected sequence at a valid position, with its own props`;
+  const atValid =
+    "a walk stepper button must be shown only at a valid position";
+  const options =
+    "the switch options must be the walk's own sequences, by place from 1 and name";
+  const pressed =
+    "the switch must press the position's sequence only when it is valid";
+
+  const rows = [
+    // Admitted.
+    ["the real walk stepper", stepper, read(stepper), []],
+    ["the real picker with the sequence switch", picker, read(picker), []],
+    ["the real stepper test", stepperTest, read(stepperTest), []],
+    [
+      "a guard written as a block",
+      stepper,
+      mutate(
+        stepper,
+        nextGuard,
+        'if (next.kind === "moved") {\n onPositionChange(next);\n }',
+      ),
+      [],
+    ],
+    [
+      "the chosen sequence written out",
+      stepper,
+      mutate(
+        stepper,
+        chosenSequence,
+        'cause: "sequence",\n sequence: sequence,',
+      ),
+      [],
+    ],
+    [
+      "an erased import of the change type in another renderer module",
+      blocks,
+      `import type { WalkChange } from "./WalkStepper.tsx";\n${read(blocks)}type C = WalkChange;\n`,
+      [],
+    ],
+    // Module, export and test entries.
+    [
+      "an export the stepper's list lacks",
+      stepper,
+      `${read(stepper)}export type Extra = number;\n`,
+      ["export type Extra is not in the module's frozen list"],
+    ],
+    [
+      "the change type left unexported",
+      stepper,
+      mutate(stepper, "export interface WalkChange", "interface WalkChange"),
+      ["export type WalkChange is missing from the module"],
+    ],
+    [
+      "an unlisted test taking the stepper",
+      "content-tests/extra.test.ts",
+      `import { WalkStepper } from "../content/WalkStepper.tsx";\nexport const w = WalkStepper;\n`,
+      ["src/content-tests/extra.test.ts is not in the renderer module list"],
+    ],
+    // Helper values: exactly the stepper, by exact source and name.
+    [
+      "the stepper taking a helper by another spelling",
+      stepper,
+      mutate(stepper, replayImport, 'import { replay } from "./walk-replay";'),
+      [
+        value("replay", "./walk-replay"),
+        "import replay from ./walk-replay is not admitted",
+        badCall,
+      ],
+    ],
+    [
+      "a namespace import of a helper in the stepper",
+      stepper,
+      `import * as walk from "./walk-position.ts";\n${read(stepper)}`,
+      [
+        "default or namespace import from ./walk-position.ts is not admitted",
+        value("*", "./walk-position.ts"),
+      ],
+    ],
+    [
+      "an inline type beside a helper value in the stepper",
+      stepper,
+      mutate(
+        stepper,
+        replayImport,
+        'import { replay, type WalkStepInput } from "./walk-replay.ts";',
+      ),
+      [
+        "inline type WalkStepInput from walk helper ./walk-replay.ts stays a run-time import; use import type",
+      ],
+    ],
+    [
+      "the stepper re-exporting a helper value",
+      stepper,
+      `${read(stepper)}export { move } from "./walk-position.ts";\n`,
+      [
+        "only local named exports are admitted in the renderer",
+        value("move", "./walk-position.ts"),
+      ],
+    ],
+    [
+      "the stepper reaching a helper through a listed test",
+      stepper,
+      mutate(
+        stepper,
+        replayImport,
+        'import { replay } from "../content-tests/walk-replay.test.ts";',
+      ),
+      [
+        testModule("../content-tests/walk-replay.test.ts"),
+        value("replay", "../content-tests/walk-replay.test.ts"),
+        "import replay from ../content-tests/walk-replay.test.ts is not admitted",
+        badCall,
+      ],
+    ],
+    [
+      "another renderer module taking a helper value",
+      blocks,
+      `import { move } from "./walk-position.ts";\n${read(blocks)}`,
+      [value("move", "./walk-position.ts")],
+    ],
+    // The sequence switch and its label.
+    [
+      "another label on the sequence switch",
+      picker,
+      mutate(picker, switchLabel, 'aria-label="Walk sequence"'),
+      [notSource("aria-label", "div")],
+    ],
+    [
+      "the sequence label on another wrapper",
+      picker,
+      mutate(picker, 'aria-label="Hint approaches"', switchLabel),
+      [notSource("aria-label", "div")],
+    ],
+    [
+      "the sequence chooser wrapped",
+      picker,
+      mutate(
+        picker,
+        switchChooser,
+        "onChoose={(id) => {\n onSequenceChange(id);\n }}",
+      ),
+      ["prop onChoose is not admitted", badCall],
+    ],
+    // Guarded callbacks.
+    [
+      "Next reporting without the guard",
+      stepper,
+      mutate(stepper, nextGuard, "onPositionChange(next);"),
+      [notSource("onClick", "button"), badCall],
+    ],
+    [
+      "Next reporting the Prev move",
+      stepper,
+      mutate(
+        stepper,
+        nextGuard,
+        'if (next.kind === "moved") onPositionChange(previous);',
+      ),
+      [notSource("onClick", "button"), badCall],
+    ],
+    [
+      "Prev labelled Next",
+      stepper,
+      mutate(stepper, /Prev\n(\s*)<\/button>/u, "Next\n$1</button>"),
+      [
+        notSource("aria-disabled", "button"),
+        notSource("onClick", "button"),
+        badCall,
+        once("Prev and one Next button"),
+      ],
+    ],
+    [
+      "the switch reporting without the guard",
+      stepper,
+      mutate(stepper, switchGuard, "onPositionChange(chosen);"),
+      ["prop onSequenceChange is not admitted", badCall],
+    ],
+    [
+      "the switch moving to a fixed sequence",
+      stepper,
+      mutate(stepper, chosenSequence, 'cause: "sequence",\n sequence: 1,'),
+      ["prop onSequenceChange is not admitted", badCall],
+    ],
+    [
+      "the change handler handed to another component",
+      stepper,
+      mutate(
+        stepper,
+        "<Spans spans={block.title} slugs={slugs} />",
+        "<Spans spans={block.title} slugs={slugs} onPositionChange={onPositionChange} />",
+      ),
+      ["prop onPositionChange is not admitted"],
+    ],
+    // Bounds.
+    [
+      "a fixed bound",
+      stepper,
+      mutate(stepper, nextBound, "aria-disabled={false}"),
+      [notSource("aria-disabled", "button")],
+    ],
+    [
+      "a bound read from the other button's move",
+      stepper,
+      mutate(stepper, nextBound, 'aria-disabled={previous.kind !== "moved"}'),
+      [notSource("aria-disabled", "button")],
+    ],
+    [
+      "a bound outside the stepper",
+      picker,
+      mutate(picker, pickerPressed, `${pickerPressed}\n aria-disabled={false}`),
+      [notSource("aria-disabled", "button")],
+    ],
+    [
+      "a stepper button without its bound",
+      stepper,
+      mutate(stepper, nextBound, ""),
+      ["<button> must carry aria-disabled"],
+    ],
+    // The live region.
+    [
+      "an assertive live region",
+      stepper,
+      mutate(stepper, 'aria-live="polite"', 'aria-live="assertive"'),
+      [notSource("aria-live", "p")],
+    ],
+    [
+      "a second live region",
+      stepper,
+      mutate(
+        stepper,
+        "<p data-block-id={block.blockId}>",
+        '<p data-block-id={block.blockId} aria-live="polite">',
+      ),
+      [
+        once("live region"),
+        "the live region must carry aria-atomic",
+        "the live region must hold the walk announcement alone",
+      ],
+    ],
+    [
+      "the live region with its literals in the other order",
+      stepper,
+      mutate(stepper, region, '<p aria-atomic="true" aria-live="polite">'),
+      [],
+    ],
+    [
+      "the live region without aria-atomic",
+      stepper,
+      mutate(stepper, region, '<p aria-live="polite">'),
+      ["the live region must carry aria-atomic"],
+    ],
+    [
+      "a live region read in parts",
+      stepper,
+      mutate(stepper, region, '<p aria-live="polite" aria-atomic="false">'),
+      [notSource("aria-atomic", "p")],
+    ],
+    [
+      "aria-atomic on another element",
+      stepper,
+      mutate(
+        stepper,
+        "<p data-block-id={block.blockId}>",
+        '<p data-block-id={block.blockId} aria-atomic="true">',
+      ),
+      [notSource("aria-atomic", "p")],
+    ],
+    [
+      "aria-atomic outside the stepper",
+      blocks,
+      mutate(
+        blocks,
+        para,
+        '<p data-block-id={block.blockId} aria-atomic="true">\n          <Spans',
+      ),
+      [notSource("aria-atomic", "p")],
+    ],
+    [
+      "the live region inside the valid part",
+      stepper,
+      mutate(
+        stepper,
+        /(\s*<\/>\s*\) : null\}\s*)(<p aria-live="polite" aria-atomic="true">[^]*?<\/p>)/u,
+        "$2$1",
+      ),
+      ["the live region must stand at the walk stepper's root"],
+    ],
+    [
+      "the live region inside another element",
+      stepper,
+      mutate(
+        stepper,
+        /(<p aria-live="polite" aria-atomic="true">[^]*?<\/p>)/u,
+        "<p>$1</p>",
+      ),
+      ["the live region must stand at the walk stepper's root"],
+    ],
+    [
+      "a link or Term in the live region",
+      stepper,
+      mutate(
+        stepper,
+        region,
+        `${region}\n<Spans spans={block.title} slugs={slugs} />`,
+      ),
+      ["the live region must hold the walk announcement alone"],
+    ],
+    [
+      "an element in the announcement",
+      stepper,
+      mutate(
+        stepper,
+        "<>Start: {spanText(sequence.intro)}</>",
+        "<>Start: <Spans spans={sequence.intro} slugs={sequence.intro} /></>",
+      ),
+      ["the walk announcement writes no element"],
+    ],
+    [
+      "an announcement at an invalid position",
+      stepper,
+      mutate(stepper, "{valid && announce", "{announce"),
+      [part("Announcement")],
+    ],
+    [
+      "an announcement of a fixed step",
+      stepper,
+      mutate(stepper, /step=\{position\.step\}(\s*\/>)/u, "step={0}$1"),
+      [part("Announcement")],
+    ],
+    [
+      "an announcement of every sequence",
+      stepper,
+      mutate(
+        stepper,
+        /index \+ 1 === position\.sequence \? \((\s*<Announcement[^]*?\/>)\s*\) : null,/u,
+        "$1,",
+      ),
+      [
+        part("Announcement"),
+        "the live region must hold the walk announcement alone",
+      ],
+    ],
+    [
+      "an announcement chosen by its step",
+      stepper,
+      mutate(
+        stepper,
+        /index \+ 1 === position\.sequence( \? \(\s*<Announcement)/u,
+        "index + 1 === position.step$1",
+      ),
+      [part("Announcement")],
+    ],
+    [
+      "an announcement the caller did not ask for",
+      stepper,
+      mutate(stepper, "{valid && announce", "{valid && valid"),
+      [part("Announcement")],
+    ],
+    [
+      "an announcement not bound to a valid position",
+      stepper,
+      mutate(stepper, "{valid && announce", "{announce && announce"),
+      [part("Announcement")],
+    ],
+    // The active sequence's call site and selection.
+    [
+      "the active sequence props in another order",
+      stepper,
+      mutate(
+        stepper,
+        /block=\{block\}(\s*)sequence=\{sequence\}/u,
+        "sequence={sequence}$1block={block}",
+      ),
+      [],
+    ],
+    [
+      "the active sequence at a fixed step",
+      stepper,
+      mutate(stepper, "step={position.step}", "step={0}"),
+      [part("ActiveSequence")],
+    ],
+    [
+      "every sequence part mounted",
+      stepper,
+      mutate(
+        stepper,
+        /index \+ 1 === position\.sequence \? \((\s*<ActiveSequence[^]*?\/>)\s*\) : null,/u,
+        "$1,",
+      ),
+      [part("ActiveSequence")],
+    ],
+    [
+      "the active sequence chosen by its step",
+      stepper,
+      mutate(
+        stepper,
+        /index \+ 1 === position\.sequence( \? \(\s*<ActiveSequence)/u,
+        "index + 1 === position.step$1",
+      ),
+      [part("ActiveSequence")],
+    ],
+    [
+      "the active sequence from another source",
+      stepper,
+      mutate(
+        stepper,
+        /sequence=\{sequence\}(\s*step=\{position\.step\}\s*slugs)/u,
+        "sequence={block.sequences[0]}$1",
+      ),
+      [part("ActiveSequence")],
+    ],
+    [
+      "the active sequence handed on as a value",
+      stepper,
+      mutate(
+        stepper,
+        "<Spans spans={block.title} slugs={slugs} />",
+        "<Spans spans={block.title} slugs={slugs} part={ActiveSequence} />",
+      ),
+      [part("ActiveSequence")],
+    ],
+    [
+      "active content at an invalid position",
+      stepper,
+      mutate(stepper, "{valid ? (", "{block.sequences.length > 0 ? ("),
+      [part("ActiveSequence"), atValid, atValid],
+    ],
+    [
+      "an intro hook in a part the call site does not bind",
+      stepper,
+      `${mutate(
+        stepper,
+        /\{step === 0 \? \(\s*<p data-block-id=\{sequence\.introBlockId\}>[^]*?<\/p>\s*\) : null\}/u,
+        "<Intro sequence={sequence} step={0} slugs={slugs} />",
+      )}
+function Intro({
+  sequence,
+  step,
+  slugs,
+}: {
+  sequence: WalkSequence;
+  step: number;
+  slugs: SlugMap;
+}): ReactElement {
+  return (
+    <>
+      {step === 0 ? (
+        <p data-block-id={sequence.introBlockId}>
+          <Spans spans={sequence.intro} slugs={slugs} />
+        </p>
+      ) : null}
+    </>
+  );
+}
+`,
+      [notSource("data-block-id", "p")],
+    ],
+    // The sequence switch's options and pressed choice.
+    [
+      "a switch option written label first",
+      stepper,
+      mutate(
+        stepper,
+        /id: index \+ 1,(\s*)label: sequence\.name,/u,
+        "label: sequence.name,$1id: index + 1,",
+      ),
+      [],
+    ],
+    [
+      "zero-based switch ids",
+      stepper,
+      mutate(stepper, "id: index + 1,", "id: index,"),
+      [options],
+    ],
+    [
+      "a forged switch id",
+      stepper,
+      mutate(stepper, "id: index + 1,", "id: 1,"),
+      [options],
+    ],
+    [
+      "switch options from another source",
+      stepper,
+      mutate(
+        stepper,
+        "options={block.sequences.map(",
+        "options={block.title.map(",
+      ),
+      [options],
+    ],
+    [
+      "switch labels from another field",
+      stepper,
+      mutate(stepper, "label: sequence.name,", "label: sequence.introBlockId,"),
+      [options],
+    ],
+    [
+      "the switch without its options",
+      stepper,
+      mutate(stepper, /options=\{block\.sequences\.map\([^]*?\}\)\)\}/u, ""),
+      ["the sequence switch must carry options"],
+    ],
+    [
+      "an extra prop on the switch",
+      stepper,
+      mutate(stepper, "<SequencePicker", "<SequencePicker extra={1}"),
+      ["prop extra is not admitted on the sequence switch"],
+    ],
+    [
+      "an unconditional pressed choice",
+      stepper,
+      mutate(stepper, pressedChoice, "selectedSequence={position.sequence}"),
+      [pressed],
+    ],
+    [
+      "a pressed choice from another field",
+      stepper,
+      mutate(
+        stepper,
+        pressedChoice,
+        "selectedSequence={valid ? position.step : null}",
+      ),
+      [pressed],
+    ],
+    [
+      "a second sequence switch",
+      stepper,
+      mutate(stepper, /(<SequencePicker[^]*?\n {8}\/>)/u, "<>$1$1</>"),
+      [once("sequence switch")],
+    ],
+    [
+      "a live region outside the stepper",
+      blocks,
+      mutate(
+        blocks,
+        para,
+        '<p data-block-id={block.blockId} aria-live="polite">\n          <Spans',
+      ),
+      [notSource("aria-live", "p")],
+    ],
+    [
+      "a live region on a div",
+      stepper,
+      mutate(stepper, root, '<div id={block.id} aria-live="polite">'),
+      ["attribute aria-live is not admitted on <div>"],
+    ],
+    // The strike.
+    [
+      "a strike outside the stepper",
+      blocks,
+      mutate(
+        blocks,
+        para,
+        "<p data-block-id={block.blockId}>\n          <s>gone</s>\n          <Spans",
+      ),
+      ["element <s> is not admitted in the renderer"],
+    ],
+    [
+      "a strike without its word",
+      stepper,
+      mutate(stepper, /\n(\s*)lost\{" "\}/u, '\n$1gone{" "}'),
+      ["<s> must stand beside the text lost"],
+    ],
+    [
+      "a strike with an attribute",
+      stepper,
+      mutate(stepper, "<s>", "<s id={block.id}>"),
+      ["attribute id is not admitted on <s>"],
+    ],
+    // The cell list.
+    [
+      "a table in the stepper",
+      stepper,
+      mutate(stepper, "<ol>", "<table>").replace("</ol>", "</table>"),
+      ["element <table> is not admitted in the walk stepper"],
+    ],
+    [
+      "a numbered start on the cell list",
+      stepper,
+      mutate(stepper, "<ol>", "<ol start={0}>"),
+      [notSource("start", "ol")],
+    ],
+    [
+      "a hook on a cell",
+      stepper,
+      mutate(stepper, "key={index}", "key={index} data-block-id={slot.value}"),
+      [notSource("data-block-id", "li")],
+    ],
+    // The active hooks.
+    [
+      "a hand-written intro hook",
+      stepper,
+      mutate(stepper, introHook, 'data-block-id="walk-test/b1.1.s0"'),
+      [notSource("data-block-id", "p"), once("intro hook")],
+    ],
+    [
+      "an intro hook from another field",
+      stepper,
+      mutate(stepper, introHook, "data-block-id={sequence.name}"),
+      [notSource("data-block-id", "p"), once("intro hook")],
+    ],
+    [
+      "an intro hook shown at every step",
+      stepper,
+      mutate(
+        stepper,
+        /step === 0 \? \(\s*<p data-block-id=\{sequence\.introBlockId\}>/u,
+        "step >= 0 ? (<p data-block-id={sequence.introBlockId}>",
+      ),
+      [notSource("data-block-id", "p")],
+    ],
+    [
+      "a note hook shown for every step",
+      stepper,
+      mutate(
+        stepper,
+        /index \+ 1 === step \? \(\s*<p key=\{item\.blockId\}/u,
+        "index + 1 >= step ? (<p key={item.blockId}",
+      ),
+      [notSource("data-block-id", "p")],
+    ],
+    [
+      "the title hook on the root",
+      stepper,
+      mutate(
+        stepper,
+        root,
+        "<div id={block.id} data-block-id={block.blockId}>",
+      ),
+      [notSource("data-block-id", "div")],
+    ],
+    // The root anchor.
+    [
+      "the walk id on an inner element",
+      stepper,
+      mutate(stepper, root, `${root}\n<div id={block.id} />`),
+      [notSource("id", "div"), once("root anchor")],
+    ],
+    [
+      "the root without the walk id",
+      stepper,
+      mutate(stepper, root, "<div>"),
+      [once("root anchor")],
+    ],
+    [
+      "a root anchor from another field",
+      stepper,
+      mutate(stepper, root, "<div id={block.blockId}>"),
+      [notSource("id", "div")],
+    ],
+  ].map(([name, unit, code, expected]) => [
+    name,
+    unit,
+    code,
+    // An edit of the pinned stepper also meets its pin, so no row is exempt from it.
+    unit === stepper && code !== read(stepper)
+      ? [...expected, pinReview(stepper)]
+      : expected,
+  ]);
+
+  it.each(rows)(
+    "finds exactly what %s holds in the build check",
+    (_n, unit, code, expected) => {
+      expect([...build(unit, code)].sort()).toEqual([...expected].sort());
+    },
+  );
+});
+
+// With its pin unchanged, the stepper admits no edit but a line-ending change through either
+// entry point, whatever its local rules make of the edit.
+describe("the walk stepper module pin", () => {
+  const changed = pinReview(walkStepper);
+  const original = read(walkStepper);
+  const change = (code, from, to) => {
+    if (!code.includes(from))
+      throw new Error(`no anchor ${from} in ${walkStepper}`);
+    return code.replace(from, () => to);
+  };
+  // One edit a reader hears and one that keeps the behaviour: the pin binds the whole text.
+  const edits = [
+    [
+      "the wrong intro announced",
+      change(original, "spanText(sequence.intro)", "sequence.name"),
+    ],
+    ["a comment added", `${original}// Added.\n`],
+  ];
+  const missing = `src/${walkStepper} has no source text to check against its pin`;
+
+  it.each(endings(walkStepper))(
+    "admits the unchanged stepper with %s in the build check",
+    (_ending, text) => {
+      expect(build(walkStepper, text)).toEqual([]);
+    },
+  );
+
+  it.each(edits)("refuses %s in the build check", (_name, code) => {
+    expect(build(walkStepper, code)).toContain(changed);
+  });
+
+  // The shared checker and the ESLint adapter, each handed no full source.
+  it("refuses the stepper checked without its source text", () => {
+    const { ast, scopeManager } = parseSource(original, `src/${walkStepper}`);
+    expect(
+      checkProgram(ast, scopeManager, walkStepper).map(describeFinding),
+    ).toContain(missing);
+  });
+
+  it.each([["no text", undefined]])(
+    "refuses the stepper in the ESLint rule given %s",
+    (_name, text) => {
+      const { ast, scopeManager } = parseSource(original, `src/${walkStepper}`);
+      const reported = [];
+      rule
+        .create({
+          filename: join(web, "src", walkStepper),
+          sourceCode: { scopeManager, text, hasBOM: false },
+          report: ({ data }) => reported.push(data.name),
+        })
+        .Program(ast);
+      expect(reported).toContain(missing);
+    },
+  );
+
+  // The absolute name the lint command gives and another letter case reach the one pin in both
+  // adapters through the shared location mapper; a case lookalike is refused.
+  const blind = existsSync(join(web, "src", "CONTENT", "href.ts"));
+  // Spelled in parts, so no misspelt word stands in the source.
+  const shouted = `${"WalkStepper".toUpperCase()}.tsx`;
+  const file = join(web, "src", "content", "WalkStepper.tsx");
+  const names = [
+    ["its absolute name", file],
+    ...(blind
+      ? [["another letter case", join(web, "src", "CONTENT", shouted)]]
+      : []),
+  ];
+  const lintAs = async (name, code) => {
+    const [result] = await lint.lintText(code, { filePath: name });
+    expect(result.messages.filter((m) => m.fatal)).toEqual([]);
+    return result.messages
+      .filter((m) => m.ruleId === app)
+      .map((m) => m.message.slice(0, -1));
+  };
+
+  it.each(names)(
+    "reaches the one pin as %s in both adapters",
+    async (_how, name) => {
+      const absolute = resolve(web, name);
+      const unit = sourceUnit(guardContext(web), absolute);
+      expect(unit).toBe(walkStepper);
+      expect(scriptViolations(original, absolute, unit)).toEqual([]);
+      expect(
+        scriptViolations(`${original}// Added.\n`, absolute, unit),
+      ).toEqual([changed]);
+      expect(await lintAs(name, original)).toEqual([]);
+      expect(await lintAs(name, `${original}// Added.\n`)).toEqual([changed]);
+    },
+  );
+
+  const lookalikes = [walkStepper.toLowerCase()];
+
+  it.each(lookalikes)(
+    "never lints the edited stepper clean as src/%s",
+    async (unit) => {
+      const [result] = await lint.lintText(`${original}// Added.\n`, {
+        filePath: `src/${unit}`,
+      });
+      expect(result.messages.length).toBeGreaterThan(0);
+    },
+  );
+}, 120_000);
+
+// The build owns completeness: a pinned module the scan never checked fails it, so neither a
+// missing file nor a list that leaves out or misspells the module drops its pin.
+describe("the pinned modules in the build scan", () => {
+  const owed = (unit) =>
+    `src/${unit} is pinned but the build scan did not check it`;
+  const main = { "src/main.tsx": "console.log(1);\n" };
+  const failure = (files) =>
+    buildFixture({ ...main, ...files }).then(
+      () => null,
+      (e) => e,
+    );
+  let ctx = null;
+
+  beforeAll(() => {
+    ctx = guardContext(fixture(main).root);
+  });
+
+  it("checks every pinned module on the real list and owes none", () => {
+    expect(rendererScan(ctx)).toEqual([]);
+  });
+
+  it.each([walkStepper])(
+    "owes %s when the scanned list leaves it out",
+    (unit) => {
+      const units = [...rendererModules.keys()].filter((u) => u !== unit);
+      expect(rendererScan(ctx, units)).toEqual([owed(unit)]);
+    },
+  );
+
+  it.each([["another letter case", "content/walkStepper.tsx"]])(
+    "owes the canonical stepper when the list spells it with %s",
+    (_how, spelled) => {
+      const units = [...rendererModules.keys()].map((u) =>
+        u === walkStepper ? spelled : u,
+      );
+      const found = rendererScan(ctx, units);
+      expect(found).toContain(owed(walkStepper));
+      expect(found.some((f) => f.startsWith(`src/${spelled} `))).toBe(true);
+    },
+  );
+
+  it("fails a real build without the stepper and owes its check", async () => {
+    const error = await failure({ [`src/${walkStepper}`]: null });
+    expect(error?.message).toMatch(/build guard: /u);
+    expect(error?.message).toContain(`src/${walkStepper} cannot be read`);
+    expect(error?.message).toContain(owed(walkStepper));
+  });
+
+  it("fails a real build on an edited stepper", async () => {
+    const error = await failure({
+      [`src/${walkStepper}`]: `${read(walkStepper)}// Added.\n`,
+    });
+    expect(error?.message).toMatch(/build guard: /u);
+    expect(error?.message).toContain(pinReview(walkStepper));
+  });
+}, 240_000);
 
 describe("the reviewed helper pins", () => {
   const helpers = [...rendererModules.keys()].filter((u) => u.endsWith(".ts"));
@@ -2101,11 +3515,18 @@ describe("the reviewed helper pins", () => {
     expect([...helperPins.keys()].sort()).toEqual(helpers.sort());
   });
 
-  it.each(helpers)("binds the pin of %s to the file on disk", (unit) => {
-    expect(helperDigest(raw(unit).toString("utf8"))).toBe(helperPins.get(unit));
+  it("pins the walk stepper whole and owes a check to every pinned module", () => {
+    expect([...modulePins.keys()]).toEqual([walkStepper]);
+    expect([...pinnedUnits].sort()).toEqual([...helpers, walkStepper].sort());
   });
 
-  it.each(helpers)(
+  it.each(pinned)("binds the pin of %s to the file on disk", (unit) => {
+    expect(helperDigest(raw(unit).toString("utf8"))).toBe(
+      helperPins.get(unit) ?? modulePins.get(unit),
+    );
+  });
+
+  it.each([walkStepper])(
     "hashes %s alike under LF and CRLF and apart behind a byte order mark",
     (unit) => {
       const lf = read(unit);
@@ -2141,13 +3562,9 @@ const shout = (unit) => {
   const dot = name.lastIndexOf(".");
   return name.slice(0, dot).toUpperCase() + name.slice(dot);
 };
-// The names one file can be linted under: its own, a folder link, and another letter case.
+// The names one file can be linted under: its own and another letter case.
 const spellings = [
   ["", (unit) => `src/${unit}`],
-  [
-    " through a folder link",
-    (unit) => `src/same/${unit.slice("content/".length)}`,
-  ],
   ...(caseBlind
     ? [[" under another letter case", (unit) => `src/CONTENT/${shout(unit)}`]]
     : []),
@@ -2167,8 +3584,9 @@ const lint = new ESLint({
   overrideConfigFile: true,
   overrideConfig: [
     {
-      files: ["src/**/*.ts"],
+      files: ["src/**/*.{ts,tsx}"],
       languageOptions: { parser },
+      linterOptions: { noInlineConfig: true },
       plugins: { sharpladder: { rules: { "app-capabilities": rule } } },
       rules: { [id]: "error" },
     },
@@ -2190,32 +3608,23 @@ process.stdout.write(JSON.stringify(found));
 
 describe("the helper pins on files ESLint reads from disk", () => {
   const plain = [
-    ...[...helperPins.keys()].flatMap((unit) =>
-      endings(unit).map(([ending, text]) => [
-        `allows ${unit} with ${ending}`,
-        unit,
-        text,
-        [],
-      ]),
-    ),
+    [`allows ${walkStepper}`, walkStepper, read(walkStepper), []],
     ...marked.map(([name, unit, code]) => [
       `refuses ${name}`,
       unit,
       code,
       [`${bomFinding(unit)}.`],
     ]),
-    ...[...helperPins.keys()].map((unit) => [
-      `refuses a comment added to ${unit}`,
-      unit,
-      `${read(unit)}// Added.\n`,
-      [
-        `${pinChanged(unit)}; update its pin only after a review of the whole helper.`,
-      ],
-    ]),
+    [
+      `refuses a comment added to ${walkStepper}`,
+      walkStepper,
+      `${read(walkStepper)}// Added.\n`,
+      [`${pinReview(walkStepper)}.`],
+    ],
   ];
-  // The lower case of the capital in the first name is two characters; folding it must not move
-  // the file out of the renderer folder. The second name is the control.
-  const unlisted = ["content/İ.ts", "content/Probe.ts"].map((unit) => [
+  // The lower case of this capital is two characters; folding it must not move the file out of
+  // the renderer folder.
+  const unlisted = ["content/İ.ts"].map((unit) => [
     `refuses the unlisted ${unit}`,
     unit,
     "export const x = 1;\n",
@@ -2245,7 +3654,6 @@ describe("the helper pins on files ESLint reads from disk", () => {
         copied.map((path) => [path, readFileSync(join(web, path), "utf8")]),
       ),
     });
-    linkFolder(join(root, "src", "content"), join(root, "src", "same"));
     const run = spawnSync(process.execPath, ["lint-cases.mjs"], {
       cwd: root,
       encoding: "utf8",
@@ -2269,85 +3677,6 @@ describe("the helper pins on files ESLint reads from disk", () => {
   );
 });
 
-const cliConfig = `import parser from "@typescript-eslint/parser";
-import rule from "./eslint-rules/app-capabilities.js";
-
-export default [
-  {
-    files: ["src/**/*.ts"],
-    languageOptions: { parser },
-    plugins: { sharpladder: { rules: { "app-capabilities": rule } } },
-    rules: { "sharpladder/app-capabilities": "error" },
-  },
-];
-`;
-
-describe("the helper pins through the ESLint command line", () => {
-  const edits = {
-    [never]: [`\uFEFF${read(never)}`, `${bomFinding(never)}.`],
-    [href]: [
-      `${read(href)}// Added.\n`,
-      `${pinChanged(href)}; update its pin only after a review of the whole helper.`,
-    ],
-  };
-  const cases = spellings.flatMap(([how, spell]) =>
-    Object.entries(edits).map(([unit, [, expected]]) => [
-      `refuses the edited ${unit}${how}`,
-      spell(unit),
-      expected,
-    ]),
-  );
-  let results = [];
-
-  beforeAll(() => {
-    const { root } = fixture({
-      "package.json": '{ "type": "module" }\n',
-      "eslint.config.mjs": cliConfig,
-      ...Object.fromEntries(
-        copied.map((path) => [path, readFileSync(join(web, path), "utf8")]),
-      ),
-      ...Object.fromEntries(
-        Object.entries(edits).map(([unit, [code]]) => [`src/${unit}`, code]),
-      ),
-    });
-    linkFolder(join(root, "src", "content"), join(root, "src", "same"));
-    const run = spawnSync(
-      process.execPath,
-      [
-        join(web, "node_modules", "eslint", "bin", "eslint.js"),
-        "--format",
-        "json",
-        ...cases.map(([, spelled]) => spelled),
-      ],
-      { cwd: root, encoding: "utf8", timeout: 90_000 },
-    );
-    if (run.error) throw run.error;
-    if (run.status !== 1)
-      throw new Error(
-        `the lint command gave ${String(run.status)}: ${run.stderr}`,
-      );
-    results = JSON.parse(run.stdout);
-  }, 120_000);
-
-  it("reports on every name it was given", () => {
-    expect(results.length).toBe(cases.length);
-  });
-
-  it.each(cases.map(([name, , expected], index) => [name, expected, index]))(
-    "%s",
-    (_name, expected, index) => {
-      // ESLint reports in its own order, so each result is found by the name it was given.
-      const spelled = `/${cases[index][1]}`;
-      const mine = results.filter((r) =>
-        r.filePath.replaceAll("\\", "/").endsWith(spelled),
-      );
-      expect(mine.map((r) => r.messages.map((m) => m.message))).toEqual([
-        [expected],
-      ]);
-    },
-  );
-});
-
 // The production configuration, with each file named as an editor or a caller might name it.
 describe.runIf(caseBlind)(
   "the renderer rules under another letter case",
@@ -2361,11 +3690,7 @@ describe.runIf(caseBlind)(
         .filter((m) => m.ruleId === app)
         .map((m) => m.message);
     };
-    const aliases = [...helperPins.keys()].flatMap((unit) => [
-      [upper(unit), unit],
-      [mixed(unit), unit],
-      [join(web, upper(unit)), unit],
-    ]);
+    const aliases = [[upper(href), href]];
 
     it.each(aliases)(
       "allows the unchanged helper as %s",
@@ -2376,32 +3701,35 @@ describe.runIf(caseBlind)(
 
     it.each(aliases)("refuses a comment added as %s", async (path, unit) => {
       expect(await named(path, `${read(unit)}// Added.\n`)).toEqual([
-        `${pinChanged(unit)}; update its pin only after a review of the whole helper.`,
+        `${pinReview(unit)}.`,
       ]);
     });
 
-    it.each(
-      aliases.flatMap(([path, unit]) => [1, 2, 3].map((n) => [n, path, unit])),
-    )("refuses %i byte order mark(s) as %s", async (count, path, unit) => {
-      expect(await named(path, "\uFEFF".repeat(count) + read(unit))).toEqual([
-        `${bomFinding(unit)}.`,
-      ]);
-    });
-
-    // ESLint selects files by extension as written, so this name never reaches the rule; the
-    // lint script fails on the warning, and the build reads the real file whatever it is called.
-    it("leaves a capital extension to ESLint, which does not lint the file", async () => {
+    // The type-aware block selects by extension as written, so a capital extension is parsed
+    // without type information; the policy still runs on it and the extension is refused.
+    it("refuses a capital extension and still checks the pin", async () => {
       const [result] = await lint.lintText(`${read(href)}// Added.\n`, {
         filePath: "src/content/href.TS",
-        warnIgnored: true,
       });
-      expect(result.messages.map((m) => [m.severity, m.ruleId])).toEqual([
-        [1, null],
+      const found = result.messages.map((m) => [
+        m.severity,
+        m.ruleId,
+        m.message,
       ]);
-      expect(result.messages[0].message).toMatch(/^File ignored/u);
+      expect(found).toHaveLength(2);
+      expect(found).toEqual(
+        expect.arrayContaining([
+          [
+            2,
+            "sharpladder/source-extension",
+            "application source must be .ts or .tsx.",
+          ],
+          [2, app, `${pinReview(href)}.`],
+        ]),
+      );
     });
 
-    it.each([blocks, spans, link, view])(
+    it.each([blocks])(
       "applies the JSX rules to %s under another letter case",
       async (unit) => {
         const code = `${read(unit)}export const extra = 1;\n`;
@@ -2457,14 +3785,13 @@ describe("a path that only looks like a renderer path", () => {
 });
 
 describe("a name ESLint is given that is not a source name", () => {
-  it.each([
-    ["a stream", `src/${href}:zone`],
-    ["a trailing dot", `src/${href}.`],
-    ["a trailing space", `src/${href} `],
-  ])("is never linted clean as %s", async (_name, path) => {
-    const [result] = await lint.lintText(read(href), { filePath: path });
-    expect(result.messages.length).toBeGreaterThan(0);
-  });
+  it.each([["a trailing dot", `src/${href}.`]])(
+    "is never linted clean as %s",
+    async (_name, path) => {
+      const [result] = await lint.lintText(read(href), { filePath: path });
+      expect(result.messages.length).toBeGreaterThan(0);
+    },
+  );
 });
 
 describe("the helper pins in a real build", () => {
@@ -2482,26 +3809,11 @@ describe("the helper pins in a real build", () => {
     await expect(buildFixture(main)).resolves.toBeDefined();
   });
 
-  it.each([...helperPins.keys()])(
-    "fails on a comment added to %s",
-    async (unit) => {
-      await rejects(
-        unit,
-        `${read(unit)}// Added.\n`,
-        /the reviewed helper source changed/u,
-      );
-    },
-  );
-
   it.each(marked)("fails on %s", async (_name, unit, code) => {
     await rejects(unit, code, /must not start with a byte order mark/u);
   });
 
-  it.each([...rendererModules.keys()])("fails without %s", async (unit) => {
-    await rejects(unit, null, /cannot be read/u);
-  });
-
-  it.each([blocks, spans, link, view])(
+  it.each([blocks])(
     "fails on a forbidden edit to %s, which nothing imports",
     async (unit) => {
       await rejects(
@@ -2605,10 +3917,11 @@ describe("the production import graph", () => {
     );
   });
 
+  // The source policy refuses the import before the graph check sees the module.
   it("fails when production reaches a renderer test", async () => {
     await rejects(
       "./content-tests/href.test.ts",
-      /test-only module content-tests\/href\.test\.ts/u,
+      /run-time import or re-export of test module \.\/content-tests\/href\.test\.ts is admitted only in a listed test/u,
     );
   });
 

@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -463,6 +463,43 @@ export const witness = {
                 },
               ],
             },
+            {
+              type: "walk-it",
+              blockId: "cards-fix-plain/b4",
+              id: "walk-fix-short",
+              title: [
+                {
+                  type: "text",
+                  text: "Raise one number",
+                },
+              ],
+              cells: [5],
+              sequences: [
+                {
+                  name: "once",
+                  introBlockId: "cards-fix-plain/b4.1.s0",
+                  intro: [
+                    {
+                      type: "text",
+                      text: "One cell holds a number.",
+                    },
+                  ],
+                  steps: [
+                    {
+                      blockId: "cards-fix-plain/b4.1.s1",
+                      dst: 0,
+                      value: 6,
+                      note: [
+                        {
+                          type: "text",
+                          text: "The number goes up by one.",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
           ],
         },
       ],
@@ -489,9 +526,30 @@ export const witness = {
             },
             text: "Why: Nothing else is needed here.",
           },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-plain/b4",
+            },
+            text: "Raise one number",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-plain/b4.1.s0",
+            },
+            text: "One cell holds a number.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-plain/b4.1.s1",
+            },
+            text: "The number goes up by one.",
+          },
         ],
         audio:
-          "sha256:40d548f253bb535691dfab960140c2772da1b97ceb57e813d6250f937f366a24",
+          "sha256:bdb860766dcddab34c90d32e32839bee3ba06890e261911c9328f426b643d7f8",
       },
     },
   ],

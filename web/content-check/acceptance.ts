@@ -33,6 +33,11 @@ export const roundTripCases: readonly string[] = [
   "renders every card under its own heading with its fields in order",
   "gives a section hook to sections only",
   "shows a picker for approaches only and mounts the selected one alone",
+  "shows every walk frozen at its first sequence's start",
+  "shows each walk at every position with that position's hooks and cells",
+  "binds every spoken segment to its hook at every walk position",
+  "lands a same-page link on one live anchor per shown walk in both views",
+  "mounts only the Terms and links each walk position shows",
 ];
 
 export const speechFile = "content-check/speech.test.ts";
@@ -321,10 +326,10 @@ function listProblems(
  * runner's failing exit, and otherwise fails on any gap the report leaves. The extra arguments
  * exist for tests of this function; the command line admits none of them.
  */
-export function acceptRun(
+export async function acceptRun(
   extra: readonly string[] = [],
   log: (line: string) => void = console.error,
-): number {
+): Promise<number> {
   const out = mkdtempSync(join(tmpdir(), "sl-accept-"));
   const results = join(out, "results.json");
   try {
@@ -345,7 +350,7 @@ export function acceptRun(
     try {
       // The compiler certifies the folder again and states each record's kind; a file name
       // or anything a test printed never decides which lists a record must pass.
-      const { stdout, exit } = runTestRecords();
+      const { stdout, exit } = await runTestRecords();
       const expected = acceptEnvelope(
         stdout,
         exit,
@@ -379,5 +384,5 @@ if (invoked) {
     // A filter or another configuration would select which evidence exists.
     console.error(`acceptance: unexpected argument ${String(args[0])}`);
     process.exitCode = 2;
-  } else process.exitCode = acceptRun();
+  } else process.exitCode = await acceptRun();
 }

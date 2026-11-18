@@ -62,6 +62,22 @@ internal static class FenceReader
             : new TextNode { BlockId = blockId, Id = id, Label = label, Spoken = spoken, Source = source };
     }
 
+    internal static string Source(FencedCodeBlock fence)
+    {
+        var text = new StringBuilder();
+        for (var i = 0; i < fence.Lines.Count; i++)
+        {
+            if (i > 0)
+            {
+                text.Append('\n');
+            }
+
+            text.Append(fence.Lines.Lines[i].Slice.AsSpan());
+        }
+
+        return text.ToString();
+    }
+
     private static Dictionary<string, string> Values(AttributeGroup? group, List<string> problems)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -134,21 +150,5 @@ internal static class FenceReader
         {
             yield return $"text fence does not take \"{key}\"";
         }
-    }
-
-    private static string Source(FencedCodeBlock fence)
-    {
-        var text = new StringBuilder();
-        for (var i = 0; i < fence.Lines.Count; i++)
-        {
-            if (i > 0)
-            {
-                text.Append('\n');
-            }
-
-            text.Append(fence.Lines.Lines[i].Slice.AsSpan());
-        }
-
-        return text.ToString();
     }
 }

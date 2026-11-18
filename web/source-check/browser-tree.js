@@ -66,10 +66,12 @@ function configProblems(web) {
  * must be inputs of the browser program when its inputs are known, and each tooling script must
  * be under an ESLint configuration, so an ignore entry cannot drop it from the lint unseen.
  */
-export async function browserTreeProblems(
-  web,
-  { readdir, inputs, inventory = browserInventory } = {},
-) {
+export async function browserTreeProblems(web, options = {}) {
+  // An unknown option is refused, so no caller can hand in another lint engine or configuration.
+  for (const key of Object.keys(options))
+    if (!["readdir", "inputs", "inventory"].includes(key))
+      throw new TypeError(`browserTreeProblems: unknown option ${key}`);
+  const { readdir, inputs, inventory = browserInventory } = options;
   const problems = configProblems(web);
   let tree;
   try {

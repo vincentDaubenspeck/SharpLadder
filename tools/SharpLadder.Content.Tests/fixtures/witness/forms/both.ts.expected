@@ -1,0 +1,28 @@
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "probe",
+  cells: [3, "x", null],
+  value: "word",
+  inline: 4,
+  mark: {
+    type: "flag",
+  },
+  spare: null,
+  steps: [
+    {
+      dst: 2,
+      src: 0,
+      note: "copy the first",
+      lost: true,
+    },
+    {
+      dst: 0,
+      src: 1,
+      value: 9,
+      note: "write a literal",
+    },
+  ],
+} satisfies ContentDoc;

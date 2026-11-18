@@ -13,6 +13,7 @@ import {
   isReservedSpecifier,
   projectPath,
   isTestOnly,
+  rendererScan,
   scriptViolations,
   sourceUnit,
 } from "./classify.js";
@@ -24,7 +25,6 @@ import {
   snapshot,
 } from "./output.js";
 import { lightningViolations } from "./contract.js";
-import { rendererModules } from "../source-policy/renderer.js";
 import { canonical } from "../source-policy/unit.js";
 import { layerPrelude } from "./prelude.js";
 import { admitStartup } from "./startup.js";
@@ -240,22 +240,9 @@ export function guard({ worker = false } = {}) {
       const pipeline = pipelineViolations(this.environment?.plugins ?? []);
       if (pipeline.length > 0)
         this.error(`build guard: ${pipeline.join("; ")}`);
-      // The App never imports the renderer, so the transform hook alone would not see its modules.
-      const renderer = [];
-      for (const unit of rendererModules.keys()) {
-        const file = join(ctx.root, "src", unit);
-        try {
-          const text = readFileSync(file, "utf8");
-          const actual = sourceUnit(ctx, file);
-          if (actual !== unit)
-            renderer.push(`src/${unit} is on disk as src/${actual}`);
-          else renderer.push(...scriptViolations(text, file, unit));
-        } catch (error) {
-          renderer.push(`src/${unit} cannot be read: ${message(error)}`);
-        }
-      }
+      const renderer = rendererScan(ctx);
       if (renderer.length > 0)
-        this.error(`build guard: ${[...new Set(renderer)].join("; ")}`);
+        this.error(`build guard: ${renderer.join("; ")}`);
       ledger.clear();
       manifest = null;
       // The licence texts reach the output only through the inventory that binds their hashes.

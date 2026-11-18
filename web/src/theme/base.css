@@ -77,4 +77,170 @@
     display: block;
     margin-top: var(--space-0-375);
   }
+
+  /* By structure: a stepper is a div in main with an id and no hook; a frozen walk has the hooked div's list. */
+  main div[id]:not([data-block-id]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--space-0-5);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--surface);
+    padding: var(--space-0-875) var(--space-1) var(--space-0-75);
+    margin: var(--space-1) 0 var(--space-1-625);
+    font-family: var(--font-ui);
+    font-size: var(--fs-cat-0-9375-1-7);
+    line-height: var(--lh-cat-0-9375-1-7);
+  }
+
+  main div[id]:not([data-block-id]) > p {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  main div[id]:not([data-block-id]) > p:first-child {
+    flex-basis: auto;
+    margin-bottom: var(--space-0-75);
+    font-weight: 650;
+  }
+
+  main
+    div[id]:not([data-block-id])
+    > p:not([data-block-id], [aria-live], :first-child) {
+    margin-bottom: var(--space-0-5);
+    font-size: var(--fs-cat-0-8125-1-7);
+    line-height: var(--lh-cat-0-8125-1-7);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  main div[id]:not([data-block-id]) > p[data-block-id]:not(:first-child) {
+    margin: var(--space-1-625) 0 var(--space-0-625);
+    min-height: 1.5em;
+    font-size: var(--fs-cat-0-9063-1-7);
+    line-height: var(--lh-cat-0-9063-1-7);
+    color: var(--text-2);
+  }
+
+  /* The note already shows this text; a hairline box, unlike display: none, keeps the region announced. */
+  main div[id]:not([data-block-id]) > p[aria-live] {
+    height: 0.0625rem;
+    overflow: hidden;
+  }
+
+  /* The cells write their own 0-based index, so the list's 1-based markers are hidden. */
+  main div[data-block-id] > ol,
+  main div[id]:not([data-block-id]) > ol {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-0-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  main div[data-block-id] > ol > li,
+  main div[id]:not([data-block-id]) > ol > li {
+    flex: 0 1 6rem;
+    border: 1.5px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    padding: var(--space-0-5) 0 var(--space-0-375);
+    text-align: center;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    font-family: var(--font-code);
+    font-size: var(--fs-cat-1-125-1-7);
+    line-height: var(--lh-cat-1-125-1-7);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  main div[data-block-id] > ol > li[data-cell~="empty"],
+  main div[id]:not([data-block-id]) > ol > li[data-cell~="empty"] {
+    border: 1.5px dashed var(--line-2);
+    color: var(--muted);
+  }
+
+  main div[id]:not([data-block-id]) > ol > li[data-cell~="source"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  main div[id]:not([data-block-id]) > ol > li[data-cell~="destination"] {
+    border: 1.5px dashed var(--text-2);
+    background: var(--surface-2);
+  }
+
+  /* On its own line the struck original does not crowd the value in a narrow cell. */
+  main div[id]:not([data-block-id]) > ol > li > s {
+    display: block;
+    margin-bottom: var(--space-0-125);
+    font-family: var(--font-ui);
+    font-size: var(--fs-cat-0-6875-1);
+    line-height: var(--lh-cat-0-6875-1);
+    font-weight: lighter;
+    color: var(--bad);
+  }
+
+  main div[id]:not([data-block-id]) > button {
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--text);
+    padding: var(--space-0-375) var(--space-0-75);
+    font-size: var(--fs-cat-0-875-1-7);
+    line-height: var(--lh-cat-0-875-1-7);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* An edge in the fill colour rather than transparent, so forced colours still draw it. */
+  main div[id]:not([data-block-id]) > button:last-of-type {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  /* Unavailable shows as a dashed edge too, which forced colours keep. */
+  main div[id]:not([data-block-id]) > button[aria-disabled="true"] {
+    border: 1px dashed var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+
+  main div[id]:not([data-block-id]) > button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  main div[id]:not([data-block-id]) > [role="group"] {
+    display: flex;
+    margin: 0 0 var(--space-0-75) auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+  }
+
+  main div[id]:not([data-block-id]) > [role="group"] > button {
+    border: 0;
+    font-size: var(--fs-cat-0-8125-1-7);
+    line-height: var(--lh-cat-0-8125-1-7);
+  }
+
+  /* Rounded ends instead of a clipping group, so a focus ring outside a button is not cut off. */
+  main div[id]:not([data-block-id]) > [role="group"] > button:first-child {
+    border-radius: var(--r-sm) 0 0 var(--r-sm);
+  }
+
+  main div[id]:not([data-block-id]) > [role="group"] > button:last-child {
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  }
+
+  main div[id]:not([data-block-id]) > [role="group"] > button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }

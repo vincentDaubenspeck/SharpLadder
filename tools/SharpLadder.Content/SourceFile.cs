@@ -68,6 +68,9 @@ internal sealed partial class SourceFile
         return file;
     }
 
+    [GeneratedRegex(@"^\(Line: \d+, Col: \d+, Idx: \d+\) - \(Line: \d+, Col: \d+, Idx: \d+\): ", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    internal static partial Regex YamlLocation();
+
     // CommonMark never builds a link inside a link, so this guards the parser, not the author.
     internal static Diagnostic? NestedLink(string path, int line, LinkInline link) =>
         link.Descendants<LinkInline>().Any(l => !l.IsImage)
@@ -113,9 +116,6 @@ internal sealed partial class SourceFile
         EmphasisInline => "emphasis other than *em* or **strong**",
         _ => node.GetType().Name,
     };
-
-    [GeneratedRegex(@"^\(Line: \d+, Col: \d+, Idx: \d+\) - \(Line: \d+, Col: \d+, Idx: \d+\): ", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
-    private static partial Regex YamlLocation();
 
     // The source offset each line starts at, as the parser counts offsets.
     private static int[] LineStarts(string[] lines)
@@ -462,8 +462,10 @@ internal sealed partial class SourceFile
         }
     }
 
-    // One segment per paragraph and per list item; a fence is spoken as its gloss. The intro is
-    // never spoken, and a skipped section speaks only its summary.
+    // One segment per paragraph and per list item; a fence is spoken as its gloss. A walk-it speaks
+    // its title, then each sequence's intro and notes as written, each on its own hook, so every
+    // step is spoken whichever one is shown. The chapter intro is never spoken, and a skipped
+    // section speaks only its summary.
     private void Segments(BodyBlock node, int line)
     {
         if (_current is not { Summary: null })
@@ -492,6 +494,20 @@ internal sealed partial class SourceFile
             case TableNode table:
                 Segment(new BlockTarget { BlockId = table.BlockId }, SpokenText.Table(table), line);
                 break;
+            case WalkItNode walk:
+                Segment(new BlockTarget { BlockId = walk.BlockId }, SpokenText.Flatten(walk.Title), line);
+                foreach (var sequence in walk.Sequences)
+                {
+                    Segment(new BlockTarget { BlockId = sequence.IntroBlockId }, SpokenText.Flatten(sequence.Intro), line);
+                    foreach (var step in sequence.Steps)
+                    {
+                        Segment(new BlockTarget { BlockId = step.BlockId }, SpokenText.Flatten(step.Note), line);
+                    }
+                }
+
+                break;
+
+            // Every body block kind has a case above; this keeps a kind added later from passing silently.
             default:
                 Error(line, "this block has no spoken form");
                 break;
@@ -630,6 +646,8 @@ internal sealed partial class SourceFile
                 return List(list, blockId, line);
             case Table table:
                 return Table(table, blockId, line);
+            case FencedCodeBlock { Info: WalkLanguage } walk:
+                return WalkIt(walk, blockId, line);
             case FencedCodeBlock fence:
                 var node = FenceReader.Read(fence, _lines[fence.Line], blockId, line, Error);
                 var fenceId = node switch

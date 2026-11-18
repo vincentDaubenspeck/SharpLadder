@@ -54,6 +54,27 @@ export function ApproachPicker({
   );
 }
 
+// A sequence option is its place in the walk from 1, so the pressed one is compared by position.
+export function SequencePicker({
+  options,
+  selectedSequence,
+  onSequenceChange,
+}: {
+  options: readonly { readonly id: number; readonly label: string }[];
+  selectedSequence: number | null;
+  onSequenceChange: (sequence: number) => void;
+}): ReactElement {
+  return (
+    <div role="group" aria-label="Walk sequences">
+      <Choices
+        choices={options}
+        pressed={selectedSequence}
+        onChoose={onSequenceChange}
+      />
+    </div>
+  );
+}
+
 // A hint option is a position, so nothing the picker hands back names a ladder.
 export function HintPicker({
   options,

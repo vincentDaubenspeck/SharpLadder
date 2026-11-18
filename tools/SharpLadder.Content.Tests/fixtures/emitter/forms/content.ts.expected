@@ -1,0 +1,33 @@
+// SharpLadder.Content type emitter output, grammar 3. Do not edit.
+
+import type {
+  Cell,
+  Copy,
+  Index,
+  Label,
+  MarkOrNone,
+  Slot,
+  Step,
+  Value,
+  Write,
+} from "./body.ts";
+
+export type Probe = {
+  type: "probe";
+  cells: Cell[];
+  value: Value;
+  inline?: number | string;
+  mark?: MarkOrNone;
+  spare?: Copy | Write | null;
+  steps: [Step, ...Step[]];
+  slots?: [Slot] | [Slot, Slot] | [Slot, Slot, Slot];
+  label?: Label;
+  index?: Index;
+  maybe?: null | Value;
+};
+
+export type Other = {
+  type: "other";
+};
+
+export type ContentDoc = Probe | Other;

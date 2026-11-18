@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../content.ts";
 
@@ -29,11 +29,48 @@ export const witness = {
         },
       ],
     },
+    {
+      type: "walk-it",
+      blockId: "err-fixture-null/b2",
+      id: "walk-fix-null",
+      title: [
+        {
+          type: "text",
+          text: "Lose the object",
+        },
+      ],
+      cells: ["box"],
+      sequences: [
+        {
+          name: "once",
+          introBlockId: "err-fixture-null/b2.1.s0",
+          intro: [
+            {
+              type: "text",
+              text: "The variable holds an object.",
+            },
+          ],
+          steps: [
+            {
+              blockId: "err-fixture-null/b2.1.s1",
+              dst: 0,
+              value: "none",
+              note: [
+                {
+                  type: "text",
+                  text: "Now it holds nothing to call.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   ],
   hint: [
     {
       type: "paragraph",
-      blockId: "err-fixture-null/b2",
+      blockId: "err-fixture-null/b3",
       content: [
         {
           type: "text",

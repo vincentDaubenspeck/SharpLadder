@@ -8,7 +8,11 @@ import {
   describeFinding,
   parseSource,
 } from "../source-policy/index.js";
-import { isReservedPath } from "../source-policy/renderer.js";
+import {
+  isReservedPath,
+  pinnedUnits,
+  rendererModules,
+} from "../source-policy/renderer.js";
 import {
   canonical,
   descendant,
@@ -146,6 +150,34 @@ export function scriptViolations(code, filePath, unit = null) {
     code,
     code.startsWith("\uFEFF"),
   ).map(describeFinding);
+}
+
+// The App never imports the renderer, so the transform hook alone would not see its modules. A
+// pinned module the scan did not check is a finding, so no list or spelling drops its pin.
+export function rendererScan(ctx, units = rendererModules.keys()) {
+  const found = [];
+  const checked = new Set();
+  for (const unit of units) {
+    const file = join(ctx.root, "src", unit);
+    try {
+      const text = readFileSync(file, "utf8");
+      const actual = sourceUnit(ctx, file);
+      if (actual !== unit)
+        found.push(`src/${unit} is on disk as src/${actual}`);
+      else {
+        found.push(...scriptViolations(text, file, unit));
+        checked.add(unit);
+      }
+    } catch (error) {
+      found.push(
+        `src/${unit} cannot be read: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  for (const unit of pinnedUnits)
+    if (!checked.has(unit))
+      found.push(`src/${unit} is pinned but the build scan did not check it`);
+  return [...new Set(found)];
 }
 
 // A first-party module's path under src, in its real case, with forward slashes. A module the

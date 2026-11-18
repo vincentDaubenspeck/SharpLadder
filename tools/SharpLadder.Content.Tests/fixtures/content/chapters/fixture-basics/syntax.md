@@ -44,3 +44,22 @@ Each type takes a fixed number of bytes.
 | repeat   | a [loop](#term-fixture-loop) |
 
 Reading a variable before it has a value gives [an unassigned variable error](#err-fixture-cs0165).
+
+```walk-it {#walk-fix-shift}
+title: Shift a value with a [*loop*](#term-fixture-loop)
+cells: [4, "ab", null]
+sequences:
+  - name: safe
+    intro: Copy first, as [the sizes](#syn-fix-sizes) allow.
+    steps:
+      - { dst: 2, src: 1, note: Copy the text to the spare cell. }
+      - { dst: 1, value: 7, note: Write over the text., lost: true }
+  - name: risky
+    intro: Write first.
+    steps:
+      - { dst: 1, value: 8, note: The text is gone., lost: true }
+  - name: spare
+    intro: Copy the spare.
+    steps:
+      - { dst: 0, src: 2, note: Copy the empty cell. }
+```

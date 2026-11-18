@@ -206,7 +206,7 @@ public sealed class LinkTests
         var file = SourceFile.Parse("chapter.md", text, isChapter: true, diagnostics);
 
         Assert.Empty(diagnostics);
-        Assert.Equal(["fix-parts", "fix-links", "fix-note"], file.Anchors, StringComparer.Ordinal);
+        Assert.Equal(["walk-fix-intro", "fix-parts", "walk-fix-parts", "fix-links", "fix-note"], file.Anchors, StringComparer.Ordinal);
     }
 
     [Theory]

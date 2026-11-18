@@ -22,8 +22,8 @@ const fail = (message) => {
  * compares every committed payload with fresh output and validates the bytes it accepted.
  * Returns the digest of the accepted records; any failure throws.
  */
-export function preflight(tree = repository, records = runTestRecords) {
-  const run = records({ repository: tree });
+export async function preflight(tree = repository, records = runTestRecords) {
+  const run = await records({ repository: tree });
   let accepted;
   try {
     // The inventory is read only once the compiler has accepted the tree.
@@ -48,7 +48,7 @@ export async function buildHarness({
   const dist = join(tree, "web", "dist");
   if (overlapping(outDir, dist) || overlapping(outDir, join(web, "dist")))
     fail(`output ${outDir} overlaps the production output`);
-  const certificate = preflight(tree, records);
+  const certificate = await preflight(tree, records);
   await build({
     root: join(tree, "web", "harness", "content"),
     configFile: false,

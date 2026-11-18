@@ -2,10 +2,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { format, resolveConfig } from "prettier";
 import ts from "typescript";
 import { cleanUp, tree } from "./fixture.js";
 import {
   generatedProblems,
+  nullableProblems,
   typeModuleProblems,
   witnessProblems,
   witnessValue,
@@ -28,7 +30,7 @@ const bs = String.fromCharCode(92);
 const u = (hex) => `${bs}u${hex}`;
 const at = "witness/chapters/a/b.ts";
 const witnessHead =
-  "// SharpLadder.Content witness emitter output, grammar 1. Do not edit.\n\n";
+  "// SharpLadder.Content witness emitter output, grammar 2. Do not edit.\n\n";
 const contentImport =
   'import type { ContentDoc } from "../../../content.ts";\n\n';
 const witness = (value, { head = witnessHead, imports = contentImport } = {}) =>
@@ -92,6 +94,17 @@ describe("witness grammar", () => {
     }
   });
 
+  it("decodes null below the root", () => {
+    const text = witness(
+      '{\n  a: null,\n  b: [null, 1, "x"],\n  c: [[null]],\n}',
+    );
+    expect(witnessValue(at, text)).toStrictEqual({
+      a: null,
+      b: [null, 1, "x"],
+      c: [[null]],
+    });
+  });
+
   it("decodes the admitted number and boolean forms", () => {
     const text = witness(
       "{\n  a: 0,\n  b: -1,\n  c: 9007199254740991,\n  d: -9007199254740991,\n  e: true,\n  f: false,\n  g: {},\n}",
@@ -108,7 +121,7 @@ describe("witness grammar", () => {
   });
 
   const values = {
-    null: "{ a: null }",
+    "null root": "null",
     undefined: "{ a: undefined }",
     spread: "{ ...other }",
     "spread in an array": "{ a: [...other] }",
@@ -200,7 +213,7 @@ describe("witness grammar", () => {
     "trailing comment": `${good}// x\n`,
     "second header": witness(base, { head: `${witnessHead}${witnessHead}` }),
     "changed header": witness(base, {
-      head: witnessHead.replace("grammar 1", "grammar 2"),
+      head: witnessHead.replace("grammar 2", "grammar 1"),
     }),
     "no header": witness(base, { head: "" }),
     "byte-order mark": `${String.fromCharCode(0xfeff)}${good}`,
@@ -251,7 +264,7 @@ describe("witness grammar", () => {
 });
 
 const typesHead =
-  "// SharpLadder.Content type emitter output, grammar 2. Do not edit.\n\n";
+  "// SharpLadder.Content type emitter output, grammar 3. Do not edit.\n\n";
 const types = (body, head = typesHead) => `${head}${body}\n`;
 const everyKind = [
   'import type { Body, Spans } from "./body.ts";',
@@ -275,6 +288,10 @@ const everyKind = [
   "  filled?: [Body] | [Body, Body];",
   "  one: [Body];",
   "  rows: ([] | [Body])[];",
+  "  maybe?: Body | null;",
+  "  text: null | string;",
+  "  late: Spans[] | null;",
+  "  holes: (null | Body)[];",
   "};",
   "",
   "export type ContentDoc = Shape | Plain;",
@@ -295,6 +312,15 @@ describe("type module grammar", () => {
     "object keyword": "export type Shape = object;",
     undefined: "export type Shape = undefined;",
     null: "export type Shape = null;",
+    "null beside a lone object type":
+      "export type Shape = { a: string } | null;",
+    "null beside a nullable union": "export type Shape = (A | null) | null;",
+    "repeated null": "export type Shape = A | null | B | null;",
+    "null property": "export type Shape = {\n  a: null;\n};",
+    "optional null property": "export type Shape = {\n  a?: null;\n};",
+    "null array": "export type Shape = null[];",
+    "null tuple": "export type Shape = [null, ...null[]];",
+    "null with bounded tuples": "export type Shape = [] | [A] | null;",
     "bigint literal": "export type Shape = 1n;",
     "negative boolean literal": "export type Shape = -true;",
     "regular expression literal": "export type Shape = /a/;",
@@ -566,12 +592,92 @@ describe("type module grammar", () => {
   });
 });
 
+describe("null beside one member", () => {
+  const body = types(
+    [
+      "export type Pair = number | string;",
+      "",
+      "export type Named = Pair;",
+      "",
+      "export type Slot = Named | null;",
+    ].join("\n"),
+  );
+  const content = (shape) =>
+    types(
+      [
+        'import type { Named, Slot } from "./body.ts";',
+        "",
+        `export type Shape = ${shape};`,
+        "",
+        "export type ContentDoc = Shape;",
+      ].join("\n"),
+    );
+  const modules = (shape) =>
+    new Map([
+      ["body.ts", body],
+      ["content.ts", content(shape)],
+    ]);
+
+  it("passes a member that admits no null, in either order", () => {
+    for (const shape of ["Named | null", "null | Named", "string | null"]) {
+      expect(typeModuleProblems("content.ts", content(shape))).toEqual([]);
+      expect(nullableProblems(modules(shape))).toEqual([]);
+    }
+  });
+
+  it("refuses a member that admits null through an alias", () => {
+    expect(nullableProblems(modules("Slot | null"))).toEqual([
+      "content.ts: Shape: null joins a member that admits null itself",
+    ]);
+    expect(nullableProblems(modules("null | Slot[]"))).toEqual([]);
+  });
+
+  it("follows aliases within one module", () => {
+    const text = types(
+      [
+        "export type A = string | null;",
+        "",
+        "export type B = A;",
+        "",
+        "export type C = B | null;",
+      ].join("\n"),
+    );
+    expect(nullableProblems(new Map([["body.ts", text]]))).toEqual([
+      "body.ts: C: null joins a member that admits null itself",
+    ]);
+  });
+
+  it("ends on an alias cycle", () => {
+    const text = types(
+      [
+        "export type A = B;",
+        "",
+        "export type B = A;",
+        "",
+        "export type C = A | null;",
+      ].join("\n"),
+    );
+    expect(nullableProblems(new Map([["body.ts", text]]))).toEqual([]);
+  });
+
+  it("names the module in the generated tree", () => {
+    const root = tree({
+      "src/generated/body.ts": body,
+      "src/generated/content.ts": content("{\n  a: Slot | null;\n}"),
+    });
+    const src = admitTree(join(root, "src"));
+    expect(generatedProblems(src.root, src.admitted)).toEqual([
+      "src/generated/content.ts: Shape: null joins a member that admits null itself",
+    ]);
+  });
+});
+
 describe("generated tree", () => {
   it("names the file for every problem and refuses stray modules", () => {
     const root = tree({
       "src/generated/body.ts": types("export type A = any;"),
       "src/generated/extra.ts": "export {};\n",
-      "src/generated/witness/a.ts": witness("{ a: null }", {
+      "src/generated/witness/a.ts": witness("{ a: undefined }", {
         imports: 'import type { ContentDoc } from "../content.ts";\n\n',
       }),
     });
@@ -588,4 +694,108 @@ describe("generated tree", () => {
       /^src\/generated\/witness\/a\.ts: witness\.a: \w+ is not an admitted value$/u,
     );
   });
+});
+
+describe("null, primitive and untagged union forms", () => {
+  const fixtures = join(
+    web,
+    "..",
+    "tools",
+    "SharpLadder.Content.Tests",
+    "fixtures",
+  );
+  const forms = join(fixtures, "emitter", "forms");
+  const witnesses = join(fixtures, "witness", "forms");
+  const read = (folder, name) => readFileSync(join(folder, name), "utf8");
+  const modules = new Map([
+    ["body.ts", read(forms, "body.ts.expected")],
+    ["content.ts", read(forms, "content.ts.expected")],
+  ]);
+  const witnessText = (name) => read(witnesses, `${name}.ts.expected`);
+  // Each is the accepted witness with one change, so that change is what the checker refuses.
+  const refusedWitnesses = [
+    "both",
+    "neither",
+    "null-value",
+    "boolean-cell",
+    "label-number",
+  ];
+
+  it("passes the type grammar", () => {
+    for (const [name, text] of modules)
+      expect(typeModuleProblems(name, text)).toEqual([]);
+    expect(nullableProblems(modules)).toEqual([]);
+  });
+
+  // Emitted modules land where format:check reads them, and these goldens sit outside its reach.
+  it("keeps both type modules in the web's Prettier format", async () => {
+    const options = await resolveConfig(join(web, ".prettierrc.json"));
+    expect(options).not.toBeNull();
+    for (const [name, text] of modules)
+      expect(
+        Buffer.from(await format(text, { ...options, parser: "typescript" })),
+      ).toEqual(readFileSync(join(forms, `${name}.expected`)));
+  });
+
+  it("passes the witness grammar", () => {
+    for (const name of ["accepted", ...refusedWitnesses])
+      expect(
+        witnessProblems(`witness/chapters/forms/${name}.ts`, witnessText(name)),
+      ).toEqual([]);
+  });
+
+  // One program per witness, with the compiler options the web project uses for these modules.
+  const diagnostics = (name) => {
+    const files = new Map([
+      ["/forms/body.ts", modules.get("body.ts")],
+      ["/forms/content.ts", modules.get("content.ts")],
+      [`/forms/witness/chapters/forms/${name}.ts`, witnessText(name)],
+    ]);
+    const options = {
+      strict: true,
+      noEmit: true,
+      types: [],
+      module: ts.ModuleKind.Preserve,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      allowImportingTsExtensions: true,
+      exactOptionalPropertyTypes: true,
+      noUncheckedIndexedAccess: true,
+    };
+    // The compiler may hand the in-memory paths back with a drive letter on Windows.
+    const key = (file) => file.replace(/^[A-Za-z]:/u, "");
+    const host = ts.createCompilerHost(options);
+    const getSourceFile = host.getSourceFile.bind(host);
+    const fileExists = host.fileExists.bind(host);
+    const readFile = host.readFile.bind(host);
+    host.getSourceFile = (file, version) =>
+      files.has(key(file))
+        ? ts.createSourceFile(file, files.get(key(file)), version)
+        : getSourceFile(file, version);
+    host.fileExists = (file) => files.has(key(file)) || fileExists(file);
+    host.readFile = (file) => files.get(key(file)) ?? readFile(file);
+    host.directoryExists = (folder) =>
+      [...files.keys()].some((f) => f.startsWith(`${key(folder)}/`));
+    host.realpath = (file) => file;
+    const program = ts.createProgram([...files.keys()], options, host);
+    return ts
+      .getPreEmitDiagnostics(program)
+      .map(
+        (d) =>
+          `${key(d.file?.fileName ?? "-")}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
+      );
+  };
+
+  it("type-checks the accepted witness against the emitted types", () => {
+    expect(diagnostics("accepted")).toEqual([]);
+  });
+
+  for (const name of refusedWitnesses)
+    it(`refuses the ${name} witness in its own module only`, () => {
+      const found = diagnostics(name);
+      expect(found).not.toEqual([]);
+      for (const d of found)
+        expect(d.startsWith(`/forms/witness/chapters/forms/${name}.ts: `)).toBe(
+          true,
+        );
+    });
 });

@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -67,6 +67,43 @@ export const witness = {
             },
           ],
         },
+        {
+          type: "walk-it",
+          blockId: "build-fix-nest/b2",
+          id: "walk-fix-nest",
+          title: [
+            {
+              type: "text",
+              text: "Replace a word",
+            },
+          ],
+          cells: ["old"],
+          sequences: [
+            {
+              name: "once",
+              introBlockId: "build-fix-nest/b2.1.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "The cell holds a word.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "build-fix-nest/b2.1.s1",
+                  dst: 0,
+                  value: "new",
+                  note: [
+                    {
+                      type: "text",
+                      text: "A new word takes its place.",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
       spoken: {
         segments: [
@@ -77,9 +114,30 @@ export const witness = {
             },
             text: "Spans nest: outer middle inner middle outer.",
           },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-nest/b2",
+            },
+            text: "Replace a word",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-nest/b2.1.s0",
+            },
+            text: "The cell holds a word.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-nest/b2.1.s1",
+            },
+            text: "A new word takes its place.",
+          },
         ],
         audio:
-          "sha256:dc9e39fbd2ba71966a85fe1ee9a8c62773ea0de7fffaec2f34b4715752d90701",
+          "sha256:d60f80529f749c565a41740e47843a2f44d2e3c6d19cb2c69f09ac3ace097b7e",
       },
     },
     {
@@ -229,6 +287,43 @@ export const witness = {
                 ],
               ],
             },
+            {
+              type: "walk-it",
+              blockId: "build-fix-total/b6",
+              id: "walk-fix-sum",
+              title: [
+                {
+                  type: "text",
+                  text: "Store the total",
+                },
+              ],
+              cells: [0],
+              sequences: [
+                {
+                  name: "once",
+                  introBlockId: "build-fix-total/b6.1.s0",
+                  intro: [
+                    {
+                      type: "text",
+                      text: "The total starts at zero.",
+                    },
+                  ],
+                  steps: [
+                    {
+                      blockId: "build-fix-total/b6.1.s1",
+                      dst: 0,
+                      value: 74,
+                      note: [
+                        {
+                          type: "text",
+                          text: "The call stores the whole total at once.",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
           ],
         },
       ],
@@ -276,9 +371,30 @@ export const witness = {
             },
             text: "Columns: Call, Result. Row 1. Call: Sum; Result: 74. Row 2. Call: Each; Result: one loop.",
           },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-total/b6",
+            },
+            text: "Store the total",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-total/b6.1.s0",
+            },
+            text: "The total starts at zero.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "build-fix-total/b6.1.s1",
+            },
+            text: "The call stores the whole total at once.",
+          },
         ],
         audio:
-          "sha256:7a2343c7d8aa73b4c94faa531afa23f9a5c16c827e80f24cd9cb33a0fac519eb",
+          "sha256:1df3c88522146dad018484d7ebd77ee4688b22d15c0783f0d3f87c1eca4d0e0d",
       },
     },
     {

@@ -1,9 +1,11 @@
 import { StrictMode } from "react";
+import type { ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import { ContentView } from "../../src/content/ContentView.tsx";
 import { buildSlugMap } from "../../src/content/href.ts";
 import { BuildController } from "./BuildController.tsx";
 import { HintsController } from "./HintsController.tsx";
+import { useWalkControl } from "./WalkController.ts";
 import { witness as build } from "../../src/generated/witness/chapters/fixture-basics/build.ts";
 import { witness as cards } from "../../src/generated/witness/chapters/fixture-basics/cards.ts";
 import { witness as basics } from "../../src/generated/witness/chapters/fixture-basics/chapter.ts";
@@ -36,17 +38,30 @@ const parts = [syntax, gotchas, build, idioms, library, cards, drill].sort(
 const entries = [loopTerm, setTerm, unassigned, nullCall, offByOne];
 const host = document.body.appendChild(document.createElement("div"));
 
-// The hosting page owns the single h1 and puts the chapter title there.
-createRoot(host).render(
-  <StrictMode>
-    <main data-harness={marker} data-preflight={certificate}>
+// The hosting page owns the single h1 and puts the chapter title there, and every walk on it
+// moves under the one walk control. Exported because fast refresh needs a component's module
+// to have exports.
+export function Page({ preflight }: { preflight: string }): ReactElement {
+  const walkControl = useWalkControl();
+  return (
+    <main data-harness={marker} data-preflight={preflight}>
       <h1>{basics.title}</h1>
-      <ContentView doc={basics} slugs={slugs} />
+      <ContentView doc={basics} slugs={slugs} walkControl={walkControl} />
       {parts.map((part) =>
         part.kind === "build" ? (
-          <BuildController key={part.kind} part={part} slugs={slugs} />
+          <BuildController
+            key={part.kind}
+            part={part}
+            slugs={slugs}
+            walkControl={walkControl}
+          />
         ) : (
-          <ContentView key={part.kind} doc={part} slugs={slugs} />
+          <ContentView
+            key={part.kind}
+            doc={part}
+            slugs={slugs}
+            walkControl={walkControl}
+          />
         ),
       )}
       <HintsController
@@ -54,8 +69,19 @@ createRoot(host).render(
         references={["ladder-lone-word", "ladder-lone-word-alt"]}
       />
       {entries.map((entry) => (
-        <ContentView key={entry.id} doc={entry} slugs={slugs} />
+        <ContentView
+          key={entry.id}
+          doc={entry}
+          slugs={slugs}
+          walkControl={walkControl}
+        />
       ))}
     </main>
+  );
+}
+
+createRoot(host).render(
+  <StrictMode>
+    <Page preflight={certificate} />
   </StrictMode>,
 );

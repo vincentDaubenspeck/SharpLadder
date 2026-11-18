@@ -1,0 +1,16 @@
+{
+  "type": "probe",
+  "cells": [3, "x", null],
+  "value": "word",
+  "inline": 4,
+  "mark": { "type": "flag" },
+  "spare": null,
+  "steps": [
+    { "dst": 2, "src": 0, "note": "copy the first", "lost": true },
+    { "dst": 0, "value": 9, "note": "write a literal" }
+  ],
+  "slots": [9007199254740991, null, "z"],
+  "label": 3,
+  "index": 9,
+  "maybe": -9007199254740991
+}

@@ -33,19 +33,12 @@ import type { CaseKey, CaseList, ExpectedRecord } from "./acceptance.ts";
 import { acceptEnvelope } from "./envelope.ts";
 import type { RecordKind } from "./envelope.ts";
 import { recordInventory } from "./inventory.ts";
-import { runTestRecords } from "./records.ts";
+import { buildingBudget, runTestRecords } from "./records.ts";
 
 const web = join(import.meta.dirname, "..");
-// The kinds come from the compiler, as in the run itself; the global setup has built it.
-const certified = runTestRecords({ builtByGlobalSetup: true });
-const all: readonly ExpectedRecord[] = acceptEnvelope(
-  certified.stdout,
-  certified.exit,
-  recordInventory(join(web, "compiled")),
-).map(({ path, kind, part }) => ({ path, kind, part }));
-const expected = all.filter(
-  (r) => r.kind !== "aliases" && r.kind !== "patterns",
-);
+// Filled once by the records run below, before any case reads them.
+let all: readonly ExpectedRecord[] = [];
+let expected: readonly ExpectedRecord[] = [];
 const scratch = join(web, ".cache");
 mkdirSync(scratch, { recursive: true });
 const temp = mkdtempSync(join(scratch, "acceptance-test-"));
@@ -124,14 +117,29 @@ const report = (
 const judged = (value: unknown, records: readonly ExpectedRecord[] = all) =>
   evidenceProblems(value, web, records);
 
-// Every rendered record makes the round trip, only those with audio slots have a speech case,
-// and hints records have their own cases.
-const renderedBacked =
-  expected.filter((r) => judges(roundTrip, r)).length * roundTripCases.length +
-  expected.filter((r) => judges(speech, r)).length * speech.cases.length;
-const recordBacked = renderedBacked + hintCases().length;
+let renderedBacked = 0;
+let recordBacked = 0;
+let first = "";
 
-const first = expected[0]?.path ?? "";
+// The kinds come from the compiler, as in the run itself; the global setup has built it. One
+// records run fits the hook's budget.
+beforeAll(async () => {
+  const certified = await runTestRecords({ builtByGlobalSetup: true });
+  all = acceptEnvelope(
+    certified.stdout,
+    certified.exit,
+    recordInventory(join(web, "compiled")),
+  ).map(({ path, kind, part }) => ({ path, kind, part }));
+  expected = all.filter((r) => r.kind !== "aliases" && r.kind !== "patterns");
+  // Every rendered record makes the round trip, only those with audio slots have a speech
+  // case, and hints records have their own cases.
+  renderedBacked =
+    expected.filter((r) => judges(roundTrip, r)).length *
+      roundTripCases.length +
+    expected.filter((r) => judges(speech, r)).length * speech.cases.length;
+  recordBacked = renderedBacked + hintCases().length;
+  first = expected[0]?.path ?? "";
+}, 40_000);
 const firstCase = roundTripCases[0] ?? "";
 const gap = (found: string) =>
   `${first}: "${firstCase}" must pass exactly once, found [${found}]`;
@@ -754,125 +762,139 @@ describe("an offline install under the child runner's environment", () => {
 });
 
 // Each run below is a real Vitest run of the round-trip file through the acceptance entry.
-describe("the acceptance run", { timeout: 300_000 }, () => {
-  const run = (extra: string[]) => {
-    const lines: string[] = [];
-    const exit = acceptRun(extra, (line) => lines.push(line));
-    return { exit, lines };
-  };
+// Each case runs Vitest, whose global setup builds and runs test-records, and then builds and
+// runs it again itself: two building budgets. The nested files get three times the slowest
+// nested run seen (9.5 s), and the caller its report and folder work.
+const nestedRun = 30_000;
+const callerWork = 10_000;
 
-  it("fails when a name filter skips the record-backed cases", () => {
-    const { exit, lines } = run([
-      roundTripFile,
-      speechFile,
-      hintsFile,
-      registryFile,
-      "-t",
-      "strict binding",
-    ]);
-    expect(exit).toBe(1);
-    expect(lines).toContain(`acceptance evidence: ${gap("skipped")}`);
-    expect(lines).toHaveLength(
-      recordBacked + aliases.cases.length + patterns.cases.length,
-    );
-  });
+describe(
+  "the acceptance run",
+  { timeout: 2 * buildingBudget + nestedRun + callerWork },
+  () => {
+    const run = async (extra: string[]) => {
+      const lines: string[] = [];
+      const exit = await acceptRun(extra, (line) => lines.push(line));
+      return { exit, lines };
+    };
 
-  it("fails when the round-trip file is not part of the run", () => {
-    const { exit, lines } = run(["src/App.test.tsx"]);
-    expect(exit).toBe(1);
-    expect(lines).toEqual([
-      `acceptance evidence: ${roundTripFile} has 0 results in the Vitest report`,
-      `acceptance evidence: ${speechFile} has 0 results in the Vitest report`,
-      `acceptance evidence: ${hintsFile} has 0 results in the Vitest report`,
-      `acceptance evidence: ${registryFile} has 0 results in the Vitest report`,
-    ]);
-  });
-
-  it.each([
-    [speechFile, [roundTripFile, hintsFile, registryFile]],
-    [hintsFile, [roundTripFile, speechFile, registryFile]],
-    [registryFile, [roundTripFile, speechFile, hintsFile]],
-  ])("fails when %s is not part of the run", (missing, files) => {
-    const { exit, lines } = run(files);
-    expect(exit).toBe(1);
-    expect(lines).toEqual([
-      `acceptance evidence: ${missing} has 0 results in the Vitest report`,
-    ]);
-  });
-
-  const withVariable = <T>(key: string, value: string, body: () => T): T => {
-    const before = process.env[key];
-    process.env[key] = value;
-    try {
-      return body();
-    } finally {
-      if (before === undefined) Reflect.deleteProperty(process.env, key);
-      else process.env[key] = before;
-    }
-  };
-
-  it("keeps the caller's NODE_OPTIONS preload out of the runner", () => {
-    const marker = join(temp, "preloaded");
-    const preload = join(temp, "preload.cjs");
-    writeFileSync(
-      preload,
-      `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "loaded");\n`,
-    );
-    const { exit } = withVariable(
-      "NODE_OPTIONS",
-      `--require ${JSON.stringify(preload)}`,
-      () => run([roundTripFile, speechFile, hintsFile, registryFile]),
-    );
-    expect(existsSync(marker)).toBe(false);
-    expect(exit).toBe(0);
-  });
-
-  it("runs in test mode whatever the caller's NODE_ENV", () => {
-    const seen = join(temp, "node-env");
-    const config = join(temp, "node-env.config.ts");
-    writeFileSync(
-      config,
-      [
-        'import { writeFileSync } from "node:fs";',
-        'import base from "../../vite.config.ts";',
-        `writeFileSync(${JSON.stringify(seen)}, String(process.env.NODE_ENV));`,
-        "export default {",
-        "  ...base,",
-        `  root: ${JSON.stringify(web)},`,
-        "};",
-        "",
-      ].join("\n"),
-    );
-    const { exit } = withVariable("NODE_ENV", "production", () =>
-      run([
+    it("fails when a name filter skips the record-backed cases", async () => {
+      const { exit, lines } = await run([
         roundTripFile,
         speechFile,
         hintsFile,
         registryFile,
-        "--config",
-        config,
-      ]),
-    );
-    expect(readFileSync(seen, "utf8")).toBe("test");
-    expect(exit).toBe(0);
-  });
+        "-t",
+        "strict binding",
+      ]);
+      expect(exit).toBe(1);
+      expect(lines).toContain(`acceptance evidence: ${gap("skipped")}`);
+      expect(lines).toHaveLength(
+        recordBacked + aliases.cases.length + patterns.cases.length,
+      );
+    });
 
-  it("fails when the configuration drops the global setup", () => {
-    const config = join(temp, "no-setup.config.ts");
-    writeFileSync(
-      config,
-      [
-        'import base from "../../vite.config.ts";',
-        "export default {",
-        "  ...base,",
-        `  root: ${JSON.stringify(web)},`,
-        "  test: { ...base.test, globalSetup: [] },",
-        "};",
-        "",
-      ].join("\n"),
-    );
-    const { exit, lines } = run([roundTripFile, "--config", config]);
-    expect(exit).not.toBe(0);
-    expect(lines).toEqual([]);
-  });
-});
+    it("fails when the round-trip file is not part of the run", async () => {
+      const { exit, lines } = await run(["src/App.test.tsx"]);
+      expect(exit).toBe(1);
+      expect(lines).toEqual([
+        `acceptance evidence: ${roundTripFile} has 0 results in the Vitest report`,
+        `acceptance evidence: ${speechFile} has 0 results in the Vitest report`,
+        `acceptance evidence: ${hintsFile} has 0 results in the Vitest report`,
+        `acceptance evidence: ${registryFile} has 0 results in the Vitest report`,
+      ]);
+    });
+
+    it.each([
+      [speechFile, [roundTripFile, hintsFile, registryFile]],
+      [hintsFile, [roundTripFile, speechFile, registryFile]],
+      [registryFile, [roundTripFile, speechFile, hintsFile]],
+    ])("fails when %s is not part of the run", async (missing, files) => {
+      const { exit, lines } = await run(files);
+      expect(exit).toBe(1);
+      expect(lines).toEqual([
+        `acceptance evidence: ${missing} has 0 results in the Vitest report`,
+      ]);
+    });
+
+    const withVariable = async <T>(
+      key: string,
+      value: string,
+      body: () => Promise<T>,
+    ): Promise<T> => {
+      const before = process.env[key];
+      process.env[key] = value;
+      try {
+        return await body();
+      } finally {
+        if (before === undefined) Reflect.deleteProperty(process.env, key);
+        else process.env[key] = before;
+      }
+    };
+
+    it("keeps the caller's NODE_OPTIONS preload out of the runner", async () => {
+      const marker = join(temp, "preloaded");
+      const preload = join(temp, "preload.cjs");
+      writeFileSync(
+        preload,
+        `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "loaded");\n`,
+      );
+      const { exit } = await withVariable(
+        "NODE_OPTIONS",
+        `--require ${JSON.stringify(preload)}`,
+        () => run([roundTripFile, speechFile, hintsFile, registryFile]),
+      );
+      expect(existsSync(marker)).toBe(false);
+      expect(exit).toBe(0);
+    });
+
+    it("runs in test mode whatever the caller's NODE_ENV", async () => {
+      const seen = join(temp, "node-env");
+      const config = join(temp, "node-env.config.ts");
+      writeFileSync(
+        config,
+        [
+          'import { writeFileSync } from "node:fs";',
+          'import base from "../../vite.config.ts";',
+          `writeFileSync(${JSON.stringify(seen)}, String(process.env.NODE_ENV));`,
+          "export default {",
+          "  ...base,",
+          `  root: ${JSON.stringify(web)},`,
+          "};",
+          "",
+        ].join("\n"),
+      );
+      const { exit } = await withVariable("NODE_ENV", "production", () =>
+        run([
+          roundTripFile,
+          speechFile,
+          hintsFile,
+          registryFile,
+          "--config",
+          config,
+        ]),
+      );
+      expect(readFileSync(seen, "utf8")).toBe("test");
+      expect(exit).toBe(0);
+    });
+
+    it("fails when the configuration drops the global setup", async () => {
+      const config = join(temp, "no-setup.config.ts");
+      writeFileSync(
+        config,
+        [
+          'import base from "../../vite.config.ts";',
+          "export default {",
+          "  ...base,",
+          `  root: ${JSON.stringify(web)},`,
+          "  test: { ...base.test, globalSetup: [] },",
+          "};",
+          "",
+        ].join("\n"),
+      );
+      const { exit, lines } = await run([roundTripFile, "--config", config]);
+      expect(exit).not.toBe(0);
+      expect(lines).toEqual([]);
+    });
+  },
+);

@@ -1,4 +1,4 @@
-// SharpLadder.Content witness emitter output, grammar 1. Do not edit.
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
 
 import type { ContentDoc } from "../../../content.ts";
 
@@ -69,6 +69,43 @@ export const witness = {
         },
       ],
     },
+    {
+      type: "walk-it",
+      blockId: "intro/b3",
+      id: "walk-fix-intro",
+      title: [
+        {
+          type: "text",
+          text: "Change one cell",
+        },
+      ],
+      cells: [1],
+      sequences: [
+        {
+          name: "once",
+          introBlockId: "intro/b3.1.s0",
+          intro: [
+            {
+              type: "text",
+              text: "Write a new value over the old one.",
+            },
+          ],
+          steps: [
+            {
+              blockId: "intro/b3.1.s1",
+              dst: 0,
+              value: 2,
+              note: [
+                {
+                  type: "text",
+                  text: "The cell now holds two.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   ],
   sections: [
     {
@@ -90,6 +127,43 @@ export const witness = {
             },
           ],
         },
+        {
+          type: "walk-it",
+          blockId: "fix-parts/b2",
+          id: "walk-fix-parts",
+          title: [
+            {
+              type: "text",
+              text: "Fill an empty cell",
+            },
+          ],
+          cells: [null],
+          sequences: [
+            {
+              name: "once",
+              introBlockId: "fix-parts/b2.1.s0",
+              intro: [
+                {
+                  type: "text",
+                  text: "Start with nothing in the cell.",
+                },
+              ],
+              steps: [
+                {
+                  blockId: "fix-parts/b2.1.s1",
+                  dst: 0,
+                  value: 3,
+                  note: [
+                    {
+                      type: "text",
+                      text: "The cell now holds three.",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       ],
       spoken: {
         segments: [
@@ -100,9 +174,30 @@ export const witness = {
             },
             text: "Each part file compiles to its own JSON file, at the same relative path.",
           },
+          {
+            target: {
+              type: "block",
+              blockId: "fix-parts/b2",
+            },
+            text: "Fill an empty cell",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "fix-parts/b2.1.s0",
+            },
+            text: "Start with nothing in the cell.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "fix-parts/b2.1.s1",
+            },
+            text: "The cell now holds three.",
+          },
         ],
         audio:
-          "sha256:418d813c1fca023581a7488e1b36161bc59f5998714dd4e55119a88eecf64f3d",
+          "sha256:3a1884162bb74ed0391633fcf3fe94792078b4f0211794c43381c6d29d508c51",
       },
     },
     {

@@ -113,9 +113,24 @@ const cases = [
 ];
 
 describe("content harness preflight", () => {
-  beforeAll(() => {
+  // Two records runs, each within its 32 s budget.
+  beforeAll(async () => {
     // Proves the copy itself is sound, so each refusal below comes from its one change.
-    expect(preflight(copy(), records)).toBe(preflight(repository, records));
+    expect(await preflight(copy(), records)).toBe(
+      await preflight(repository, records),
+    );
+  }, 80_000);
+
+  it("never starts Vite when the records run rejects", async () => {
+    const tree = copy();
+    const outDir = join(tree, "web", ".cache", "harness-dist");
+    const failure = new Error(
+      "content compiler test-records timed out after 20000 ms",
+    );
+    await expect(
+      buildHarness({ tree, outDir, records: () => Promise.reject(failure) }),
+    ).rejects.toBe(failure);
+    expect(existsSync(outDir)).toBe(false);
   });
 
   it.each(cases)(
@@ -165,12 +180,12 @@ describe("content harness preflight", () => {
 });
 
 // The preflight's own path, given an envelope the compiler did not write.
-function altered(change) {
-  const run = records({ repository });
+async function altered(change) {
+  const run = await records({ repository });
   const parsed = JSON.parse(new TextDecoder().decode(run.stdout));
   change(parsed.records);
   const stdout = new TextEncoder().encode(JSON.stringify(parsed));
-  return () => ({ stdout, stderr: "", exit: 0 });
+  return () => Promise.resolve({ stdout, stderr: "", exit: 0 });
 }
 
 describe("content harness preflight record set", () => {
@@ -199,36 +214,30 @@ describe("content harness preflight record set", () => {
         });
       },
     ],
-  ])("refuses %s", { timeout: 60_000 }, (_, change) => {
-    expect(() => preflight(repository, altered(change))).toThrow(membership);
+  ])("refuses %s", { timeout: 40_000 }, async (_, change) => {
+    await expect(preflight(repository, await altered(change))).rejects.toThrow(
+      membership,
+    );
   });
 
   it(
     "accepts the compiler's own envelope through the same path",
-    { timeout: 60_000 },
-    () => {
-      expect(
-        preflight(
-          repository,
-          altered(() => {}),
-        ),
-      ).toBe(preflight(repository, records));
+    { timeout: 80_000 },
+    async () => {
+      expect(await preflight(repository, await altered(() => {}))).toBe(
+        await preflight(repository, records),
+      );
     },
   );
 
   it(
     "refuses when the inventory of the checked tree fails",
-    { timeout: 60_000 },
-    () => {
+    { timeout: 80_000 },
+    async () => {
       const tree = copy((t) => {
         writeFileSync(at(t, "web/compiled/notes.txt"), "");
       });
-      expect(() =>
-        preflight(
-          tree,
-          altered(() => {}),
-        ),
-      ).toThrow(
+      await expect(preflight(tree, await altered(() => {}))).rejects.toThrow(
         /preflight refused: .*compiled inventory refused: .*compiled\/notes\.txt/u,
       );
     },

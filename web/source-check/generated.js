@@ -3,9 +3,9 @@ import ts from "typescript";
 import { shown } from "./paths.js";
 
 const typesHeader =
-  "// SharpLadder.Content type emitter output, grammar 2. Do not edit.";
+  "// SharpLadder.Content type emitter output, grammar 3. Do not edit.";
 const witnessHeader =
-  "// SharpLadder.Content witness emitter output, grammar 1. Do not edit.";
+  "// SharpLadder.Content witness emitter output, grammar 2. Do not edit.";
 const typeModules = new Set(["body.ts", "content.ts"]);
 const propertyName = /^[a-z][A-Za-z0-9]{0,47}(?![\s\S])/u;
 const aliasName = /^[A-Z][A-Za-z0-9]{0,47}(?![\s\S])/u;
@@ -117,8 +117,12 @@ function valueProblems(file, node, at, problems) {
   } else if (ts.isStringLiteral(node)) {
     if (!node.getText(file).startsWith('"'))
       problems.push(`${at}: string is not double-quoted`);
-  } else if (node.kind === K.TrueKeyword || node.kind === K.FalseKeyword) {
-    // Boolean literals are admitted as they stand.
+  } else if (
+    node.kind === K.TrueKeyword ||
+    node.kind === K.FalseKeyword ||
+    node.kind === K.NullKeyword
+  ) {
+    // Boolean and null literals are admitted as they stand.
   } else if (ts.isNumericLiteral(node)) {
     const p = numberProblem(file, node);
     if (p) problems.push(`${at}: ${p}`);
@@ -227,6 +231,9 @@ function sameType(a, b) {
   return xs.length === ys.length && xs.every((c, i) => sameType(c, ys[i]));
 }
 
+const isNull = (node) =>
+  ts.isLiteralTypeNode(node) && node.literal.kind === K.NullKeyword;
+
 const maxBound = 16;
 const isBounded = (node) =>
   ts.isTupleTypeNode(node) && !node.elements.some((e) => ts.isRestTypeNode(e));
@@ -295,6 +302,9 @@ function typeNodeProblems(file, node, at, problems, place = "alias") {
         // A negative safe integer literal type.
       } else if (l.kind === K.TrueKeyword || l.kind === K.FalseKeyword) {
         // A boolean literal type.
+      } else if (l.kind === K.NullKeyword) {
+        if (place !== "union")
+          problems.push(`${at}: null is admitted only as a union member`);
       } else problems.push(`${at}: literal type is not admitted`);
       return;
     }
@@ -332,6 +342,13 @@ function typeNodeProblems(file, node, at, problems, place = "alias") {
         if (p) problems.push(`${at}: ${p}`);
         return;
       }
+      // The formatter hugs an object type beside a lone null, a layout the emitter never writes.
+      if (
+        node.types.length === 2 &&
+        node.types.some(isNull) &&
+        node.types.some((t) => ts.isTypeLiteralNode(t))
+      )
+        problems.push(`${at}: null joins a lone object type`);
       node.types.forEach((t, i) => {
         if (ts.isUnionTypeNode(t) || ts.isParenthesizedTypeNode(t))
           problems.push(
@@ -424,21 +441,68 @@ export function typeModuleProblems(name, text) {
   return problems;
 }
 
+/**
+ * A union keeps the schema's oneOf meaning only while no member beside null admits null itself,
+ * which an alias may hide, so aliases are followed across the type modules given by name.
+ */
+export function nullableProblems(modules) {
+  const aliases = new Map();
+  const files = [...modules].map(([name, text]) => {
+    const file = parse(name, text, []);
+    for (const s of file.statements)
+      if (ts.isTypeAliasDeclaration(s)) aliases.set(s.name.text, s.type);
+    return [name, file];
+  });
+  const admitsNull = (node, seen) => {
+    const n = withoutParentheses(node);
+    if (isNull(n)) return true;
+    if (ts.isUnionTypeNode(n)) return n.types.some((t) => admitsNull(t, seen));
+    if (!ts.isTypeReferenceNode(n) || !ts.isIdentifier(n.typeName))
+      return false;
+    const name = n.typeName.text;
+    if (seen.has(name) || !aliases.has(name)) return false;
+    seen.add(name);
+    return admitsNull(aliases.get(name), seen);
+  };
+  const problems = [];
+  for (const [name, file] of files)
+    for (const s of file.statements) {
+      if (!ts.isTypeAliasDeclaration(s)) continue;
+      const visit = (node) => {
+        if (
+          ts.isUnionTypeNode(node) &&
+          node.types.some(isNull) &&
+          node.types.some((t) => !isNull(t) && admitsNull(t, new Set()))
+        )
+          problems.push(
+            `${name}: ${s.name.text}: null joins a member that admits null itself`,
+          );
+        ts.forEachChild(node, visit);
+      };
+      visit(s.type);
+    }
+  return problems;
+}
+
 /** Checks every admitted file under src/generated against its grammar. */
 export function generatedProblems(src, admitted) {
   const problems = [];
+  const types = new Map();
   for (const { path: full } of admitted) {
     const path = shown(src, full);
     if (!path.startsWith("generated/")) continue;
     const inner = path.slice("generated/".length);
     const read = () => strict.decode(readFileSync(full));
     let found;
-    if (typeModules.has(inner)) found = typeModuleProblems(inner, read());
-    else if (/^witness\/.+\.ts$/u.test(inner))
+    if (typeModules.has(inner)) {
+      types.set(inner, read());
+      found = typeModuleProblems(inner, types.get(inner));
+    } else if (/^witness\/.+\.ts$/u.test(inner))
       found = witnessProblems(inner, read());
     else found = ["is not a generated type or witness module"];
     for (const p of found) problems.push(`src/${path}: ${p}`);
   }
+  for (const p of nullableProblems(types)) problems.push(`src/generated/${p}`);
   return problems;
 }
 
@@ -451,6 +515,7 @@ function decode(node) {
   if (ts.isStringLiteral(node)) return node.text;
   if (ts.isNumericLiteral(node)) return Number(node.text);
   if (ts.isPrefixUnaryExpression(node)) return -Number(node.operand.text);
+  if (node.kind === K.NullKeyword) return null;
   return node.kind === K.TrueKeyword;
 }
 

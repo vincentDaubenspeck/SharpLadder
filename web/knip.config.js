@@ -23,6 +23,8 @@ export default {
     "src/generated/witness/**/*.ts",
     // Compile-only fixtures, checked by the type-test program and never imported.
     "type-tests/**/*.ts",
+    // Started by path as the process-group anchor of a supervised run, never imported.
+    "content-check/supervise-stub.js",
     // The harness entry is loaded by its own Vite page, never by the app.
     "harness/content/main.tsx",
   ],

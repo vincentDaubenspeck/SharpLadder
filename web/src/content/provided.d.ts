@@ -1,4 +1,5 @@
-// The records the Vitest global setup accepted from the compiler's test-records command.
+// What the Vitest global setup provides: the records it accepted from the compiler's
+// test-records command, and the text of the walk-it replay vectors file.
 declare module "vitest" {
   export interface ProvidedContext {
     contentRecords: readonly {
@@ -7,6 +8,7 @@ declare module "vitest" {
       readonly part: string | null;
       readonly text: string;
     }[];
+    walkReplayVectors: string;
   }
 }
 

@@ -172,20 +172,23 @@ internal sealed partial class SourceFile
 
     // A paragraph line that starts with a pipe is table syntax the parser did not take as a
     // table, so it is never shown as prose. A pipe inside a code span is that span's text.
-    private bool NoReservedPipe(ParagraphBlock paragraph, int line)
+    private bool NoReservedPipe(ParagraphBlock paragraph, int line) => NoReservedPipe(paragraph, line, _lines, _lineStarts);
+
+    // The lines are those of the text the paragraph was parsed from, with their start offsets.
+    private bool NoReservedPipe(ParagraphBlock paragraph, int line, string[] lines, int[] lineStarts)
     {
         var code = (paragraph.Inline?.Descendants<CodeInline>() ?? []).Select(c => c.Span).ToList();
-        var start = _lineStarts[paragraph.Line];
-        for (var index = paragraph.Line; index < _lines.Length && start <= paragraph.Span.End; index++)
+        var start = lineStarts[paragraph.Line];
+        for (var index = paragraph.Line; index < lines.Length && start <= paragraph.Span.End; index++)
         {
             var at = Math.Max(start, paragraph.Span.Start);
-            var end = start + _lines[index].Length;
-            while (at < end && _lines[index][at - start] is ' ' or '\t')
+            var end = start + lines[index].Length;
+            while (at < end && lines[index][at - start] is ' ' or '\t')
             {
                 at++;
             }
 
-            if (at < end && _lines[index][at - start] == '|' && !code.Exists(c => c.Start <= at && at <= c.End))
+            if (at < end && lines[index][at - start] == '|' && !code.Exists(c => c.Start <= at && at <= c.End))
             {
                 Error(line + index - paragraph.Line, $"a line that starts with | is read as a table and this one is not a table; {TableRule}, or start the line with \\| to show a pipe");
                 return false;

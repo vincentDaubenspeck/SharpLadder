@@ -11,13 +11,19 @@
 // Needs the pinned .NET SDK and nuget.org.
 import { createHash } from "node:crypto";
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { aliasRecord, compilerDll, contentProblems, fixture, retentionProblems } from "../checks/content.mjs";
 import { dotnet, env, exec } from "../checks/lib.mjs";
+import { claimWorkDir } from "./work-dir.mjs";
 
 const src = join(import.meta.dirname, "..", "..");
-const work = resolve(process.argv[2] ?? ".");
+const claim = claimWorkDir(process.argv.slice(2), "usage: node tools/tests/content-cases.mjs <empty work directory>");
+if (claim.problem) {
+  console.error(claim.problem);
+  process.exit(2);
+}
+const work = claim.dir;
 const node = process.execPath;
 const lines = (out) => out.split(/\r?\n/);
 
@@ -29,7 +35,6 @@ function check(label, ok, detail = "") {
   for (const line of detail.split(/\r?\n/).filter((l) => l.trim() !== "")) console.log(`  ${line}`);
 }
 
-mkdirSync(work, { recursive: true });
 const build = exec(dotnet, ["build", "tools/SharpLadder.Content/SharpLadder.Content.csproj", "-nologo"], { cwd: src });
 check("content compiler builds", build.code === 0, build.out);
 

@@ -1,22 +1,25 @@
 import type { ReactElement } from "react";
 import type { DrillList, DrillSection } from "../generated/content.ts";
 import { Blocks } from "./Blocks.tsx";
+import type { WalkControl } from "./Blocks.tsx";
 import type { SlugMap } from "./href.ts";
 import { Spans } from "./Spans.tsx";
 
 export function DrillSectionView({
   section,
   slugs,
+  walkControl,
 }: {
   section: DrillSection;
   slugs: SlugMap;
+  walkControl?: WalkControl | undefined;
 }): ReactElement {
   return (
     <section data-section-id={section.id}>
       <h3 id={section.id}>
         {section.number} <Spans spans={section.title} slugs={slugs} />
       </h3>
-      <Blocks blocks={section.body} slugs={slugs} />
+      <Blocks blocks={section.body} slugs={slugs} walkControl={walkControl} />
       <DrillListView block={section.drills} />
     </section>
   );

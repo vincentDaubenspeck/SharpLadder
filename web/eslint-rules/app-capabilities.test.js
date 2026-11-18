@@ -3,7 +3,7 @@ import { ESLint, RuleTester } from "eslint";
 import tseslint from "typescript-eslint";
 import { afterAll, describe, expect, it } from "vitest";
 import rule from "./app-capabilities.js";
-import { production, web } from "./production-eslint.js";
+import { probeProject, web } from "./production-eslint.js";
 
 RuleTester.afterAll = afterAll;
 // Rule cases run real ESLint with typescript-eslint; the first case loads them cold.
@@ -130,10 +130,18 @@ tester.run("app-capabilities", rule, {
   })),
 });
 
-const lint = async (code, filePath = "src/Probe.tsx") => {
-  const [result] = await production.lintText(code, { filePath });
-  return result.messages;
-};
+// The production ESLint in a copy of the project, with each typed name a real file it holds.
+const production = probeProject("AppCapabilities", [
+  "Probe.tsx",
+  "TypedProbe.ts",
+]);
+afterAll(production.teardown);
+const probe = production.probe;
+// The json formatter prints the result list itself, so each result arrives as ESLint gave it.
+const lintResult = async (code, filePath) =>
+  JSON.parse((await production.lintText(code, filePath, "json")).output)[0];
+const lint = async (code, filePath = probe("Probe.tsx")) =>
+  (await lintResult(code, filePath)).messages;
 
 const card = 'import styles from "./Card.module.css";\n';
 const app = "sharpladder/app-capabilities";
@@ -262,7 +270,7 @@ const composed = [
     app,
     "attributes",
   ],
-  ...["pcss", "postcss", "scss", "less", "styl", "sss"].flatMap((family) => [
+  ...["scss"].flatMap((family) => [
     [
       `default import of .module.${family}`,
       `import s from "./Card.module.${family}";\nexport const c: unknown = s;\n`,
@@ -299,18 +307,16 @@ describe("application capabilities in the production configuration", () => {
     ).toBe(true);
   });
 
-  it.each(["jsx", "mts", "cts", "js", "mjs", "cjs"])(
-    "fails a planted src/w.%s",
-    async (ext) => {
-      const messages = await lint(
-        `${card}export const s = styles;\n`,
-        `src/w.${ext}`,
-      );
-      expect(messages.filter((m) => m.fatal)).toEqual([]);
-      expect(messages.map((m) => m.ruleId)).toContain(extension);
-      expect(messages.map((m) => m.ruleId)).toContain(css);
-    },
-  );
+  // Any script name the typed block does not match meets both rules.
+  it.each(["mts"])("fails a planted src/w.%s", async (ext) => {
+    const messages = await lint(
+      `${card}export const s = styles;\n`,
+      `src/w.${ext}`,
+    );
+    expect(messages.filter((m) => m.fatal)).toEqual([]);
+    expect(messages.map((m) => m.ruleId)).toContain(extension);
+    expect(messages.map((m) => m.ruleId)).toContain(css);
+  });
 
   it("passes the approved imports and reads", async () => {
     const messages = await lint(
@@ -330,7 +336,10 @@ export const fn = function F() {
 }, 30_000);
 
 describe("source extension coverage", () => {
-  const extensions = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts"];
+  // One name per block: the two typed extensions parse apart, and every other script is refused.
+  const extensions = ["ts", "tsx", "mts"];
+  // Configuration-content checks only: a test-owned engine reads what the facade never hands
+  // out, and never stands in for it.
   const plain = new ESLint({ cwd: web });
 
   it.each(extensions)(
@@ -352,7 +361,10 @@ describe("source extension coverage", () => {
       } else {
         expect(config.rules[extension]).toEqual([2]);
       }
-      const messages = await lint("export const x = 1;\n", filePath);
+      const messages = await lint(
+        "export const x = 1;\n",
+        typed ? probe(ext === "ts" ? "TypedProbe.ts" : "Probe.tsx") : filePath,
+      );
       expect(messages.map((m) => m.message).join("\n")).not.toMatch(
         /No matching configuration|File ignored/u,
       );

@@ -64,6 +64,13 @@ function expectCleanExit(r) {
   expect(r.status).toBe(0);
 }
 
+// A launch error, a timeout or a signal leaves no exit of the child's own to judge.
+function expectOwnExit(r) {
+  expect(r.error).toBeUndefined();
+  expect(r.signal).toBeNull();
+  expect(r.status).toBeTypeOf("number");
+}
+
 const moduleUrl = (...path) =>
   JSON.stringify(pathToFileURL(join(web, ...path)).href);
 
@@ -286,6 +293,7 @@ describe("startup admission: each guard entry", () => {
     const r = entry([sweepingFlag], "guard.routeViolations(new Map())", {
       nodeOptions: "--concurrent-array-buffer-sweeping",
     });
+    expectOwnExit(r);
     // Node may refuse the variable before the script starts; either way nothing is admitted.
     expect(r.status === 0 && r.stdout.trim() === "returned []").toBe(false);
   });
@@ -375,6 +383,7 @@ describe("startup admission: the release helpers", () => {
     "never runs %s with the flag in the real NODE_OPTIONS",
     (_, call) => {
       const r = entry([sweepingFlag], call, { nodeOptions: sweepingFlag });
+      expectOwnExit(r);
       // Either Node refuses the variable before the script starts or the guard refuses the call.
       expect(r.stdout.trim()).toBe(
         r.status === 0 ? `threw build guard: startup: ${inOptions}` : "",

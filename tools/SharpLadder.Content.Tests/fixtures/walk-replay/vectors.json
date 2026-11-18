@@ -1,0 +1,371 @@
+{
+  "replays": [
+    {
+      "name": "a stated value is struck",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "zero and the empty string are struck as values",
+      "cells": [0, "", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 0, "value": 1, "lost": true }, { "dst": 1, "value": 2, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 0 }, { "value": "" }, { "value": null }] },
+            { "slots": [{ "value": 1, "struck": 0 }, { "value": "" }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 1, "struck": 0 }, { "value": 2, "struck": "" }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a literal over the starting null is then struck",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 2, "value": 5 }, { "dst": 2, "value": 6, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": 5 }], "last": { "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": 6, "struck": 5 }], "last": { "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a read before the strike",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 2, "src": 1 }, { "dst": 1, "value": 7, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": "ab" }], "last": { "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a read after the strike copies the new value",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }, { "dst": 2, "src": 1 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": 7 }], "last": { "src": 1, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the copy is written over before it is read",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [
+            { "dst": 2, "src": 1 },
+            { "dst": 1, "value": 7, "lost": true },
+            { "dst": 2, "value": 5 },
+            { "dst": 0, "src": 2 }
+          ],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": "ab" }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": 5 }], "last": { "dst": 2 } },
+            { "slots": [{ "value": 5 }, { "value": 7, "struck": "ab" }, { "value": 5 }], "last": { "src": 2, "dst": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a write over the copy is not a read",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 2, "src": 1 }, { "dst": 1, "value": 7, "lost": true }, { "dst": 2, "src": 0 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": "ab" }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": 4 }], "last": { "src": 0, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equal starting values are different tokens",
+      "cells": [5, 5, null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 0, "value": 9, "lost": true }, { "dst": 2, "src": 1 }],
+          "states": [
+            { "slots": [{ "value": 5 }, { "value": 5 }, { "value": null }] },
+            { "slots": [{ "value": 9, "struck": 5 }, { "value": 5 }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 9, "struck": 5 }, { "value": 5 }, { "value": 5 }], "last": { "src": 1, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a literal equal to the struck value",
+      "cells": [5, 0, null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 5 }, { "dst": 0, "value": 7, "lost": true }, { "dst": 2, "src": 1 }],
+          "states": [
+            { "slots": [{ "value": 5 }, { "value": 0 }, { "value": null }] },
+            { "slots": [{ "value": 5 }, { "value": 5 }, { "value": null }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 7, "struck": 5 }, { "value": 5 }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 7, "struck": 5 }, { "value": 5 }, { "value": 5 }], "last": { "src": 1, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "two strikes in different cells",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }, { "dst": 0, "value": 8, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 8, "struck": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a copy leaves the strike behind",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }, { "dst": 2, "src": 1 }, { "dst": 2, "value": 9, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": 7 }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": 9, "struck": 7 }], "last": { "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unmarked overwrites strike nothing",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 0, "value": 7 }, { "dst": 1, "value": 8 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 7 }, { "value": "ab" }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 7 }, { "value": 8 }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a copy of the starting null",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 0, "src": 2 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": null }, { "value": "ab" }, { "value": null }], "last": { "src": 2, "dst": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a marked copy of the same token",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 2, "src": 1 }, { "dst": 1, "src": 2, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": "ab", "struck": "ab" }, { "value": "ab" }], "last": { "src": 2, "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "each sequence strikes from the starting cells",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        },
+        {
+          "steps": [{ "dst": 1, "value": 8, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 8, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a later sequence reads the starting value",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 1, "value": 7, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } }
+          ]
+        },
+        {
+          "steps": [{ "dst": 2, "src": 1 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a later sequence does not see an earlier copy",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [{ "dst": 2, "src": 1 }, { "dst": 1, "value": 7, "lost": true }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": "ab" }], "last": { "src": 1, "dst": 2 } },
+            { "slots": [{ "value": 4 }, { "value": 7, "struck": "ab" }, { "value": "ab" }], "last": { "dst": 1 } }
+          ]
+        },
+        {
+          "steps": [{ "dst": 0, "src": 2 }],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": null }, { "value": "ab" }, { "value": null }], "last": { "src": 2, "dst": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equal literals are different tokens",
+      "cells": [4, "ab", 5],
+      "sequences": [
+        {
+          "steps": [
+            { "dst": 0, "value": 7 },
+            { "dst": 1, "value": 7 },
+            { "dst": 0, "value": 8, "lost": true },
+            { "dst": 2, "src": 1 }
+          ],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": 5 }] },
+            { "slots": [{ "value": 7 }, { "value": "ab" }, { "value": 5 }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 7 }, { "value": 7 }, { "value": 5 }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 8, "struck": 7 }, { "value": 7 }, { "value": 5 }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 8, "struck": 7 }, { "value": 7 }, { "value": 7 }], "last": { "src": 1, "dst": 2 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the first strike stays through unmarked writes",
+      "cells": [0, "", null],
+      "sequences": [
+        {
+          "steps": [
+            { "dst": 0, "value": 1, "lost": true },
+            { "dst": 0, "value": 2 },
+            { "dst": 0, "src": 1 },
+            { "dst": 0, "src": 2 }
+          ],
+          "states": [
+            { "slots": [{ "value": 0 }, { "value": "" }, { "value": null }] },
+            { "slots": [{ "value": 1, "struck": 0 }, { "value": "" }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 2, "struck": 0 }, { "value": "" }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": "", "struck": 0 }, { "value": "" }, { "value": null }], "last": { "src": 1, "dst": 0 } },
+            { "slots": [{ "value": null, "struck": 0 }, { "value": "" }, { "value": null }], "last": { "src": 2, "dst": 0 } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the first and last of ten cells",
+      "cells": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "sequences": [
+        {
+          "steps": [{ "dst": 9, "value": 0, "lost": true }, { "dst": 0, "src": 9 }, { "dst": 0, "value": "", "lost": true }],
+          "states": [
+            {
+              "slots": [
+                { "value": 0 }, { "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 },
+                { "value": 5 }, { "value": 6 }, { "value": 7 }, { "value": 8 }, { "value": 9 }
+              ]
+            },
+            {
+              "slots": [
+                { "value": 0 }, { "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 },
+                { "value": 5 }, { "value": 6 }, { "value": 7 }, { "value": 8 }, { "value": 0, "struck": 9 }
+              ],
+              "last": { "dst": 9 }
+            },
+            {
+              "slots": [
+                { "value": 0 }, { "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 },
+                { "value": 5 }, { "value": 6 }, { "value": 7 }, { "value": 8 }, { "value": 0, "struck": 9 }
+              ],
+              "last": { "src": 9, "dst": 0 }
+            },
+            {
+              "slots": [
+                { "value": "", "struck": 0 }, { "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 },
+                { "value": 5 }, { "value": 6 }, { "value": 7 }, { "value": 8 }, { "value": 0, "struck": 9 }
+              ],
+              "last": { "dst": 0 }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "earlier prefixes recomputed after the final one",
+      "cells": [4, "ab", null],
+      "sequences": [
+        {
+          "steps": [
+            { "dst": 0, "src": 1 },
+            { "dst": 1, "value": 8, "lost": true },
+            { "dst": 0, "value": 9 },
+            { "dst": 2, "src": 0 }
+          ],
+          "states": [
+            { "slots": [{ "value": 4 }, { "value": "ab" }, { "value": null }] },
+            { "slots": [{ "value": "ab" }, { "value": "ab" }, { "value": null }], "last": { "src": 1, "dst": 0 } },
+            { "slots": [{ "value": "ab" }, { "value": 8, "struck": "ab" }, { "value": null }], "last": { "dst": 1 } },
+            { "slots": [{ "value": 9 }, { "value": 8, "struck": "ab" }, { "value": null }], "last": { "dst": 0 } },
+            { "slots": [{ "value": 9 }, { "value": 8, "struck": "ab" }, { "value": 9 }], "last": { "src": 0, "dst": 2 } }
+          ],
+          "order": [4, 0, 3, 1, 2, 4, 2]
+        }
+      ]
+    }
+  ]
+}

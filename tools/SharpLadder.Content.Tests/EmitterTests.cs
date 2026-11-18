@@ -32,6 +32,31 @@ public sealed class EmitterTests
         "m1":{"type":"object","additionalProperties":false,"required":["type"],"properties":{"type":{"const":"one"}}},"m2":{"type":"object","additionalProperties":false,"required":["type"],"properties":{"type":{"const":"two"}}}
         """;
 
+    private const string Nullables = """
+        "pair":{"oneOf":[{"type":"integer"},{"type":"string"}]},
+        "tagged":{"oneOf":[{"$ref":"#/definitions/m1"},{"$ref":"#/definitions/m2"}]},
+        "cell":{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"null"}]},
+        "slot":{"oneOf":[{"$ref":"#/definitions/pair"},{"type":"null"}]},
+        "slotAlias":{"$ref":"#/definitions/slot"},
+        "slotRefined":{"allOf":[{"$ref":"#/definitions/slotAlias"},{"pattern":"^a"}]}
+        """;
+
+    private const string Untagged = """
+        "copy":{"type":"object","additionalProperties":false,"required":["dst","src"],"properties":{"dst":{"type":"integer"},"src":{"type":"integer"},"note":{"type":"string"}}},
+        "write":{"type":"object","additionalProperties":false,"required":["dst","value"],"properties":{"dst":{"type":"integer"},"value":{"type":"string"}}},
+        "steps":{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write"}]},
+        "either":{"type":"object","additionalProperties":false,"required":["e"],"properties":{"e":{"type":"string"},"note":{"type":"string"}}},
+        "writeAgain":{"type":"object","additionalProperties":false,"required":["value"],"properties":{"dst":{"type":"integer"},"value":{"type":"string"}}},
+        "optionalSrc":{"type":"object","additionalProperties":false,"required":["dst"],"properties":{"dst":{"type":"integer"},"src":{"type":"integer"},"value":{"type":"string"}}},
+        "loose1":{"type":"object","additionalProperties":false,"properties":{"a":{"type":"string"}}},
+        "loose2":{"type":"object","additionalProperties":false,"properties":{"b":{"type":"string"}}},
+        "copyAlias":{"$ref":"#/definitions/copy"},
+        "choice":{"type":"object","additionalProperties":false,"required":["k"],"properties":{"k":{"type":"string"},"a":{"type":"string"},"b":{"type":"string"}},"not":{"anyOf":[{"required":["a","b"]}]}}
+        """;
+
+    private const string CopyNeverValue = "export type Copy = {\n  dst: number;\n  src: number;\n  note?: string;\n  value?: never;\n};\n";
+    private const string WriteNeverNoteSrc = "export type Write = {\n  dst: number;\n  value: string;\n  note?: never;\n  src?: never;\n};\n";
+
     private static readonly string[] ModuleNames = ["body.ts", "content.ts"];
 
     private static string Emitter => Path.Combine(Repository.Root, "tools", "SharpLadder.Content.Tests", "fixtures", "emitter");
@@ -86,7 +111,7 @@ public sealed class EmitterTests
 
         foreach (var text in modules.Values)
         {
-            Assert.StartsWith("// SharpLadder.Content type emitter output, grammar 2. Do not edit.\n", text, StringComparison.Ordinal);
+            Assert.StartsWith("// SharpLadder.Content type emitter output, grammar 3. Do not edit.\n", text, StringComparison.Ordinal);
             AssertNoEmptyObject(text);
             Assert.DoesNotContain("\r", text, StringComparison.Ordinal);
             Assert.EndsWith(";\n", text, StringComparison.Ordinal);
@@ -223,7 +248,7 @@ public sealed class EmitterTests
     [InlineData("""{"type":"string","description":"x"}""", "unsupported keyword \"description\"")]
     [InlineData("""{"type":"string","default":"a"}""", "unsupported keyword \"default\"")]
     [InlineData("""{"type":"number"}""", "type \"number\" is not supported")]
-    [InlineData("""{"type":"null"}""", "type \"null\" is not supported")]
+    [InlineData("""{"type":"null"}""", "x: a null type is admitted only as a oneOf member")]
     [InlineData("""{}""", "matches no supported form")]
     [InlineData("""true""", "a schema node must be a JSON object")]
     [InlineData("""{"not":{"type":"string"}}""", "matches no supported form")]
@@ -232,7 +257,7 @@ public sealed class EmitterTests
     [InlineData("""{"type":"array","items":{"type":"string"},"additionalItems":false}""", "unsupported keyword \"additionalItems\"")]
     [InlineData("""{"type":"array","items":{"type":"string"},"maxItems":3}""", "maxItems needs items that are a $ref")]
     [InlineData("""{"type":"boolean","const":true}""", "unsupported keyword \"type\"")]
-    [InlineData("""{"type":"integer","maximum":3}""", "unsupported keyword \"maximum\"")]
+    [InlineData("""{"type":"integer","exclusiveMaximum":3}""", "unsupported keyword \"exclusiveMaximum\"")]
     public void UnsupportedConstructsAreRefused(string node, string problem) => RefusedNode(node, problem);
 
     [Theory]
@@ -259,6 +284,8 @@ public sealed class EmitterTests
     [InlineData("""{"type":"integer","minimum":-0}""")]
     [InlineData("""{"type":"integer","minimum":"1"}""")]
     [InlineData("""{"type":"integer","minimum":9007199254740992}""")]
+    [InlineData("""{"type":"integer","maximum":1.5}""")]
+    [InlineData("""{"type":"integer","maximum":9007199254740992}""")]
     [InlineData("""{"type":"string","maxLength":1.0}""")]
     [InlineData("""{"type":"string","maxLength":"48"}""")]
     [InlineData("""{"type":"string","minLength":-9007199254740992}""")]
@@ -378,6 +405,153 @@ public sealed class EmitterTests
     public void UnionsNotToldApartByOneTagAreRefused(string node, string problem, string extra = "") =>
         Refused(KindDocument(node, extra), ContentDocument(), problem);
 
+    [Fact]
+    public void NewUnionFormsEmitTheRecordedModules()
+    {
+        var forms = Path.Combine(Emitter, "forms");
+        var modules = Accepted(File.ReadAllText(Path.Combine(forms, TypeEmitter.BodyFile)), File.ReadAllText(Path.Combine(forms, TypeEmitter.ContentFile)));
+
+        Assert.Equal(File.ReadAllText(Path.Combine(forms, "body.ts.expected")), modules["body.ts"]);
+        Assert.Equal(File.ReadAllText(Path.Combine(forms, "content.ts.expected")), modules["content.ts"]);
+    }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"type":"string"}]}""", "export type X = number | string;")]
+    [InlineData("""{"oneOf":[{"type":"string","maxLength":12},{"type":"integer","minimum":0}]}""", "export type X = string | number;")]
+    [InlineData("""{"type":"integer","maximum":-1}""", "export type X = number;")]
+    [InlineData("""{"oneOf":[{"type":"null"},{"type":"integer"},{"type":"string"}]}""", "export type X = null | number | string;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/m1"},{"type":"null"},{"$ref":"#/definitions/m2"}]}""", "export type X = M1 | null | M2;")]
+    [InlineData("""{"type":"array","items":{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"null"}]}}""", "export type X = (number | string | null)[];")]
+    [InlineData("""{"type":"array","minItems":1,"items":{"oneOf":[{"type":"integer"},{"type":"string"}]}}""", "export type X = [number | string, ...(number | string)[]];")]
+    [InlineData("""{"type":"object","additionalProperties":false,"properties":{"a":{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"null"}]}}}""", "export type X = {\n  a?: number | string | null;\n};")]
+    public void NullAndPrimitiveUnionsAreAccepted(string node, string expected)
+    {
+        var body = Accepted(BodyDocument(IdDefinition + "," + Members + ",\"x\":" + node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected + "\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"type":["integer","null"]}""", "x: a null type is admitted only as a oneOf member, never in a type array")]
+    [InlineData("""{"oneOf":[{"type":"null"},{"type":"null"}]}""", "x/oneOf/1: null is repeated")]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"null","title":"t"}]}""", "x/oneOf/2: unsupported keyword \"title\"")]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"type":"integer"}]}""", "x/oneOf/1: a union member must be a $ref to an Object definition, or the members exactly one integer and one string")]
+    [InlineData("""{"oneOf":[{"type":"string"},{"type":"boolean"}]}""", "x/oneOf/1: a union member must be a $ref to an Object definition, or the members exactly one integer and one string")]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"boolean"}]}""", "x/oneOf/0: a union member must be a $ref to an Object definition, or the members exactly one integer and one string")]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"$ref":"#/definitions/m1"}]}""", "x/oneOf/0: a union member must be a $ref to an Object definition when another member is one")]
+    [InlineData("""{"oneOf":[{"type":"integer","exclusiveMinimum":3},{"type":"string"}]}""", "x/oneOf/0: unsupported keyword \"exclusiveMinimum\"")]
+    [InlineData("""{"oneOf":[{"type":"integer"},{"type":"string","format":"uri"}]}""", "x/oneOf/1: unsupported keyword \"format\"")]
+    [InlineData("""{"anyOf":[{"type":"integer"},{"type":"null"}]}""", "matches no supported form")]
+    public void NullAndPrimitiveUnionsOutsideTheFormsAreRefused(string node, string problem) =>
+        Refused(BodyDocument(IdDefinition + "," + Members + ",\"x\":" + node), ContentDocument(), problem);
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/m1"},{"type":"null"}]}""", "export type X = M1 | null;")]
+    [InlineData("""{"oneOf":[{"type":"null"},{"$ref":"#/definitions/m1"}]}""", "export type X = null | M1;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/pair"},{"type":"null"}]}""", "export type X = Pair | null;")]
+    [InlineData("""{"oneOf":[{"type":"null"},{"$ref":"#/definitions/id"}]}""", "export type X = null | Id;")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/tagged"},{"type":"null"}]}""", "export type X = Tagged | null;")]
+    [InlineData("""{"oneOf":[{"type":"string","minLength":1},{"type":"null"}]}""", "export type X = string | null;")]
+    [InlineData("""{"oneOf":[{"type":"null"},{"type":"integer","minimum":0,"maximum":9}]}""", "export type X = null | number;")]
+    [InlineData("""{"oneOf":[{"enum":["ok"]},{"type":"null"}]}""", "export type X = \"ok\" | null;")]
+    [InlineData("""{"oneOf":[{"type":"array","items":{"$ref":"#/definitions/id"}},{"type":"null"}]}""", "export type X = Id[] | null;")]
+    [InlineData("""{"oneOf":[{"allOf":[{"$ref":"#/definitions/id"},{"pattern":"^a"}]},{"type":"null"}]}""", "export type X = Id | null;")]
+    [InlineData("""{"type":"array","items":{"oneOf":[{"type":"null"},{"$ref":"#/definitions/pair"}]}}""", "export type X = (null | Pair)[];")]
+    [InlineData("""{"type":"object","additionalProperties":false,"properties":{"a":{"oneOf":[{"$ref":"#/definitions/m1"},{"type":"null"}]}}}""", "export type X = {\n  a?: M1 | null;\n};")]
+    public void ANullableSingleFormIsAccepted(string node, string expected)
+    {
+        var body = Accepted(BodyDocument(IdDefinition + "," + Members + "," + Nullables + ",\"x\":" + node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected + "\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"oneOf":[{"type":"integer"},{"type":"string"},{"type":"null"}]},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must not admit null itself")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/cell"},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must not admit null itself")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/slotAlias"},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must not admit null itself")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/slotRefined"},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must not admit null itself")]
+    [InlineData("""{"oneOf":[{"oneOf":[{"type":"integer"},{"type":"string"}]},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"enum":["ok","no"]},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"type":"array","maxItems":2,"items":{"$ref":"#/definitions/id"}},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"type":"array","minItems":1,"maxItems":1,"items":{"$ref":"#/definitions/id"}},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"type":"object","additionalProperties":false,"properties":{"a":{"type":"string"}}},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"type":"boolean","title":"t"},{"type":"null"}]}""", "x/oneOf/0: unsupported keyword \"title\"")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/missing"},{"type":"null"}]}""", "x/oneOf/0: $ref \"#/definitions/missing\" names no definition")]
+    public void ANullableSingleFormOutsideTheRulesIsRefused(string node, string problem) =>
+        Refused(BodyDocument(IdDefinition + "," + Members + "," + Nullables + ",\"x\":" + node), ContentDocument(), problem);
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"oneOf":[{"$ref":"#/definitions/m1"},{"$ref":"#/definitions/m2"}]},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    [InlineData("""{"oneOf":[{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write"}]},{"type":"null"}]}""", "x/oneOf/0: the member beside a lone null must be a $ref when it is an Object, a bounded array or a union")]
+    public void AnInlineObjectUnionBesideALoneNullIsRefused(string node, string problem) =>
+        Refused(BodyDocument(IdDefinition + "," + Members + "," + Untagged + ",\"x\":" + node), ContentDocument(), problem);
+
+    [Fact]
+    public void ANullableSelfReferenceIsRefused() =>
+        Refused(BodyDocument(IdDefinition + ",\"x\":{\"oneOf\":[{\"$ref\":\"#/definitions/x\"},{\"type\":\"null\"}]}"), ContentDocument(), "x/oneOf/0: the member beside a lone null must not admit null itself");
+
+    [Theory]
+    [InlineData("""[{"$ref":"#/definitions/aFile"},{"$ref":"#/definitions/bFile"},{"type":"null"}]""", "content.schema.json#/oneOf/2: the root union holds no null")]
+    [InlineData("""[{"type":"integer"},{"type":"string"}]""", "content.schema.json#/oneOf/0: a union member must be a $ref to an Object definition")]
+    [InlineData("""[{"$ref":"#/definitions/uFile"},{"$ref":"#/definitions/vFile"}]""", "union member uFile needs a required string const property named type")]
+    public void TheRootUnionStaysTaggedObjects(string members, string problem)
+    {
+        const string Files = """
+            "uFile":{"type":"object","additionalProperties":false,"required":["u"],"properties":{"u":{"type":"string"}}},
+            "vFile":{"type":"object","additionalProperties":false,"required":["v"],"properties":{"v":{"type":"string"}}}
+            """;
+        Refused(BodyDocument(IdDefinition), "{" + Draft + ContentId + "\"oneOf\":" + members + ",\"definitions\":{" + AFile + "," + BFile + "," + Files + "}}", problem);
+    }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write"}]}""", "export type X = Copy | Write;\n")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write"},{"type":"null"}]}""", "export type X = Copy | Write | null;\n")]
+    [InlineData("""{"type":"array","minItems":1,"items":{"$ref":"#/definitions/steps"}}""", "export type Steps = Copy | Write;\n")]
+    public void UntaggedUnionsOfClosedObjectsAreAccepted(string node, string expected)
+    {
+        var body = Accepted(BodyDocument(IdDefinition + "," + Untagged + ",\"x\":" + node), ContentDocument())["body.ts"];
+
+        Assert.Contains(expected, body, StringComparison.Ordinal);
+        Assert.Contains(CopyNeverValue, body, StringComparison.Ordinal);
+        Assert.Contains(WriteNeverNoteSrc, body, StringComparison.Ordinal);
+        Assert.Contains("export type WriteAgain = {\n  dst?: number;\n  value: string;\n};\n", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("type:", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryMemberOfAnUntaggedUnionNamesItsSiblingsPropertiesAsNever()
+    {
+        var body = Accepted(BodyDocument(IdDefinition + "," + Untagged + ",\"x\":{\"oneOf\":[{\"$ref\":\"#/definitions/copy\"},{\"$ref\":\"#/definitions/write\"},{\"$ref\":\"#/definitions/either\"}]}"), ContentDocument())["body.ts"];
+
+        Assert.Contains("export type X = Copy | Write | Either;\n", body, StringComparison.Ordinal);
+        Assert.Contains("  note?: string;\n  e?: never;\n  value?: never;\n};\n", body, StringComparison.Ordinal);
+        Assert.Contains("  value: string;\n  e?: never;\n  note?: never;\n  src?: never;\n};\n", body, StringComparison.Ordinal);
+        Assert.Contains("export type Either = {\n  e: string;\n  note?: string;\n  dst?: never;\n  src?: never;\n  value?: never;\n};\n", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnAtMostOneMemberOfAnUntaggedUnionGetsTheNeverFieldsInEveryVariant()
+    {
+        var body = Accepted(BodyDocument(IdDefinition + "," + Untagged + ",\"x\":{\"oneOf\":[{\"$ref\":\"#/definitions/write\"},{\"$ref\":\"#/definitions/choice\"}]}"), ContentDocument())["body.ts"];
+
+        Assert.Contains("export type X = Write | Choice;\n", body, StringComparison.Ordinal);
+        Assert.Equal(2, Occurrences(body, "      b?: string;\n      dst?: never;\n      value?: never;\n    }") + Occurrences(body, "      b?: never;\n      dst?: never;\n      value?: never;\n    }"));
+        Assert.Contains("  value: string;\n  a?: never;\n  b?: never;\n  k?: never;\n  note?: never;\n  src?: never;\n};\n", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/copy"}]}""", "x/oneOf/1: union members copy and copy are not told apart by a property required in one and absent from the other")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/optionalSrc"}]}""", "x/oneOf/1: union members copy and optionalSrc are not told apart")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/loose1"},{"$ref":"#/definitions/loose2"}]}""", "x/oneOf/1: union members loose1 and loose2 are not told apart")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write"},{"$ref":"#/definitions/writeAgain"}]}""", "x/oneOf/2: union members write and writeAgain are not told apart")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/m1"}]}""", "x/oneOf/0: union member copy needs a required string const property named type")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/copyAlias"}]}""", "x/oneOf/0: union member copy needs a required string const property named type")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/m1"},{"$ref":"#/definitions/steps"}]}""", "x/oneOf/1: union member copy needs a required string const property named type")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/copy"},{"$ref":"#/definitions/write","title":"t"}]}""", "x/oneOf/1: unsupported keyword \"title\"")]
+    [InlineData("""{"oneOf":[{"$ref":"#/definitions/missing"},{"$ref":"#/definitions/copy"}]}""", "x/oneOf/0: $ref \"#/definitions/missing\" names no definition")]
+    public void UntaggedUnionsOutsideTheFormAreRefused(string node, string problem) =>
+        Refused(BodyDocument(IdDefinition + "," + Members + "," + Untagged + ",\"x\":" + node), ContentDocument(), problem);
+
     [Theory]
     [InlineData("""{"type":"array","maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "export type X = [] | [Id] | [Id, Id];")]
     [InlineData("""{"type":"array","minItems":1,"maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "export type X = [Id] | [Id, Id];")]
@@ -457,7 +631,7 @@ public sealed class EmitterTests
     [Fact]
     public void SafeIntegerBoundsAreAccepted()
     {
-        var body = Accepted(BodyDocument(IdDefinition + ",\"x\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"hi\":{\"const\":9007199254740991},\"lo\":{\"const\":-9007199254740991},\"n\":{\"type\":\"integer\",\"minimum\":-9007199254740991}}}"), ContentDocument())["body.ts"];
+        var body = Accepted(BodyDocument(IdDefinition + ",\"x\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"hi\":{\"const\":9007199254740991},\"lo\":{\"const\":-9007199254740991},\"n\":{\"type\":\"integer\",\"minimum\":-9007199254740991,\"maximum\":9007199254740991}}}"), ContentDocument())["body.ts"];
 
         Assert.Contains("  hi?: 9007199254740991;\n  lo?: -9007199254740991;\n  n?: number;\n", body, StringComparison.Ordinal);
     }

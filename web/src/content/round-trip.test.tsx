@@ -6,6 +6,7 @@ import type {
   ListItem,
   Span,
   TermSpan,
+  WalkItBlock,
 } from "../generated/body.ts";
 import type {
   Card,
@@ -41,10 +42,15 @@ import type {
   SelectedApproach,
   StaticDoc,
 } from "./approach.ts";
+import type { WalkControl } from "./Blocks.tsx";
 import { BuildPartView } from "./Build.tsx";
 import { ContentView } from "./ContentView.tsx";
 import { buildSlugMap } from "./href.ts";
 import { Spans } from "./Spans.tsx";
+import { isValidPosition } from "./walk-position.ts";
+import type { WalkPosition } from "./walk-position.ts";
+import { replay } from "./walk-replay.ts";
+import type { WalkCell } from "./walk-replay.ts";
 
 // Hints are shown only through their own view, so they never make this round trip.
 type RoundTripDoc = Exclude<ContentDoc, HintsPart | HintsCatalogue>;
@@ -148,16 +154,24 @@ const shownOf = (doc: RoundTripDoc, selection: ApproachSelection): ShownDoc =>
     ? projectBuild(doc, selection)
     : doc;
 
-// The test's own controller: it holds no state, so a view shows exactly the selection it was given.
-function Shown({ doc }: { doc: ShownDoc }) {
+// The test's own controller: it holds no state, so a view shows exactly the selection and walk
+// positions it was given.
+function Shown({
+  doc,
+  walkControl,
+}: {
+  doc: ShownDoc;
+  walkControl?: WalkControl | undefined;
+}) {
   return doc.type === "build-view" ? (
     <BuildPartView
       view={doc}
       slugs={slugs}
       onApproachChange={() => undefined}
+      walkControl={walkControl}
     />
   ) : (
-    <ContentView doc={doc} slugs={slugs} />
+    <ContentView doc={doc} slugs={slugs} walkControl={walkControl} />
   );
 }
 
@@ -195,12 +209,49 @@ const sectionsOf = (doc: ShownDoc): AnySection[] =>
 const selectedOf = (section: AnySection): SelectedApproach | undefined =>
   "options" in section ? section.selected : undefined;
 
-// The hook ids a run of blocks renders: each block's own and each list item's.
-const hookIds = (blocks: readonly Block[]): string[] =>
+// Where each walk stands; the static view and a walk a state does not name are at Start.
+type At = (walkId: string) => WalkPosition;
+const start: WalkPosition = { sequence: 1, step: 0 };
+const atStart: At = () => start;
+
+// The one target a walk shows at a position: its sequence's intro at Start, else that step's note.
+function activeOf(
+  walk: WalkItBlock,
+  position: WalkPosition,
+): { blockId: string; spans: readonly Span[] } {
+  const sequence = walk.sequences[position.sequence - 1];
+  if (sequence === undefined || !isValidPosition(walk.sequences, position))
+    throw new Error(
+      `${walk.id} has no position ${String(position.sequence)}.${String(position.step)}`,
+    );
+  const step = sequence.steps[position.step - 1];
+  return step === undefined
+    ? { blockId: sequence.introBlockId, spans: sequence.intro }
+    : { blockId: step.blockId, spans: step.note };
+}
+
+// The hook ids a run of blocks renders: each block's own, each list item's and each walk's
+// active target.
+const hookIds = (blocks: readonly Block[], at: At = atStart): string[] =>
   blocks.flatMap((b) => [
     b.blockId,
     ...(b.type === "list" ? b.items.map((i) => i.blockId) : []),
+    ...(b.type === "walk-it" ? [activeOf(b, at(b.id)).blockId] : []),
   ]);
+
+const walksOf = (blocks: readonly Block[]): WalkItBlock[] =>
+  blocks.flatMap((b) => (b.type === "walk-it" ? [b] : []));
+
+// The targets a walk leaves out at its position: every intro and step note but the active one.
+const inactiveHookIds = (
+  blocks: readonly Block[],
+  at: At = atStart,
+): string[] =>
+  walksOf(blocks).flatMap((w) =>
+    w.sequences
+      .flatMap((s) => [s.introBlockId, ...s.steps.map((step) => step.blockId)])
+      .filter((id) => id !== activeOf(w, at(w.id)).blockId),
+  );
 
 // The fields a card shows, each with its label, in the one order a card is read.
 const cardFields = (card: Card): [string, Block[]][] => [
@@ -265,8 +316,8 @@ const blocksOf = (doc: ShownDoc): Block[] => {
 const entryIdOf = (doc: ShownDoc): string[] =>
   doc.type === "glossary" || doc.type === "error" ? [doc.id] : [];
 
-// The ids the renderer may write as anchors: entry, section, card and shown approach ids and code
-// or text block ids.
+// The ids the renderer may write as anchors: entry, section, card and shown approach ids, code
+// or text block ids and walk ids.
 const anchorsOf = (doc: ShownDoc): string[] => [
   ...entryIdOf(doc),
   ...sectionsOf(doc).map((s) => s.id),
@@ -277,6 +328,7 @@ const anchorsOf = (doc: ShownDoc): string[] => [
       ? [b.id]
       : [],
   ),
+  ...walksOf(blocksOf(doc)).map((w) => w.id),
 ];
 
 const spansOf = (spans: readonly Span[]): Span[] =>
@@ -284,43 +336,56 @@ const spansOf = (spans: readonly Span[]): Span[] =>
     s.type === "em" || s.type === "strong" ? [s, ...spansOf(s.content)] : [s],
   );
 
-const blockSpans = (b: Block): Span[] => {
+const blockSpans = (b: Block, at: At = atStart): Span[] => {
   if (b.type === "paragraph") return [...b.content];
   if (b.type === "list") return b.items.flatMap((i) => i.content);
   if (b.type === "table") return [b.headers, ...b.rows].flat(2);
+  if (b.type === "walk-it") return [...b.title, ...activeOf(b, at(b.id)).spans];
   return [];
 };
 
 // Every span in the order it is rendered: a title before what stands under it.
-const spansInOrder = (doc: ShownDoc): Span[] => {
+const spansInOrder = (doc: ShownDoc, at: At = atStart): Span[] => {
+  const spansOfBlock = (b: Block) => blockSpans(b, at);
   const sections = sectionsOf(doc).flatMap((s) => [
     ...s.title,
     ...("cards" in s
       ? s.cards.flatMap((c) => [
           ...c.title,
-          ...cardBlocks(c).flatMap(blockSpans),
+          ...cardBlocks(c).flatMap(spansOfBlock),
         ])
-      : s.body.flatMap(blockSpans)),
+      : s.body.flatMap(spansOfBlock)),
     ...(selectedOf(s)?.title ?? []),
-    ...(selectedOf(s)?.body.flatMap(blockSpans) ?? []),
+    ...(selectedOf(s)?.body.flatMap(spansOfBlock) ?? []),
   ]);
   switch (doc.type) {
     case "chapter":
-      return [...doc.intro.flatMap(blockSpans), ...sections];
+      return [...doc.intro.flatMap(spansOfBlock), ...sections];
     case "part":
     case "build-view":
       return sections;
     case "glossary":
     case "error":
-      return blocksOf(doc).flatMap(blockSpans);
+      return blocksOf(doc).flatMap(spansOfBlock);
   }
 };
 
-const linksOf = (doc: ShownDoc): LinkSpan[] =>
-  spansOf(spansInOrder(doc)).flatMap((s) => (s.type === "link" ? [s] : []));
+const linksOf = (doc: ShownDoc, at: At = atStart): LinkSpan[] =>
+  spansOf(spansInOrder(doc, at)).flatMap((s) => (s.type === "link" ? [s] : []));
 
-const termsOf = (doc: ShownDoc): TermSpan[] =>
-  spansOf(spansInOrder(doc)).flatMap((s) => (s.type === "term" ? [s] : []));
+const termsOf = (doc: ShownDoc, at: At = atStart): TermSpan[] =>
+  spansOf(spansInOrder(doc, at)).flatMap((s) => (s.type === "term" ? [s] : []));
+
+// Every href a view renders, in reading order; a Term's definition link follows its button.
+const hrefsOf = (doc: ShownDoc, at: At = atStart): string[] =>
+  spansOf(spansInOrder(doc, at)).flatMap((s) => {
+    if (s.type === "term") return [`/glossary#${s.id}`];
+    if (s.type !== "link") return [];
+    if (s.kind === "error") return [`/errors#${s.id}`];
+    return s.chapter === undefined
+      ? [`#${s.id}`]
+      : [`/chapters/${String(slugs.slugOf(s.chapter))}#${s.id}`];
+  });
 
 // What a reader sees before opening anything: a closed Term definition is left out.
 const shownText = (node: Node): string =>
@@ -354,7 +419,7 @@ const unselectedHooks = (
       ? doc.sections.flatMap((s) =>
           (s.approaches ?? [])
             .filter((a) => a.id !== selection.get(s.id))
-            .flatMap((a) => hookIds(a.body)),
+            .flatMap((a) => [...hookIds(a.body), ...inactiveHookIds(a.body)]),
         )
       : [],
   );
@@ -365,15 +430,20 @@ const speechSections = (doc: RoundTripDoc) =>
 /**
  * What a rendered record fails to prove about its speech: every segment bound to exactly one
  * rendered hook inside its section, in reading order, and a segment of an unselected approach
- * to none. A skipped section holds its one summary and nothing else.
+ * or of a walk target its position leaves out to none. A skipped section holds its one summary
+ * and nothing else.
  */
 function speechProblems(
   container: Element,
   doc: RoundTripDoc,
   selection: ApproachSelection = nothing,
+  at: At = atStart,
 ): string[] {
   const problems: string[] = [];
   const unselected = unselectedHooks(doc, selection);
+  const inactive = new Set(
+    inactiveHookIds(blocksOf(shownOf(doc, selection)), at),
+  );
   const all = [...container.querySelectorAll("[data-block-id]")].map((e) =>
     e.getAttribute("data-block-id"),
   );
@@ -403,6 +473,11 @@ function speechProblems(
       if (unselected.has(target.blockId)) {
         if (found.length !== 0)
           problems.push(`${at}: ${target.blockId} is shown unselected`);
+        continue;
+      }
+      if (inactive.has(target.blockId)) {
+        if (found.length !== 0)
+          problems.push(`${at}: ${target.blockId} is shown while inactive`);
         continue;
       }
       if (element === undefined || found.length !== 1) {
@@ -435,6 +510,287 @@ function headingProblems(container: Element): string[] {
     else if (level > previous + 1)
       problems.push(`h${String(level)} skips a level`);
     previous = level;
+  }
+  return problems;
+}
+
+// Every walk a record holds, found by its shape, so a host the oracle does not model still counts.
+const isWalk = (value: object): value is WalkItBlock =>
+  "type" in value && value.type === "walk-it";
+const walksIn = (value: unknown): WalkItBlock[] => {
+  if (Array.isArray(value)) return value.flatMap(walksIn);
+  if (typeof value !== "object" || value === null) return [];
+  return [
+    ...(isWalk(value) ? [value] : []),
+    ...Object.values(value).flatMap(walksIn),
+  ];
+};
+
+// Every place a walk can stand, in the order a reader reaches them.
+const positionsOf = (walk: WalkItBlock): WalkPosition[] =>
+  walk.sequences.flatMap((sequence, index) =>
+    Array.from({ length: sequence.steps.length + 1 }, (_, step) => ({
+      sequence: index + 1,
+      step,
+    })),
+  );
+
+// The selections that matter to a walk: its approach picked, then a sibling or nothing in its
+// place; a walk outside every approach is shown with nothing picked.
+function selectionsFor(
+  doc: RoundTripDoc,
+  walk: WalkItBlock,
+): ApproachSelection[] {
+  if (doc.type !== "part" || doc.kind !== "build") return [nothing];
+  for (const section of doc.sections) {
+    const approaches = section.approaches ?? [];
+    const holder = approaches.find((a) =>
+      walksIn(a.body).some((w) => w.id === walk.id),
+    );
+    if (holder === undefined) continue;
+    const sibling = approaches.find((a) => a !== holder);
+    return [
+      new Map([[section.id, holder.id]]),
+      sibling === undefined ? nothing : new Map([[section.id, sibling.id]]),
+    ];
+  }
+  return [nothing];
+}
+
+/** One rendered state: the approach selection and the walks it moves away from Start. */
+interface WalkState {
+  readonly selection: ApproachSelection;
+  readonly positions: ReadonlyMap<string, WalkPosition>;
+}
+
+const atOf =
+  (state: WalkState): At =>
+  (walkId) =>
+    state.positions.get(walkId) ?? start;
+
+/**
+ * The states a record is shown in with a walk control: each walk at every position under each
+ * selection that matters to it while the others stay at Start, then every walk at once, each at
+ * another place from its end. A record without a walk is shown once.
+ */
+function walkStatesOf(doc: RoundTripDoc): WalkState[] {
+  const walks = walksIn(doc);
+  if (walks.length === 0) return [{ selection: nothing, positions: new Map() }];
+  const visits = walks.flatMap((walk) =>
+    selectionsFor(doc, walk).flatMap((selection) =>
+      positionsOf(walk).map((position) => ({
+        selection,
+        positions: new Map([[walk.id, position]]),
+      })),
+    ),
+  );
+  if (walks.length === 1) return visits;
+  const mixed: WalkState = {
+    selection: new Map(
+      walks.flatMap((walk) => [...(selectionsFor(doc, walk)[0] ?? nothing)]),
+    ),
+    positions: new Map(
+      walks.map((walk, index) => {
+        const all = positionsOf(walk);
+        return [walk.id, all[all.length - 1 - (index % all.length)] ?? start];
+      }),
+    ),
+  };
+  return [...visits, mixed];
+}
+
+// The control a state hands the views: its positions, each announced as after the reader's move.
+const controlOf = (state: WalkState): WalkControl => ({
+  shownOf: (walkId) => ({ position: atOf(state)(walkId), announce: true }),
+  onWalkChange: () => undefined,
+});
+
+// Successive states rerender one mounted view, as a reader's moves do. What is expected is read
+// from the witness apart from what the renderer is handed.
+function walkRoundTrip(
+  text: string,
+  witness: RoundTripDoc,
+  check: (container: HTMLElement, state: WalkState) => void,
+): void {
+  const parsed: unknown = JSON.parse(text);
+  expect(parsed).toStrictEqual(witness);
+  const view = (state: WalkState) => (
+    <Shown
+      doc={shownOf(witness, state.selection)}
+      walkControl={controlOf(state)}
+    />
+  );
+  const [first, ...rest] = walkStatesOf(witness);
+  if (first === undefined) throw new Error("a record with no state to show");
+  const { container, rerender, unmount } = render(view(first));
+  check(container, first);
+  for (const state of rest) {
+    rerender(view(state));
+    check(container, state);
+  }
+  unmount();
+}
+
+// A cell value as a walk shows it: quotes keep a string apart from a number, and null is empty.
+const cellValue = (value: WalkCell): string =>
+  value === null
+    ? "empty"
+    : typeof value === "string"
+      ? `“${value}”`
+      : String(value);
+
+// The cells a walk shows at a position, replayed from its starting cells.
+function cellsOf(
+  walk: WalkItBlock,
+  position: WalkPosition,
+): { text: string; struck: string; states: string | null }[] {
+  const sequence = walk.sequences[position.sequence - 1];
+  const state =
+    sequence === undefined
+      ? undefined
+      : replay(walk.cells, sequence.steps, position.step);
+  if (state?.kind !== "state")
+    throw new Error(`${walk.id} does not replay to its position`);
+  return state.slots.map((slot, index) => {
+    const struck = slot.struck === undefined ? "" : cellValue(slot.struck);
+    const marks = [
+      ...(state.last?.dst === index ? [" ← written"] : []),
+      ...(state.last?.src === index ? [" ← read"] : []),
+    ].join("");
+    const states = [
+      ...(slot.value === null ? ["empty"] : []),
+      ...(state.last?.src === index ? ["source"] : []),
+      ...(state.last?.dst === index ? ["destination"] : []),
+    ];
+    return {
+      text: `${String(index)}: ${struck === "" ? "" : `${struck} lost `}${cellValue(slot.value)}${marks}`,
+      struck,
+      states: states.length === 0 ? null : states.join(" "),
+    };
+  });
+}
+
+/**
+ * What a rendered state fails to show of its walks: each shown walk once under its anchor, with
+ * the hooks, status, cells, sequence and announcement of its own position and nothing else
+ * hooked, and no anchor or hook of a walk whose approach is not picked.
+ */
+function walkProblems(
+  container: Element,
+  doc: RoundTripDoc,
+  state: WalkState,
+): string[] {
+  const problems: string[] = [];
+  const at = atOf(state);
+  const shown = walksOf(blocksOf(shownOf(doc, state.selection)));
+  const listed = (values: readonly (string | null)[]) => values.join(" | ");
+  for (const walk of shown) {
+    const position = at(walk.id);
+    const where = `${walk.id} at ${String(position.sequence)}.${String(position.step)}`;
+    const roots = hooked(container, "id", walk.id);
+    const [root] = roots;
+    if (root === undefined || roots.length !== 1) {
+      problems.push(`${where}: ${String(roots.length)} anchors`);
+      continue;
+    }
+    const sequence = walk.sequences[position.sequence - 1];
+    const active = activeOf(walk, position);
+    const targets = [root, ...root.querySelectorAll("[data-block-id]")]
+      .filter((e) => e.hasAttribute("data-block-id"))
+      .map((e) => e.getAttribute("data-block-id"));
+    const expected = [walk.blockId, active.blockId];
+    if (listed(targets) !== listed(expected))
+      problems.push(
+        `${where}: the active targets are [${listed(targets)}], expected [${listed(expected)}]`,
+      );
+    const title = root.firstElementChild;
+    if (
+      title?.tagName !== "P" ||
+      title.getAttribute("data-block-id") !== walk.blockId ||
+      shownText(title) !== spansText(walk.title)
+    )
+      problems.push(`${where}: the title is not its first hooked paragraph`);
+    const [target] = hooked(root, "data-block-id", active.blockId);
+    if (target !== undefined && shownText(target) !== spansText(active.spans))
+      problems.push(`${where}: the active target reads ${shownText(target)}`);
+    const status =
+      position.step === 0
+        ? "Start"
+        : `Step ${String(position.step)} of ${String(sequence?.steps.length)}`;
+    const lists = root.querySelectorAll(":scope > ol");
+    const [list] = lists;
+    if (list === undefined || lists.length !== 1)
+      problems.push(`${where}: ${String(lists.length)} cell lists`);
+    else {
+      if (list.previousElementSibling?.textContent !== status)
+        problems.push(`${where}: the status does not read ${status}`);
+      const cells = cellsOf(walk, position);
+      const items = [...list.children];
+      if (
+        listed(items.map((li) => li.textContent)) !==
+        listed(cells.map((c) => c.text))
+      )
+        problems.push(
+          `${where}: the cells read [${listed(items.map((li) => li.textContent))}], expected [${listed(cells.map((c) => c.text))}]`,
+        );
+      if (
+        listed(
+          items.map((li) =>
+            [...li.querySelectorAll("s")].map((s) => s.textContent).join(""),
+          ),
+        ) !== listed(cells.map((c) => c.struck))
+      )
+        problems.push(`${where}: a struck value is not shown struck`);
+      const states = JSON.stringify(
+        items.map((li) => li.getAttribute("data-cell")),
+      );
+      const expectedStates = JSON.stringify(cells.map((c) => c.states));
+      if (states !== expectedStates)
+        problems.push(
+          `${where}: the cell states read ${states}, expected ${expectedStates}`,
+        );
+    }
+    const groups = [...root.querySelectorAll('[role="group"]')];
+    const pressed = groups.flatMap((g) =>
+      [...g.querySelectorAll("button")].map((b) =>
+        b.getAttribute("aria-pressed"),
+      ),
+    );
+    if (
+      walk.sequences.length > 1
+        ? groups.length !== 1 ||
+          listed(pressed) !==
+            listed(
+              walk.sequences.map((_, i) => String(i + 1 === position.sequence)),
+            )
+        : groups.length !== 0
+    )
+      problems.push(
+        `${where}: the sequence switch does not press its sequence`,
+      );
+    const regions = [...root.querySelectorAll("[aria-live]")];
+    const announced = `${status}: ${spansText(active.spans)}`;
+    if (
+      regions.length !== 1 ||
+      regions[0]?.childElementCount !== 0 ||
+      regions[0].textContent !== announced
+    )
+      problems.push(`${where}: the announcement is not ${announced}`);
+  }
+  for (const walk of walksIn(doc)) {
+    if (shown.some((w) => w.id === walk.id)) continue;
+    const hooks = [
+      walk.blockId,
+      ...walk.sequences.flatMap((s) => [
+        s.introBlockId,
+        ...s.steps.map((step) => step.blockId),
+      ]),
+    ];
+    if (
+      hooked(container, "id", walk.id).length > 0 ||
+      hooks.some((id) => hooked(container, "data-block-id", id).length > 0)
+    )
+      problems.push(`${walk.id}: shown while its approach is not picked`);
   }
   return problems;
 }
@@ -543,16 +899,7 @@ describe.each(records.map((r) => [r.path, r.text] as const))(
         const targets = [...container.querySelectorAll("a")].map((a) =>
           a.getAttribute("href"),
         );
-        // A Term's definition link follows its button, in reading order with the other links.
-        const expected = spansOf(spansInOrder(shown)).flatMap((s) => {
-          if (s.type === "term") return [`/glossary#${s.id}`];
-          if (s.type !== "link") return [];
-          if (s.kind === "error") return [`/errors#${s.id}`];
-          return s.chapter === undefined
-            ? [`#${s.id}`]
-            : [`/chapters/${String(slugs.slugOf(s.chapter))}#${s.id}`];
-        });
-        expect(targets).toEqual(expected);
+        expect(targets).toEqual(hrefsOf(shown));
         for (const href of targets)
           expect(href).toMatch(/^(?:#|\/chapters\/|\/errors#|\/glossary#)/u);
         expect(container.querySelector("a a")).toBeNull();
@@ -612,7 +959,11 @@ describe.each(records.map((r) => [r.path, r.text] as const))(
 
     it("keeps each list's kind and start", () => {
       roundTrip(text, witness, (container, shown) => {
-        const lists = [...container.querySelectorAll("ul, ol")];
+        // A walk's cell list is checked with its walk.
+        const walkIds = walksOf(blocksOf(shown)).map((w) => w.id);
+        const lists = [...container.querySelectorAll("ul, ol")].filter(
+          (l) => !walkIds.includes(l.parentElement?.id ?? ""),
+        );
         const blocks = blocksOf(shown).flatMap((b) =>
           b.type === "list" ? [b] : [],
         );
@@ -756,6 +1107,183 @@ describe.each(records.map((r) => [r.path, r.text] as const))(
                   on ? 1 : 0,
                 );
             }
+      });
+    });
+
+    it("shows every walk frozen at its first sequence's start", () => {
+      const cellText = (cell: WalkItBlock["cells"][number], at: number) =>
+        `${String(at)}: ${
+          cell === null
+            ? "empty"
+            : typeof cell === "string"
+              ? `“${cell}”`
+              : String(cell)
+        }`;
+      roundTrip(text, witness, (container, shown) => {
+        for (const walk of walksOf(blocksOf(shown))) {
+          const [first] = walk.sequences;
+          const roots = hooked(container, "id", walk.id);
+          expect(roots).toHaveLength(1);
+          const [root] = roots;
+          expect(root?.tagName).toBe("DIV");
+          expect(root?.getAttribute("data-block-id")).toBe(walk.blockId);
+          const parts = [...(root?.children ?? [])];
+          expect(parts.map((e) => e.tagName)).toEqual(["P", "OL", "P"]);
+          const [title, cells, intro] = parts;
+          if (title === undefined || cells === undefined || intro === undefined)
+            throw new Error("a walk without its parts");
+          expect(title.attributes).toHaveLength(0);
+          expect(shownText(title)).toBe(spansText(walk.title));
+          expect(cells.attributes).toHaveLength(0);
+          const items = [...cells.children];
+          expect(items.map((li) => li.tagName)).toEqual(
+            walk.cells.map(() => "LI"),
+          );
+          expect(
+            items.map((li) =>
+              [...li.attributes].map((a) => `${a.name}=${a.value}`),
+            ),
+          ).toEqual(
+            walk.cells.map((cell) =>
+              cell === null ? ["data-cell=empty"] : [],
+            ),
+          );
+          expect(items.map((li) => li.textContent)).toEqual(
+            walk.cells.map(cellText),
+          );
+          expect(intro.attributes).toHaveLength(1);
+          expect(shownText(intro)).toBe(spansText(first.intro));
+          const active = hooked(container, "data-block-id", first.introBlockId);
+          expect(active).toHaveLength(1);
+          expect(active[0]).toBe(intro);
+          for (const id of inactiveHookIds([walk]))
+            expect(hooked(container, "data-block-id", id)).toHaveLength(0);
+          // A Term in the title or intro keeps its own button; nothing else may act or announce.
+          expect(
+            root?.querySelectorAll(
+              "button:not([popovertarget]), [aria-live], [role], s",
+            ),
+          ).toHaveLength(0);
+        }
+      });
+    });
+
+    it("shows each walk at every position with that position's hooks and cells", () => {
+      const visit = (id: string, at: WalkPosition, shown: boolean) =>
+        `${id} ${String(at.sequence)}.${String(at.step)} ${shown ? "shown" : "left out"}`;
+      const visited = new Set<string>();
+      walkRoundTrip(text, witness, (container, state) => {
+        expect(walkProblems(container, witness, state)).toEqual([]);
+        const shown = walksOf(blocksOf(shownOf(witness, state.selection)));
+        for (const [id, at] of state.positions)
+          visited.add(
+            visit(
+              id,
+              at,
+              shown.some((w) => w.id === id),
+            ),
+          );
+      });
+      // Every walk the bytes hold is seen at every position, and one in an approach also left out.
+      expect([...visited].sort()).toEqual(
+        walksIn(witness)
+          .flatMap((walk) =>
+            positionsOf(walk).flatMap((at) =>
+              selectionsFor(witness, walk).length > 1
+                ? [visit(walk.id, at, true), visit(walk.id, at, false)]
+                : [visit(walk.id, at, true)],
+            ),
+          )
+          .sort(),
+      );
+    });
+
+    it("binds every spoken segment to its hook at every walk position", () => {
+      walkRoundTrip(text, witness, (container, state) => {
+        expect(
+          speechProblems(container, witness, state.selection, atOf(state)),
+        ).toEqual([]);
+      });
+    });
+
+    it("lands a same-page link on one live anchor per shown walk in both views", () => {
+      const walks = walksIn(witness);
+      // A link to each walk, built by the renderer as an author's same-page link is.
+      const links = render(
+        <p>
+          <Spans
+            spans={walks.map((w): LinkSpan => ({
+              type: "link",
+              kind: "anchor",
+              id: w.id,
+              content: [{ type: "text", text: w.id }],
+            }))}
+            slugs={slugs}
+          />
+        </p>,
+      );
+      const hrefs = [...links.container.querySelectorAll("a")].map((a) =>
+        a.getAttribute("href"),
+      );
+      links.unmount();
+      expect(hrefs).toHaveLength(walks.length);
+      const landing = (container: Element, href: string | null) =>
+        href?.startsWith("#") === true
+          ? hooked(container, "id", href.slice(1))
+          : [];
+      const lands = (
+        container: Element,
+        shown: ShownDoc,
+        hookOf: (root: Element | undefined) => string | null | undefined,
+      ) => {
+        for (const a of container.querySelectorAll('a[href^="#"]'))
+          expect(landing(container, a.getAttribute("href"))).toHaveLength(1);
+        const live = walksOf(blocksOf(shown)).map((w) => w.id);
+        walks.forEach((walk, index) => {
+          const landed = landing(container, hrefs[index] ?? null);
+          expect(landed).toHaveLength(live.includes(walk.id) ? 1 : 0);
+          if (live.includes(walk.id))
+            expect(hookOf(landed[0])).toBe(walk.blockId);
+        });
+      };
+      roundTrip(text, witness, (container, shown) => {
+        lands(container, shown, (root) => root?.getAttribute("data-block-id"));
+      });
+      walkRoundTrip(text, witness, (container, state) => {
+        const shown = shownOf(witness, state.selection);
+        const anchors = [...container.querySelectorAll("[id]")]
+          .filter((e) => e.tagName !== "SPAN")
+          .map((e) => e.id);
+        expect(anchors.sort()).toEqual(anchorsOf(shown).sort());
+        lands(container, shown, (root) =>
+          root?.firstElementChild?.getAttribute("data-block-id"),
+        );
+      });
+    });
+
+    it("mounts only the Terms and links each walk position shows", () => {
+      walkRoundTrip(text, witness, (container, state) => {
+        const shown = shownOf(witness, state.selection);
+        const at = atOf(state);
+        const anchors = [...container.querySelectorAll("a")];
+        expect(anchors.map((a) => a.getAttribute("href"))).toEqual(
+          hrefsOf(shown, at),
+        );
+        expect(
+          anchors
+            .filter((a) => a.closest("[popover]") === null)
+            .map((a) => a.textContent),
+        ).toEqual(linksOf(shown, at).map((l) => spansText(l.content)));
+        // Each Term button opens its own definition, however many steppers share the page.
+        const definitions = [...container.querySelectorAll("[popover]")];
+        const targets = [...container.querySelectorAll("[popovertarget]")].map(
+          (b) => b.getAttribute("popovertarget"),
+        );
+        expect(definitions).toHaveLength(termsOf(shown, at).length);
+        expect(targets).toHaveLength(definitions.length);
+        expect(new Set(targets).size).toBe(targets.length);
+        for (const target of targets)
+          expect(definitions.filter((d) => d.id === target)).toHaveLength(1);
       });
     });
   },

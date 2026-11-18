@@ -53,3 +53,13 @@ order: 6
 - reach: One sentence.
 - build: One more sentence, written on the label line.
 - why: Nothing else is needed here.
+
+  ```walk-it {#walk-fix-short}
+  title: Raise one number
+  cells: [5]
+  sequences:
+    - name: once
+      intro: One cell holds a number.
+      steps:
+        - { dst: 0, value: 6, note: The number goes up by one. }
+  ```

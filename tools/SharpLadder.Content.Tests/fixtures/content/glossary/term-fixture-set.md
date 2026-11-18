@@ -22,3 +22,13 @@ seen.Add(7);
 | second Add | `false` |
 
 A missing value is one cause of [a wrong count](#err-fixture-off-by-one).
+
+```walk-it {#walk-fix-set}
+title: Add a first value
+cells: [null]
+sequences:
+  - name: once
+    intro: The set starts empty.
+    steps:
+      - { dst: 0, value: 7, note: The set now holds seven. }
+```

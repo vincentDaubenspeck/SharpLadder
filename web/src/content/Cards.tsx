@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { Card, CardsSection } from "../generated/content.ts";
 import { Blocks } from "./Blocks.tsx";
+import type { WalkControl } from "./Blocks.tsx";
 import type { SlugMap } from "./href.ts";
 import { Spans } from "./Spans.tsx";
 
@@ -8,9 +9,11 @@ import { Spans } from "./Spans.tsx";
 export function CardsSectionView({
   section,
   slugs,
+  walkControl,
 }: {
   section: CardsSection;
   slugs: SlugMap;
+  walkControl?: WalkControl | undefined;
 }): ReactElement {
   return (
     <section data-section-id={section.id}>
@@ -18,7 +21,12 @@ export function CardsSectionView({
         {section.number} <Spans spans={section.title} slugs={slugs} />
       </h3>
       {section.cards.map((card) => (
-        <CardView key={card.id} card={card} slugs={slugs} />
+        <CardView
+          key={card.id}
+          card={card}
+          slugs={slugs}
+          walkControl={walkControl}
+        />
       ))}
     </section>
   );
@@ -28,9 +36,11 @@ export function CardsSectionView({
 function CardView({
   card,
   slugs,
+  walkControl,
 }: {
   card: Card;
   slugs: SlugMap;
+  walkControl: WalkControl | undefined;
 }): ReactElement {
   return (
     <>
@@ -48,7 +58,7 @@ function CardView({
         </dd>
         <dt>Why</dt>
         <dd>
-          <Blocks blocks={card.why} slugs={slugs} />
+          <Blocks blocks={card.why} slugs={slugs} walkControl={walkControl} />
         </dd>
         {card.traps === undefined ? null : (
           <>
