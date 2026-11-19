@@ -42,7 +42,7 @@ public sealed class PayloadCheckTests
         Assert.Equal(["  ]", "}", string.Empty], lines[^3..]);
         var paths = lines[3..^3].Select(l => JsonDocument.Parse(l.TrimEnd(',')).RootElement.GetProperty("path").GetString()!).ToList();
         Assert.Equal(paths.Order(StringComparer.Ordinal), paths, StringComparer.Ordinal);
-        Assert.Equal(39, paths.Count);
+        Assert.Equal(49, paths.Count);
         Assert.DoesNotContain("compiled/manifest.json", paths, StringComparer.Ordinal);
         Assert.Matches("^    \\{ \"path\": \"compiled/aliases.json\", \"kind\": \"aliases\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[3]);
         Assert.Matches("^    \\{ \"path\": \"compiled/chapters/fixture-basics/build.json\", \"kind\": \"part\", \"part\": \"build\", \"sha256\": \"[0-9a-f]{64}\" \\},$", lines[4]);
@@ -176,14 +176,14 @@ public sealed class PayloadCheckTests
         Assert.Empty(result.Error);
         var records = ParseEnvelope(result.Stdout);
         Assert.Equal(
-            ["compiled/aliases.json", "compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/cards.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/drill.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/hints.catalogue.json", "compiled/chapters/fixture-basics/hints.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter, "compiled/errors/err-fixture-cs0165.json", "compiled/errors/err-fixture-null.json", "compiled/errors/err-fixture-off-by-one.json", "compiled/glossary/term-fixture-loop.json", "compiled/glossary/term-fixture-set.json", "compiled/patterns.json"],
+            ["compiled/aliases.json", "compiled/chapters/fixture-basics/build.json", "compiled/chapters/fixture-basics/cards.json", "compiled/chapters/fixture-basics/chapter.json", "compiled/chapters/fixture-basics/drill.json", "compiled/chapters/fixture-basics/gotchas.json", "compiled/chapters/fixture-basics/hints.catalogue.json", "compiled/chapters/fixture-basics/hints.json", "compiled/chapters/fixture-basics/idioms.json", "compiled/chapters/fixture-basics/library.json", "compiled/chapters/fixture-basics/syntax.json", "compiled/chapters/fixture-empty-intro/chapter.json", "compiled/chapters/fixture-no-sections/chapter.json", "compiled/" + SecondChapter, "compiled/errors/err-fixture-cs0165.json", "compiled/errors/err-fixture-null.json", "compiled/errors/err-fixture-off-by-one.json", "compiled/glossary/term-fixture-loop.json", "compiled/glossary/term-fixture-set.json", "compiled/patterns.json", "compiled/practice/drills/drill-fix-count-letters.json", "compiled/practice/drills/drill-fix-largest.json", "compiled/practice/drills/drill-fix-pair-scores.json", "compiled/practice/drills/drill-fix-stop-word.json", "compiled/practice/problems/prob-9001.json"],
             records.Select(r => r.Path),
             StringComparer.Ordinal);
         Assert.All(records, r => Assert.Equal(File.ReadAllText(Path.Combine(work.Web, r.Path)), r.Text));
 
         // Each record carries the kind the manifest states for it.
         Assert.Equal(
-            ["aliases", "part", "part", "chapter", "part", "part", "hints-catalogue", "part", "part", "part", "part", "chapter", "chapter", "chapter", "error", "error", "error", "glossary", "glossary", "patterns"],
+            ["aliases", "part", "part", "chapter", "part", "part", "hints-catalogue", "part", "part", "part", "part", "chapter", "chapter", "chapter", "error", "error", "error", "glossary", "glossary", "patterns", "drill", "drill", "drill", "drill", "problem"],
             JsonNode.Parse(Strict.GetString(result.Stdout))!["records"]!.AsArray().Select(r => r!["kind"]!.GetValue<string>()),
             StringComparer.Ordinal);
 
@@ -389,7 +389,7 @@ public sealed class PayloadCheckTests
             case "part-first": lines[4] = lines[4].Replace("\"kind\": \"part\", \"part\": \"build\"", "\"part\": \"build\", \"kind\": \"part\"", StringComparison.Ordinal); break;
             case "part-on-aliases": lines[3] = first.Replace(Stated, Stated + ", \"part\": \"syntax\"", StringComparison.Ordinal); break;
             case "part-on-chapter" or "part-on-glossary" or "part-on-error": PartOn(lines, $"\"kind\": \"{change[8..]}\""); break;
-            case "part-on-patterns": lines[src - 1] = lines[src - 1].Replace("\"kind\": \"patterns\"", "\"kind\": \"patterns\", \"part\": \"syntax\"", StringComparison.Ordinal); break;
+            case "part-on-patterns": var at = lines.Select((l, i) => (l, i)).First(p => p.l.Contains("\"kind\": \"patterns\"", StringComparison.Ordinal)).i; lines[at] = lines[at].Replace("\"kind\": \"patterns\"", "\"kind\": \"patterns\", \"part\": \"syntax\"", StringComparison.Ordinal); break;
             case "part-on-generated": lines[src] = lines[src].Replace(", \"sha256\"", ", \"part\": \"syntax\", \"sha256\"", StringComparison.Ordinal); break;
             case "no-part": lines[4] = lines[4].Replace(" \"part\": \"build\",", string.Empty, StringComparison.Ordinal); break;
             case "unknown-part": lines[4] = lines[4].Replace("\"part\": \"build\"", "\"part\": \"quiz\"", StringComparison.Ordinal); break;

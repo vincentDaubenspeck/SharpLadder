@@ -70,7 +70,7 @@ public sealed class ReferenceSetTests
     {
         using var root = Checker.EmptyRoot();
 
-        var (code, lines) = Checker.Run(install.Path, Checker.SchemaFolder, root.Path);
+        var (code, lines) = Checker.Check(install.Path, root.Path);
 
         Assert.Equal(2, code);
         Assert.Equal(["  " + expected, "FAIL code check"], lines);

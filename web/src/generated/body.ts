@@ -38,6 +38,60 @@ export type Speech = {
   audio: string;
 };
 
+export type PracticeBlockId = string;
+
+export type PracticeItemId = string;
+
+export type PracticeBlockTarget = {
+  type: "block";
+  blockId: string;
+};
+
+export type PracticeSegment = {
+  target: PracticeBlockTarget;
+  text: string;
+};
+
+export type PracticeSpeech = {
+  segments: PracticeSegment[];
+  audio: string;
+};
+
+export type PracticeBody = [
+  PracticeParagraphBlock | PracticeListBlock,
+  ...(PracticeParagraphBlock | PracticeListBlock)[],
+];
+
+export type PracticeExamples = [PracticeTextBlock, ...PracticeTextBlock[]];
+
+export type PracticeParagraphBlock = {
+  type: "paragraph";
+  blockId: PracticeBlockId;
+  content: Spans;
+};
+
+export type PracticeListBlock = {
+  type: "list";
+  blockId: PracticeBlockId;
+  ordered: boolean;
+  start?: number;
+  items: [PracticeListItem, ...PracticeListItem[]];
+};
+
+export type PracticeListItem = {
+  blockId: PracticeItemId;
+  content: Spans;
+};
+
+export type PracticeTextBlock = {
+  type: "text";
+  blockId: PracticeBlockId;
+  id?: Id;
+  label?: string;
+  spoken: Spoken;
+  source: string;
+};
+
 export type Body = Block[];
 
 export type Block =

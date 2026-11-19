@@ -175,6 +175,41 @@ export const row05 = {
   ],
 } satisfies ContentDoc;
 
+export const row05b = {
+  type: "chapter",
+  id: "ch-matrix",
+  slug: "matrix",
+  title: "Matrix",
+  order: 1,
+  // @ts-expect-error Row 5b: Fixed number value (dotnet 10).
+  targets: { csharp: 14, dotnet: 9 },
+  intro: [
+    {
+      type: "paragraph",
+      blockId: "intro/b1",
+      content: [{ type: "text", text: "Text." }],
+    },
+  ],
+  sections: [
+    {
+      id: "matrix-intro",
+      title: [{ type: "text", text: "Intro" }],
+      body: [
+        {
+          type: "paragraph",
+          blockId: "matrix-intro/b1",
+          content: [{ type: "text", text: "Text." }],
+        },
+      ],
+      spoken: {
+        segments: [],
+        audio:
+          "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      },
+    },
+  ],
+} satisfies ContentDoc;
+
 export const row06 = {
   type: "part",
   // @ts-expect-error Row 6: Allowed list (kind).

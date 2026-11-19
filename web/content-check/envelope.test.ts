@@ -239,6 +239,8 @@ describe("the test-records transport", () => {
       "glossary",
       "error",
       "hints-catalogue",
+      "problem",
+      "drill",
     ].map((kind): [string, Uint8Array, RegExp] => [
       `a part kind on the ${kind} record`,
       utf8(envelope([{ ...partRecord("syntax"), kind }])),

@@ -159,7 +159,7 @@ public sealed class GroupAssemblyTests
                 "chapters/fixture-basics/cards.md tally-fix-why1 Card -",
                 "chapters/fixture-basics/chapter.md fix-intro-code1 Intro -",
                 "chapters/fixture-basics/chapter.md fix-parts-code1 Section -",
-                "chapters/fixture-basics/drill.md ramp-fix-easy-code1 Drill -",
+                "chapters/fixture-basics/drill.md ramp-fix-start-code1 Drill -",
                 "chapters/fixture-basics/gotchas.md gotcha-fix-key1 Section -",
                 "chapters/fixture-basics/gotchas.md gotcha-fix-out1 Section -",
                 "chapters/fixture-basics/syntax.md syn-fix-sum1 Section -",
@@ -183,7 +183,7 @@ public sealed class GroupAssemblyTests
     {
         var root = Fixtures.Root("mixed-owner");
 
-        var (code, lines) = Checker.Run(Checker.RepositoryRoot, Checker.SchemaFolder, root);
+        var (code, lines) = Checker.Check(Checker.RepositoryRoot, root);
 
         Assert.Equal(1, code);
         Assert.Equal(
@@ -200,7 +200,7 @@ public sealed class GroupAssemblyTests
     {
         var root = Fixtures.Root("missing-id-group");
 
-        var (code, lines) = Checker.Run(Checker.RepositoryRoot, Checker.SchemaFolder, root);
+        var (code, lines) = Checker.Check(Checker.RepositoryRoot, root);
 
         Assert.Equal(1, code);
         Assert.Equal(

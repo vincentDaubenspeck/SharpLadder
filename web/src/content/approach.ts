@@ -3,9 +3,11 @@ import type {
   BuildPart,
   BuildSection,
   ContentDoc,
+  DrillFile,
   HintsCatalogue,
   HintsPart,
   PartFile,
+  ProblemFile,
 } from "../generated/content.ts";
 
 /** What the picker shows for one approach: its id and label, never its body. */
@@ -40,10 +42,13 @@ export type ApproachSelection = ReadonlyMap<string, string>;
 
 export type ApproachChange = (sectionId: string, approachId: string) => void;
 
-/** Every record the static view takes: a build part and hints are shown only through their views. */
+/**
+ * Every record the static view takes: a build part and hints are shown only through their views,
+ * and a practice record has no static view.
+ */
 export type StaticDoc = Exclude<
   ContentDoc,
-  BuildPart | HintsPart | HintsCatalogue
+  BuildPart | HintsPart | HintsCatalogue | ProblemFile | DrillFile
 >;
 
 export type StaticPart = Exclude<PartFile, BuildPart | HintsPart>;

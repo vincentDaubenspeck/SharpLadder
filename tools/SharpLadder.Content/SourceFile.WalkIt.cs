@@ -13,6 +13,9 @@ internal sealed partial class SourceFile
     // The walk ids this file declares; only these may carry the walk prefix.
     public List<string> WalkIds { get; } = [];
 
+    // The section each walk-it stands in, so a review entry can name a walk-it of its own section.
+    public List<(string Section, string Walk)> SectionWalks { get; } = [];
+
     private WalkItNode? WalkIt(FencedCodeBlock fence, string blockId, int line)
     {
         var id = WalkId(fence, line);
@@ -81,6 +84,11 @@ internal sealed partial class SourceFile
         Ids.Add((block.Id, line));
         Anchors.Add(block.Id);
         WalkIds.Add(block.Id);
+        if (_current is { } section)
+        {
+            SectionWalks.Add((section.Id, block.Id));
+        }
+
         return block;
     }
 

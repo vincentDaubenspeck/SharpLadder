@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   exec,
+  execBatched,
   gitFiles,
   installHint,
   pins,
@@ -16,6 +17,7 @@ import { codeCheckChecks } from "./code-check.mjs";
 import { contentChecks } from "./content.mjs";
 import { csharpChecks } from "./csharp.mjs";
 import { dotnetChecks } from "./dotnet.mjs";
+import { leakChecks } from "./leak.mjs";
 import { shellChecks, trackedShellFiles } from "./shell.mjs";
 import { npmAuditNotRun, npmAuditStage, runWebStage, webStages } from "./web.mjs";
 
@@ -83,7 +85,7 @@ for (const [name, script] of [
 const ec = toolProblem("ec", ["--version"], /v?(\d+\.\d+\.\d+)/, pins.ec.version);
 if (ec) report("EditorConfig (editorconfig-checker)", [ec]);
 else {
-  const r = exec("ec", ["-no-color", ...gitFiles(root, [])], { cwd: root });
+  const r = execBatched("ec", ["-no-color"], gitFiles(root, []), { cwd: root });
   report("EditorConfig (editorconfig-checker)", r.code === 0 ? [] : [r.out]);
 }
 
@@ -91,12 +93,13 @@ const yl = toolProblem("yamllint", ["--version"], /yamllint (\d+\.\d+\.\d+)/, pi
 if (yl) report("YAML (yamllint)", [yl]);
 else {
   const files = gitFiles(root, ["*.yml", "*.yaml"]);
-  const r = exec("yamllint", ["--strict", "-f", "parsable", ...files], { cwd: root });
+  const r = execBatched("yamllint", ["--strict", "-f", "parsable"], files, { cwd: root });
   report("YAML (yamllint)", r.code === 0 ? [] : [r.out]);
 }
 
 const built = csharpChecks(root, dotnetChecks(root));
 contentChecks(root, built);
 codeCheckChecks(root, built);
+leakChecks(root, built);
 
 setExitCode();

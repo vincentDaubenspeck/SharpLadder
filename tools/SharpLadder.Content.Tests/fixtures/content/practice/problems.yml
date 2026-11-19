@@ -1,0 +1,10 @@
+# Generated from the problem files by the content compiler's index mode; never edit it by hand.
+problems:
+  - id: prob-9001
+    number: 9001
+    link: https://example.com/fixture-problem-9001
+    title: Matching ends
+    chapter: ch-fixture
+    ladders:
+      - ladder-lone-word
+      - ladder-lone-word-alt

@@ -12,6 +12,10 @@ const records = inject("contentRecords").filter(
 const catalogues = inject("contentRecords").filter(
   (r) => r.kind === "hints-catalogue",
 );
+// The acceptance run requires this case by name for every certified problem and drill record.
+const practice = inject("contentRecords").filter(
+  (r) => r.kind === "problem" || r.kind === "drill",
+);
 if (records.length === 0 || catalogues.length === 0)
   throw new Error("the global setup provided no content records");
 
@@ -27,7 +31,9 @@ const spokenParts = (kind: string, text: string): unknown => {
 };
 
 describe.each(
-  [...records, ...catalogues].map((r) => [r.path, r.kind, r.text] as const),
+  [...records, ...catalogues, ...practice].map(
+    (r) => [r.path, r.kind, r.text] as const,
+  ),
 )("the speech of %s", (_, kind, text) => {
   it("recomputes every audio slot from its segment texts", () => {
     expect(slotProblems(spokenParts(kind, text))).toEqual([]);
@@ -124,6 +130,18 @@ describe("the slot check", () => {
     const problems = slotProblems(doc);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain(fragment);
+  });
+
+  it("refuses a practice record whose statement slot is wrong", () => {
+    const record = (audio: string) => ({
+      type: "drill",
+      spoken: { segments: [{ text: "a" }, { text: "b" }], audio },
+    });
+    // The same record with its own slot passes, so only the slot is refused.
+    expect(slotProblems(record(slotOf(["a", "b"])))).toEqual([]);
+    expect(slotProblems(record(slotOf(["b", "a"])))).toEqual([
+      "the statement speech: the slot is not the hash of its segment texts",
+    ]);
   });
 
   it("names the section that fails among sections that pass", () => {

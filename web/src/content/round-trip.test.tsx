@@ -13,10 +13,12 @@ import type {
   CardsSection,
   ChapterSection,
   ContentDoc,
+  DrillFile,
   DrillSection,
   HintsCatalogue,
   HintsPart,
   PartSection,
+  ProblemFile,
 } from "../generated/content.ts";
 import { witness as build } from "../generated/witness/chapters/fixture-basics/build.ts";
 import { witness as cards } from "../generated/witness/chapters/fixture-basics/cards.ts";
@@ -53,7 +55,11 @@ import { replay } from "./walk-replay.ts";
 import type { WalkCell } from "./walk-replay.ts";
 
 // Hints are shown only through their own view, so they never make this round trip.
-type RoundTripDoc = Exclude<ContentDoc, HintsPart | HintsCatalogue>;
+// A practice record has no view to render yet.
+type RoundTripDoc = Exclude<
+  ContentDoc,
+  HintsPart | HintsCatalogue | ProblemFile | DrillFile
+>;
 
 // Each compiled record path with the witness emitted from the same validated bytes.
 const witnesses = new Map<string, RoundTripDoc>([
@@ -104,13 +110,15 @@ function provided(value: unknown): readonly {
   return entries;
 }
 
-// The registries have no view, and hints are shown only through their own view in
-// content-tests/hints.test.tsx, so every other record makes the round trip.
+// The registries have no view, a practice record has none yet, and hints are shown only through
+// their own view in content-tests/hints.test.tsx, so every other record makes the round trip.
 const records = provided(inject("contentRecords")).filter(
   (r) =>
     r.kind !== "aliases" &&
     r.kind !== "patterns" &&
     r.kind !== "hints-catalogue" &&
+    r.kind !== "problem" &&
+    r.kind !== "drill" &&
     r.part !== "hints",
 );
 const slugs = buildSlugMap([basics, emptyIntro, noSections, second]);

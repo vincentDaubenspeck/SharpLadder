@@ -2,7 +2,7 @@
 // Usage: node tools/checks/shell.mjs [file...]   (default: every tracked shell file)
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { anyFailed, exec, gitFiles, pins, report, toolProblem } from "./lib.mjs";
+import { anyFailed, exec, execBatched, gitFiles, pins, report, toolProblem } from "./lib.mjs";
 
 // Every Comment node in the typed JSON tree carries Hash and Text.
 function collectComments(node, out) {
@@ -48,38 +48,44 @@ function suppressionProblems(file) {
   return problems;
 }
 
-export function shellChecks(files) {
-  const shfmt = toolProblem("shfmt", ["--version"], /v?(\d+\.\d+\.\d+)/, pins.shfmt.version);
+// A discovery problem fails every stage; a missing tool is named instead, as the more useful cause.
+export function shellChecks({ files, problem }) {
+  const shfmt = toolProblem("shfmt", ["--version"], /v?(\d+\.\d+\.\d+)/, pins.shfmt.version) ?? problem;
   if (shfmt) {
     report("shell format (shfmt)", [shfmt]);
     report("shell suppression reasons", [shfmt]);
   } else {
-    const d = exec("shfmt", ["-d", ...files]);
+    const d = execBatched("shfmt", ["-d"], files);
     report("shell format (shfmt)", d.code === 0 ? [] : [d.out]);
     report("shell suppression reasons", files.flatMap(suppressionProblems));
   }
-  const sc = toolProblem(
-    "shellcheck",
-    ["--version"],
-    /version: (\d+\.\d+\.\d+)/,
-    pins.shellcheck.version,
-  );
+  const sc =
+    toolProblem("shellcheck", ["--version"], /version: (\d+\.\d+\.\d+)/, pins.shellcheck.version) ?? problem;
   if (sc) report("ShellCheck", [sc]);
   else {
-    const s = exec("shellcheck", ["--norc", ...files]);
+    const s = execBatched("shellcheck", ["--norc"], files);
     report("ShellCheck", s.code === 0 ? [] : [s.out]);
   }
 }
 
-// Shell files among the tracked files, as shfmt detects them (extension or shebang).
+// Shell files among the tracked files, as shfmt detects them (extension or shebang). A failed
+// discovery is a problem for the shell stages, never an empty list they would pass.
 export function trackedShellFiles(root) {
-  const r = exec("shfmt", ["-f", ...gitFiles(root, [])], { cwd: root });
-  if (r.code !== 0) return [];
-  return r.out.split(/\r?\n/).filter((f) => f !== "");
+  const tracked = gitFiles(root, []);
+  const r = execBatched("shfmt", ["-f"], tracked, { cwd: root });
+  if (r.code !== 0) {
+    const why = (r.error ?? r.stderr.trim()) || `exit ${String(r.code)}`;
+    return { problem: `shell file discovery (shfmt -f) failed: ${why}` };
+  }
+  const files = r.out.split(/\r?\n/).filter((f) => f !== "");
+  if (files.length === 0 && tracked.some((f) => /\.(sh|bash)$/.test(f))) {
+    return { problem: "shell file discovery (shfmt -f) found no shell file, but .sh or .bash files are tracked" };
+  }
+  return { files };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const files = process.argv.slice(2);
-  shellChecks(files.length > 0 ? files : trackedShellFiles(process.cwd()));
+  shellChecks(files.length > 0 ? { files } : trackedShellFiles(process.cwd()));
   process.exitCode = anyFailed() ? 1 : 0;
 }

@@ -1,0 +1,97 @@
+{
+  "type": "drill",
+  "id": "drill-fix-pair-scores",
+  "chapter": "ch-fixture",
+  "rung": "easy",
+  "title": "Pair each name with its score",
+  "move": "Walk two lists side by side",
+  "ideas": [
+    "term-fixture-set"
+  ],
+  "prerequisites": [
+    "drill-fix-largest"
+  ],
+  "prepares": [
+    "prob-9001"
+  ],
+  "variationOf": null,
+  "ladders": [
+    "ladder-lone-word"
+  ],
+  "statement": [
+    {
+      "type": "paragraph",
+      "blockId": "drill-fix-pair-scores/statement/b1",
+      "content": [
+        {
+          "type": "text",
+          "text": "Given a list of names and a list of scores, pair the name at each place with the score at the same place."
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "type": "text",
+      "blockId": "drill-fix-pair-scores/examples/b1",
+      "spoken": "ann and bo with 3 and 5 give ann 3, bo 5",
+      "source": "[ann, bo], [3, 5] gives ann 3, bo 5"
+    }
+  ],
+  "constraints": [
+    {
+      "type": "list",
+      "blockId": "drill-fix-pair-scores/constraints/b1",
+      "ordered": false,
+      "items": [
+        {
+          "blockId": "drill-fix-pair-scores/constraints/b1.i1",
+          "content": [
+            {
+              "type": "text",
+              "text": "When one list is longer, its extra items stay unpaired."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "starter": {
+    "id": "drill-fix-pair-scores-starter",
+    "spoken": "The method to fill in",
+    "source": "using System;\nusing System.Collections.Generic;\n\npublic static class Solution\n{\n    public static Dictionary\u003Cstring, int\u003E Pair(string[] names, int[] scores) =\u003E\n        throw new NotImplementedException();\n}"
+  },
+  "spoken": {
+    "segments": [
+      {
+        "target": {
+          "type": "block",
+          "blockId": "drill-fix-pair-scores/statement/b1"
+        },
+        "text": "Given a list of names and a list of scores, pair the name at each place with the score at the same place."
+      },
+      {
+        "target": {
+          "type": "block",
+          "blockId": "drill-fix-pair-scores/examples/b1"
+        },
+        "text": "ann and bo with 3 and 5 give ann 3, bo 5"
+      },
+      {
+        "target": {
+          "type": "block",
+          "blockId": "drill-fix-pair-scores/constraints/b1.i1"
+        },
+        "text": "When one list is longer, its extra items stay unpaired."
+      }
+    ],
+    "audio": "sha256:d161e5f1efbb764e8bcadc8e5d1bfe87f5f945354eb4ec8fe7411e5f72a75f8a"
+  },
+  "tests": {
+    "text": "using System;\nusing System.Collections.Generic;\n\nvar failed = 0;\nCheck(\u0022pairs each name with its score\u0022, () =\u003E\n{\n    var pairs = Solution.Pair([\u0022ann\u0022, \u0022bo\u0022], [3, 5]);\n    return pairs.Count == 2 \u0026\u0026 pairs[\u0022ann\u0022] == 3 \u0026\u0026 pairs[\u0022bo\u0022] == 5;\n});\nCheck(\u0022stops at the shorter list\u0022,\n    () =\u003E Solution.Pair([\u0022ann\u0022, \u0022bo\u0022, \u0022cy\u0022], [3, 5]).Count == 2);\nCheck(\u0022edge: no names gives no pairs\u0022, () =\u003E Solution.Pair([], []).Count == 0);\nreturn failed == 0 ? 0 : 1;\n\n// Each check runs alone, so one that throws fails and the rest still report.\nvoid Check(string name, Func\u003Cbool\u003E test)\n{\n    var passed = false;\n    try\n    {\n        passed = test();\n    }\n    catch (Exception)\n    {\n        passed = false;\n    }\n\n    Console.WriteLine((passed ? \u0022#check pass \u0022 : \u0022#check fail \u0022) \u002B name);\n    failed \u002B= passed ? 0 : 1;\n}\n",
+    "version": 1,
+    "hash": "sha256:ece0144c9f90fe79d83df4075d87e3598ec31eef5bf2aa85812b9809c1ef58c9",
+    "count": 3,
+    "review": []
+  }
+}

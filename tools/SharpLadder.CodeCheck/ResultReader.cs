@@ -12,16 +12,23 @@ internal sealed class ResultReader
     private readonly IReadOnlyList<string> _expectedChecks;
     private readonly IReadOnlyList<SourceBlock> _blocks;
     private readonly bool _processGroup;
+    private readonly int _maxRecords;
     private readonly byte[] _pending = new byte[WireContract.MaxRecordBytes];
     private int _pendingLength;
     private int _records;
 
     public ResultReader(string token, CompiledGroup group, bool processGroup)
+        : this(token, group.ExpectedChecks, group.Program.Blocks, processGroup, group.ExpectedChecks.Count + 2)
+    {
+    }
+
+    private ResultReader(string token, IReadOnlyList<string> expectedChecks, IReadOnlyList<SourceBlock> blocks, bool processGroup, int maxRecords)
     {
         _token = token;
-        _expectedChecks = group.ExpectedChecks;
-        _blocks = group.Program.Blocks;
+        _expectedChecks = expectedChecks;
+        _blocks = blocks;
         _processGroup = processGroup;
+        _maxRecords = maxRecords;
     }
 
     public StartRecord? Start { get; private set; }
@@ -32,7 +39,10 @@ internal sealed class ResultReader
 
     public RecordFault? Fault { get; private set; }
 
-    private int MaxRecords => _expectedChecks.Count + 2;
+    private int MaxRecords => _maxRecords;
+
+    // A suite reports on standard output, so its results file holds the start record and nothing else.
+    public static ResultReader StartOnly(string token, bool processGroup) => new(token, [], [], processGroup, 1);
 
     public static string MissingCheck(string blockId, int record) =>
         string.Create(CultureInfo.InvariantCulture, $"the check record of {blockId} is missing before result record {record}");

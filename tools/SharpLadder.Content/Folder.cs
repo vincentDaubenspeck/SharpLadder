@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Win32.SafeHandles;
 
 namespace SharpLadder.Content;
@@ -146,8 +147,9 @@ internal sealed class Folder : IDisposable
         TryOpenFolder(name) ?? throw new BoundaryException($"{ChildDisplay(name)}: no longer there");
 
     // The whole file, read through a handle that is a regular file with one hard link, inside
-    // this folder as the parent this run recorded.
-    public byte[] ReadFile(string name)
+    // this folder as the parent this run recorded. A file over limit is refused before anything
+    // is allocated, and the read never goes past the length checked.
+    public byte[] ReadFile(string name, long limit)
     {
         var display = ChildDisplay(name);
         HandleInfo info;
@@ -180,7 +182,13 @@ internal sealed class Folder : IDisposable
             throw new BoundaryException($"{display}: changed while it was being opened");
         }
 
-        var bytes = new byte[RandomAccess.GetLength(file)];
+        var length = RandomAccess.GetLength(file);
+        if (length > limit)
+        {
+            throw new BoundaryException(string.Create(CultureInfo.InvariantCulture, $"{display}: {length} bytes; at most {limit} are read of one file"));
+        }
+
+        var bytes = new byte[length];
         var read = 0;
         while (read < bytes.Length)
         {

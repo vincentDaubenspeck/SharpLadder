@@ -10,6 +10,7 @@ internal interface IRunBackend
     // The OS's canonical form, so the observed and the expected runtime directory compare exactly.
     string Canonical(string directory);
 
-    // A failed start throws ToolProblem once the backend has cleaned up whatever it started.
-    IRunningChild Start(ChildLaunch launch);
+    // A failed start throws ToolProblem once the backend has cleaned up whatever it started. The
+    // sink is in place before the child runs, so it sees standard output from its first byte.
+    IRunningChild Start(ChildLaunch launch, OutputSink output);
 }

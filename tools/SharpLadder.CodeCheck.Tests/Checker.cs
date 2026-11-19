@@ -7,10 +7,20 @@ internal static class Checker
     public static string SchemaFolder => Path.Combine(RepositoryRoot, "content", "schema");
 
     // The live install is only ever read; a case that changes it works on a stand-in copy.
-    public static (int Code, string[] Lines) Run(string repositoryRoot, params string[] args)
+    public static (int Code, string[] Lines) Run(string repositoryRoot, params string[] args) => RunWith(repositoryRoot, null, null, args);
+
+    // The live schema and the given content, with a reference root that is absent: no subject is solved.
+    public static (int Code, string[] Lines) Check(string repositoryRoot, string content)
+    {
+        using var parent = new TempFolder();
+        return Run(repositoryRoot, SchemaFolder, content, Path.Combine(parent.Path, "reference"));
+    }
+
+    // A backend with a fault seam, or a suite deadline shorter than the checker's own.
+    public static (int Code, string[] Lines) RunWith(string repositoryRoot, IRunBackend? backend, TimeSpan? suiteLimit, params string[] args)
     {
         using var output = new StringWriter();
-        var code = Cli.Run(args, output, repositoryRoot);
+        var code = Cli.Run(args, output, repositoryRoot, backend, suiteLimit);
         return (code, output.ToString().ReplaceLineEndings("\n").TrimEnd('\n').Split('\n'));
     }
 

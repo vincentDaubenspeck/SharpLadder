@@ -42,7 +42,7 @@ internal sealed class WindowsBackend(WindowsSeam seam) : IRunBackend
         return final.StartsWith(LongPrefix, StringComparison.Ordinal) && final.Length > 5 && final[5] == ':' ? final[4..] : final;
     }
 
-    public IRunningChild Start(ChildLaunch launch) => WindowsChild.Start(launch, seam);
+    public IRunningChild Start(ChildLaunch launch, OutputSink output) => WindowsChild.Start(launch, output, seam);
 
     internal static bool Inheritable(SafeFileHandle handle, bool inherit) =>
         WindowsNative.SetHandleInformation(handle, WindowsNative.HandleFlagInherit, inherit ? WindowsNative.HandleFlagInherit : 0);

@@ -12,9 +12,14 @@ import type {
   LinkContent,
   ListItem,
   ParagraphBlock,
+  PracticeBody,
+  PracticeExamples,
+  PracticeSpeech,
   SectionId,
   Spans,
   Speech,
+  Spoken,
+  WalkId,
 } from "./body.ts";
 
 export type ChapterId = Id;
@@ -282,5 +287,75 @@ export type CatalogueLadder = {
   spoken: Speech;
 };
 
+export type ProblemId = Id;
+
+export type DrillSubjectId = Id;
+
+export type LadderList = [LadderId, ...LadderId[]];
+
+export type ProblemFile = {
+  type: "problem";
+  id: ProblemId;
+  chapter: ChapterId;
+  number: number;
+  link: string;
+  title: ShownText;
+  patternTags: [PatternId, ...PatternId[]];
+  ladders: LadderList;
+  statement: PracticeBody;
+  examples: PracticeExamples;
+  constraints: PracticeBody;
+  starter: PracticeStarter;
+  spoken: PracticeSpeech;
+  tests: Suite;
+};
+
+export type DrillFile = {
+  type: "drill";
+  id: DrillSubjectId;
+  chapter: ChapterId;
+  rung: RampRung;
+  title: ShownText;
+  move: ShownText;
+  ideas: TermId[];
+  prerequisites: DrillId[];
+  prepares: ProblemId[];
+  variationOf: DrillId | null;
+  ladders: LadderList;
+  statement: PracticeBody;
+  examples: PracticeExamples;
+  constraints: PracticeBody;
+  starter: PracticeStarter;
+  spoken: PracticeSpeech;
+  tests: Suite;
+};
+
+export type PracticeStarter = {
+  id: string;
+  spoken: Spoken;
+  source: string;
+};
+
+export type Suite = {
+  text: string;
+  version: number;
+  hash: string;
+  count: number;
+  review: ReviewEntry[];
+};
+
+export type ReviewEntry = {
+  check: string;
+  sectionId: SectionId;
+  label: ShownText;
+  walkId?: WalkId;
+};
+
 export type ContentDoc =
-  ChapterFile | PartFile | GlossaryEntry | ErrorEntry | HintsCatalogue;
+  | ChapterFile
+  | PartFile
+  | GlossaryEntry
+  | ErrorEntry
+  | HintsCatalogue
+  | ProblemFile
+  | DrillFile;

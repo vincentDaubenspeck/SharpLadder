@@ -27,6 +27,11 @@ public sealed class PayloadModeTests
         "compiled/glossary/term-fixture-set.json",
         "compiled/manifest.json",
         "compiled/patterns.json",
+        "compiled/practice/drills/drill-fix-count-letters.json",
+        "compiled/practice/drills/drill-fix-largest.json",
+        "compiled/practice/drills/drill-fix-pair-scores.json",
+        "compiled/practice/drills/drill-fix-stop-word.json",
+        "compiled/practice/problems/prob-9001.json",
         "src/generated/body.ts",
         "src/generated/content.ts",
         "src/generated/witness/chapters/fixture-basics/build.ts",
@@ -46,6 +51,11 @@ public sealed class PayloadModeTests
         "src/generated/witness/errors/err-fixture-off-by-one.ts",
         "src/generated/witness/glossary/term-fixture-loop.ts",
         "src/generated/witness/glossary/term-fixture-set.ts",
+        "src/generated/witness/practice/drills/drill-fix-count-letters.ts",
+        "src/generated/witness/practice/drills/drill-fix-largest.ts",
+        "src/generated/witness/practice/drills/drill-fix-pair-scores.ts",
+        "src/generated/witness/practice/drills/drill-fix-stop-word.ts",
+        "src/generated/witness/practice/problems/prob-9001.ts",
     ];
 
     [Fact]
@@ -94,7 +104,7 @@ public sealed class PayloadModeTests
         var result = work.Run("compare");
 
         Assert.Equal(0, result.Code);
-        Assert.Equal("40 committed files equal fresh output\nPASS content compare\n", result.Output);
+        Assert.Equal("50 committed files equal fresh output\nPASS content compare\n", result.Output);
         Assert.Equal(PayloadFiles, Files(work.Web), StringComparer.Ordinal);
     }
 

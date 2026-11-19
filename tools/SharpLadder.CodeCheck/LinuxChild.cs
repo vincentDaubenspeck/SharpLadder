@@ -9,8 +9,8 @@ namespace SharpLadder.CodeCheck;
 
 // One group's child on Linux, started through setsid by its explicit path, so it leads a new session
 // and process group before the muxer runs. Process keeps the three pipes and closes the checker's
-// copies of the child's ends; both output pipes are drained from the start on their own threads,
-// counted against the cap and discarded.
+// copies of the child's ends; both output pipes are drained from the start on their own threads and
+// counted against the cap; standard output goes on to the run's sink, standard error is discarded.
 [SupportedOSPlatform("linux")]
 internal sealed unsafe class LinuxChild : IRunningChild
 {
@@ -24,6 +24,7 @@ internal sealed unsafe class LinuxChild : IRunningChild
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(10);
 
     private readonly LinuxSeam _seam;
+    private readonly StandardOutputFeed _feed;
     private Process? _process;
     private Stream? _input;
     private Stream? _outputRead;
@@ -34,15 +35,19 @@ internal sealed unsafe class LinuxChild : IRunningChild
     private IOException? _readFault;
     private int? _group;
 
-    private LinuxChild(LinuxSeam seam) => _seam = seam;
+    private LinuxChild(OutputSink output, LinuxSeam seam)
+    {
+        _feed = new StandardOutputFeed(output);
+        _seam = seam;
+    }
 
     public int ProcessId { get; private set; }
 
     private OutputStream? Capped => Volatile.Read(ref _cappedStream) is var stream and not NoStream ? (OutputStream)stream : null;
 
-    public static LinuxChild Start(ChildLaunch launch, LinuxSeam seam)
+    public static LinuxChild Start(ChildLaunch launch, OutputSink output, LinuxSeam seam)
     {
-        var child = new LinuxChild(seam);
+        var child = new LinuxChild(output, seam);
         try
         {
             child.Launch(launch);
@@ -170,6 +175,7 @@ internal sealed unsafe class LinuxChild : IRunningChild
             throw new ToolProblem($"the code group's output could not be read ({fault.Message})", fault);
         }
 
+        _feed.ThrowIfFaulted();
         return Capped;
     }
 
@@ -315,6 +321,11 @@ internal sealed unsafe class LinuxChild : IRunningChild
                 if (total > RunLimits.OutputCapBytes)
                 {
                     Interlocked.CompareExchange(ref _cappedStream, (int)stream, NoStream);
+                }
+
+                if (stream == OutputStream.StandardOutput)
+                {
+                    _feed.Write(buffer.AsSpan(0, read));
                 }
             }
         }

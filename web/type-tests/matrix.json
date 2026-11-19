@@ -111,6 +111,22 @@
       }
     },
     {
+      "name": "row05b",
+      "rule": "Fixed number value (dotnet 10)",
+      "module": "rejected.ts",
+      "json": "json/row05b.json",
+      "typescript": {
+        "code": 2322,
+        "text": "Type '9' is not assignable to type '10'"
+      },
+      "validator": "refused",
+      "repair": {
+        "op": "set",
+        "path": ["targets", "dotnet"],
+        "value": 10
+      }
+    },
+    {
       "name": "row06",
       "rule": "Allowed list (kind)",
       "module": "rejected.ts",

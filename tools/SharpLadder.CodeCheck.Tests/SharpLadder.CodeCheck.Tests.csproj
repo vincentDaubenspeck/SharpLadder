@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Fixture suites and solutions are content, compiled only by the code check. -->
+    <Compile Remove="fixtures/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="xunit.analyzers" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>

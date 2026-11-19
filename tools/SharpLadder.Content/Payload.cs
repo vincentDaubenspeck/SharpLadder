@@ -24,6 +24,8 @@ internal static class Payload
         (RecordKind.Glossary, "glossary"),
         (RecordKind.Error, "error"),
         (RecordKind.HintsCatalogue, "hints-catalogue"),
+        (RecordKind.Problem, "problem"),
+        (RecordKind.Drill, "drill"),
     ];
 
     private static readonly UTF8Encoding Strict = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -52,7 +54,7 @@ internal static class Payload
         var witnesses = new List<OutputFile>();
 
         // A hints part holds what its view never shows, so only its catalogue reaches typed source.
-        foreach (var file in result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part or RecordKind.Glossary or RecordKind.Error or RecordKind.HintsCatalogue
+        foreach (var file in result.Files.Where(f => f.Kind is RecordKind.Chapter or RecordKind.Part or RecordKind.Glossary or RecordKind.Error or RecordKind.HintsCatalogue or RecordKind.Problem or RecordKind.Drill
             && !string.Equals(f.Part, PartKinds.Hints, StringComparison.Ordinal)))
         {
             // The witness is emitted only from bytes the schema accepts, the same bytes compiled/ receives.

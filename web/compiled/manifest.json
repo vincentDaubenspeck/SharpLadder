@@ -21,8 +21,13 @@
     { "path": "compiled/glossary/term-fixture-loop.json", "kind": "glossary", "sha256": "97ae9df58462d09464423ffb7402655b1276e10110118871ad886cbee0b89648" },
     { "path": "compiled/glossary/term-fixture-set.json", "kind": "glossary", "sha256": "b31d954eaad99fc4be253e81b92c296be828d060f3630e1a89d8d0eefad4d541" },
     { "path": "compiled/patterns.json", "kind": "patterns", "sha256": "e8b2e1b93ab823b8f6918116c4edd0d721f5a581488aea5ccafc806188539263" },
-    { "path": "src/generated/body.ts", "sha256": "fec319bc149bebe7a508d08d2fdf6bf47f86e6f58e4d667f17ac2918503c3bb2" },
-    { "path": "src/generated/content.ts", "sha256": "217d43d7281279d51cd38a6fec5696cdfdbced2198d422c15544b901f01b9908" },
+    { "path": "compiled/practice/drills/drill-fix-count-letters.json", "kind": "drill", "sha256": "154bdefe88e4cecae6ac429371ca1cc7b7c0cee72610b1dda2bc4dc67aec88fb" },
+    { "path": "compiled/practice/drills/drill-fix-largest.json", "kind": "drill", "sha256": "e360732187aa37d82101ad58a66919f73e5ac5b6718b703ba8d777cdba92119c" },
+    { "path": "compiled/practice/drills/drill-fix-pair-scores.json", "kind": "drill", "sha256": "91aa5c978375466f3d7b4aeda46414515bdce6f44b3447d72f7e7cbe48baf16a" },
+    { "path": "compiled/practice/drills/drill-fix-stop-word.json", "kind": "drill", "sha256": "a4229f90170315bd2098dae4159990d1781b3cad3cf59a6cb6e8682553c552dd" },
+    { "path": "compiled/practice/problems/prob-9001.json", "kind": "problem", "sha256": "568514cd22671606c912f5d0077cb3d2dba768a960dca8eefbd76935ea01b901" },
+    { "path": "src/generated/body.ts", "sha256": "a3041f84723428a1940eede5610bfc2f94b8d6a91b31f165b896c54bb09e3d82" },
+    { "path": "src/generated/content.ts", "sha256": "80af3b2c48f3c1d6067f8eb5001d7d0745476cd860515fa59f92a468f3aa5aa1" },
     { "path": "src/generated/witness/chapters/fixture-basics/build.ts", "sha256": "05d54965bca4418961ff8dfecbcb6eeb1c009e0d459c51b680092b162a824fd8" },
     { "path": "src/generated/witness/chapters/fixture-basics/cards.ts", "sha256": "b6fb95f91e2f32302d021eb81ae223f6e26be1e5ce150739d0aecb9af3f3c606" },
     { "path": "src/generated/witness/chapters/fixture-basics/chapter.ts", "sha256": "bf6ddd37b1163eb737f790b1167a49c76134549a585a478219c49ea096d2efd8" },
@@ -39,6 +44,11 @@
     { "path": "src/generated/witness/errors/err-fixture-null.ts", "sha256": "645b7fedeae79b7bc1561075a31975b0afafe6b76605a5eee700a879b0f1fcb7" },
     { "path": "src/generated/witness/errors/err-fixture-off-by-one.ts", "sha256": "1868cc96fb4ed39940cdc82d44e5b8eeb34dd134ee8755686f33c96aa48652c7" },
     { "path": "src/generated/witness/glossary/term-fixture-loop.ts", "sha256": "16c922bf5c82804eb95551a9187d22fe2d4769944305c86213a103565f1dd3aa" },
-    { "path": "src/generated/witness/glossary/term-fixture-set.ts", "sha256": "121349b25a08853b01d6ab3db274145ea85a29f19744e75c7a905ebc031b549f" }
+    { "path": "src/generated/witness/glossary/term-fixture-set.ts", "sha256": "121349b25a08853b01d6ab3db274145ea85a29f19744e75c7a905ebc031b549f" },
+    { "path": "src/generated/witness/practice/drills/drill-fix-count-letters.ts", "sha256": "7b95b4e6212b350708fede418b1f12bcb19370624ca257fb15e30aff9f0c8a57" },
+    { "path": "src/generated/witness/practice/drills/drill-fix-largest.ts", "sha256": "d9c460bef59ccd302929e1738845db332a761390c50eafc3242b0916e19d9a69" },
+    { "path": "src/generated/witness/practice/drills/drill-fix-pair-scores.ts", "sha256": "a7eebc7a542442a25ab0749a61738e37b846f507ae302a90aa5710a38ac7fffa" },
+    { "path": "src/generated/witness/practice/drills/drill-fix-stop-word.ts", "sha256": "4c0499ae135be631284921c92aa6b89e125955bad7fec09b47a23a2d87c61687" },
+    { "path": "src/generated/witness/practice/problems/prob-9001.ts", "sha256": "4c8c326e1023963d820ac3486f6ea653712b877e5ecbcc2b9457369c1e9c49ff" }
   ]
 }

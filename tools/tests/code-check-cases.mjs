@@ -25,12 +25,14 @@ function check(label, ok, detail = "") {
 }
 
 const fixture = "tools/SharpLadder.CodeCheck.Tests/fixtures/all-containers";
+// The fixture drill's reference and wrong solution, so its suite runs too.
+const reference = "tools/SharpLadder.CodeCheck.Tests/fixtures/all-containers-reference";
 const truth = 'check="sum == 74"';
 
 const build = exec(dotnet, ["build", "tools/SharpLadder.CodeCheck/SharpLadder.CodeCheck.csproj", "-nologo"], { cwd: src });
 if (build.code !== 0) check("code checker builds", false, build.out);
 else {
-  const passing = codeCheckProblems(src, { input: fixture });
+  const passing = codeCheckProblems(src, { input: fixture, reference });
   check("code check passes a fixture whose groups all run", passing.length === 0, passing.join("\n"));
 
   // The same fixture with one check made false: only running the group can find it.
@@ -40,7 +42,7 @@ else {
   const text = readFileSync(file, "utf8");
   if (!text.includes(truth)) throw new Error(`syntax.md lacks ${truth}`);
   writeFileSync(file, text.replace(truth, 'check="sum == 75"'));
-  const failing = codeCheckProblems(src, { input: copy });
+  const failing = codeCheckProblems(src, { input: copy, reference });
   // The checker shows the root in its own resolved form, which may expand 8.3 names, so only the part below it is compared.
   check(
     "code check fails a false check with its file, line, block id and reason",

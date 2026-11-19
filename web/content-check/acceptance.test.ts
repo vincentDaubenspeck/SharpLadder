@@ -482,6 +482,8 @@ describe("the record-backed case lists", () => {
       "glossary",
       "error",
       "hints-catalogue",
+      "problem",
+      "drill",
       "part:syntax",
       "part:build",
       "part:idioms",

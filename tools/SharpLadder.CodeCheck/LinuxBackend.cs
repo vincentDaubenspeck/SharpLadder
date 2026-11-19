@@ -29,5 +29,5 @@ internal sealed class LinuxBackend(LinuxSeam seam) : IRunBackend
         }
     }
 
-    public IRunningChild Start(ChildLaunch launch) => LinuxChild.Start(launch, seam);
+    public IRunningChild Start(ChildLaunch launch, OutputSink output) => LinuxChild.Start(launch, output, seam);
 }

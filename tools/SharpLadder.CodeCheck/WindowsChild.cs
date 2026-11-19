@@ -8,7 +8,8 @@ namespace SharpLadder.CodeCheck;
 
 // One group's child on Windows: created suspended with only its three pipe ends inheritable, put in
 // a kill-on-close job without breakaway before it runs, then resumed. Both output pipes are drained
-// from the start on their own threads, counted against the cap and discarded.
+// from the start on their own threads and counted against the cap; standard output goes on to the
+// run's sink, standard error is discarded.
 [SupportedOSPlatform("windows")]
 internal sealed unsafe class WindowsChild : IRunningChild
 {
@@ -22,6 +23,7 @@ internal sealed unsafe class WindowsChild : IRunningChild
     private static readonly SafeWaitHandle InvalidWait = new(0, ownsHandle: false);
 
     private readonly WindowsSeam _seam;
+    private readonly StandardOutputFeed _feed;
     private readonly ManualResetEvent _capped = new(initialState: false);
     private SafeWaitHandle? _job;
     private SafeWaitHandle? _process;
@@ -37,15 +39,19 @@ internal sealed unsafe class WindowsChild : IRunningChild
     private int _cappedStream = NoStream;
     private IOException? _readFault;
 
-    private WindowsChild(WindowsSeam seam) => _seam = seam;
+    private WindowsChild(OutputSink output, WindowsSeam seam)
+    {
+        _feed = new StandardOutputFeed(output);
+        _seam = seam;
+    }
 
     public int ProcessId { get; private set; }
 
     private OutputStream? Capped => Volatile.Read(ref _cappedStream) is var stream and not NoStream ? (OutputStream)stream : null;
 
-    public static WindowsChild Start(ChildLaunch launch, WindowsSeam seam)
+    public static WindowsChild Start(ChildLaunch launch, OutputSink output, WindowsSeam seam)
     {
-        var child = new WindowsChild(seam);
+        var child = new WindowsChild(output, seam);
         try
         {
             child.Launch(launch);
@@ -120,6 +126,7 @@ internal sealed unsafe class WindowsChild : IRunningChild
             throw new ToolProblem($"the code group's output could not be read ({fault.Message})", fault);
         }
 
+        _feed.ThrowIfFaulted();
         return Capped;
     }
 
@@ -415,6 +422,11 @@ internal sealed unsafe class WindowsChild : IRunningChild
                 if (total > RunLimits.OutputCapBytes && Interlocked.CompareExchange(ref _cappedStream, (int)stream, NoStream) == NoStream)
                 {
                     _capped.Set();
+                }
+
+                if (stream == OutputStream.StandardOutput)
+                {
+                    _feed.Write(buffer.AsSpan(0, read));
                 }
             }
         }

@@ -13,10 +13,10 @@ public sealed class CommandLineRunTests
         Runs.RequireBackend();
         using var root = Root(Chapter(string.Empty), SyntaxHead + Sum("total == 5"));
 
-        var (code, lines) = Checker.Run(Checker.RepositoryRoot, Checker.SchemaFolder, root.Path);
+        var (code, lines) = Checker.Check(Checker.RepositoryRoot, root.Path);
 
         Assert.Equal(0, code);
-        Assert.Equal(["1 group", "PASS code check"], lines);
+        Assert.Equal(["1 group", "0 suite runs", "PASS code check"], lines);
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public sealed class CommandLineRunTests
         Runs.RequireBackend();
         using var root = Root(Chapter(string.Empty), SyntaxHead + Sum("total == 6"));
 
-        var (code, lines) = Checker.Run(Checker.RepositoryRoot, Checker.SchemaFolder, root.Path);
+        var (code, lines) = Checker.Check(Checker.RepositoryRoot, root.Path);
 
         Assert.Equal(1, code);
         Assert.Equal([$"  {Checker.Shown(root.Path)}/chapters/run/syntax.md:9 sum-1 check is false: total == 6", "FAIL code check"], lines);
@@ -42,10 +42,10 @@ public sealed class CommandLineRunTests
             SyntaxHead + "## Later letters {#syn-later}\n\n" + Marking("beta-1", "beta", name) + "\n" + Marking("alpha-1", "alpha", name));
         try
         {
-            var (code, lines) = Checker.Run(Checker.RepositoryRoot, Checker.SchemaFolder, root.Path);
+            var (code, lines) = Checker.Check(Checker.RepositoryRoot, root.Path);
 
             Assert.Equal((0, "zeta+ zeta- beta+ beta- alpha+ alpha- "), (code, File.ReadAllText(log)));
-            Assert.Equal(["3 groups", "PASS code check"], lines);
+            Assert.Equal(["3 groups", "0 suite runs", "PASS code check"], lines);
         }
         finally
         {
@@ -59,14 +59,15 @@ public sealed class CommandLineRunTests
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "nested jobs exist only on Windows");
         using var root = Root(Chapter(string.Empty), SyntaxHead + Sum("total == 5"));
+        using var parent = new TempFolder();
         var checker = Path.Combine(AppContext.BaseDirectory, "SharpLadder.CodeCheck.dll");
         var environment = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
             .Select(e => new KeyValuePair<string, string>((string)e.Key, (string)e.Value!))
             .ToList();
-        var launch = new ChildLaunch(Locations.FromRepository(Checker.RepositoryRoot).Muxer, ["exec", checker, Checker.SchemaFolder, root.Path], Checker.RepositoryRoot, environment);
+        var launch = new ChildLaunch(Locations.FromRepository(Checker.RepositoryRoot).Muxer, ["exec", checker, Checker.SchemaFolder, root.Path, Path.Combine(parent.Path, "reference")], Checker.RepositoryRoot, environment);
 
         ChildState end;
-        using (var outer = Runs.Backend().Start(launch))
+        using (var outer = Runs.Backend().Start(launch, StandardOutputFeed.Discard))
         {
             end = outer.Wait(TimeSpan.FromMinutes(1));
             var cleanup = Deadline.After(RunLimits.Cleanup);

@@ -312,7 +312,7 @@ public sealed class WalkItSpeechTests
 
         Assert.Equal(
             ["ramp-warm/b1 = Each drill uses one idea.", "ramp-warm/b2 = Plan", "ramp-warm/b2.1.s0 = Intro.", "ramp-warm/b2.1.s1 = Note.", "ramp-warm/b3.i1 = Count the letters"],
-            Pairs(Speech(("chapters/c/drill.md", drill), "chapters/c/drill.json")),
+            Pairs(Record(Accepted([("chapters/c/drill.md", drill), .. PracticeClosure.WithProblem, .. PracticeClosure.Drill("drill-count", "warm-up")]), "chapters/c/drill.json")["sections"]![0]!["spoken"]!),
             StringComparer.Ordinal);
     }
 

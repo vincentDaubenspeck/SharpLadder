@@ -22,6 +22,9 @@ internal sealed partial class SourceFile
     private readonly HashSet<string> _drills = new(StringComparer.Ordinal);
     private int _lastRung = -1;
 
+    // Each drill link with its section's rung, resolved against the drill files once all are read.
+    public List<(string Drill, string Rung, int Line)> DrillTargets { get; } = [];
+
     private bool ReadDrill(List<Block> blocks, List<Section> sections, int? partOrder)
     {
         var before = _diagnostics.Count;
@@ -106,7 +109,7 @@ internal sealed partial class SourceFile
             }
         }
 
-        section.Drills = DrillList(list, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"));
+        section.Drills = DrillList(list, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), rung);
         Speak();
     }
 
@@ -141,7 +144,7 @@ internal sealed partial class SourceFile
         return rung;
     }
 
-    private DrillList? DrillList(ListBlock list, string blockId)
+    private DrillList? DrillList(ListBlock list, string blockId, string rung)
     {
         var line = list.Line + 1;
         if (!NoAttributes(list, line))
@@ -165,7 +168,7 @@ internal sealed partial class SourceFile
             DrillReference? reference = null;
             if (child is ListItemBlock { Count: 1 } item && item[0] is ParagraphBlock paragraph)
             {
-                reference = DrillItem(item, paragraph, itemId, itemLine);
+                reference = DrillItem(item, paragraph, itemId, itemLine, rung);
             }
             else
             {
@@ -182,9 +185,9 @@ internal sealed partial class SourceFile
         return ok ? new DrillList { BlockId = blockId, Items = items } : null;
     }
 
-    // The label is the learner's only view of a drill until the drill files exist, so it is
-    // plain text, and the target is kept as written for a later stage to resolve.
-    private DrillReference? DrillItem(ListItemBlock item, ParagraphBlock paragraph, string blockId, int line)
+    // The label is authored public text shown before the drill opens, so it is plain text; the
+    // target names a drill of the same chapter, resolved with the drill files.
+    private DrillReference? DrillItem(ListItemBlock item, ParagraphBlock paragraph, string blockId, int line, string rung)
     {
         if (!NoAttributes(item, line) || !NoAttributes(paragraph, line))
         {
@@ -230,6 +233,7 @@ internal sealed partial class SourceFile
         }
 
         Segment(new BlockTarget { BlockId = blockId }, label, line);
+        DrillTargets.Add((target.Id, rung, line));
         return new DrillReference { BlockId = blockId, Id = target.Id, Label = label };
     }
 }

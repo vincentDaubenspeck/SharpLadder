@@ -3,7 +3,7 @@
 #   1. Text rules (tools/checks/text.sh): phrases, encoding, HEAD commit message
 #   2. Tool checks (tools/checks/run.mjs): web, npm audit, shell, PowerShell, EditorConfig, YAML,
 #      .NET config, .NET build and tests, C# suppression reasons, nuget vulnerabilities,
-#      nuget licences, content, alias retention, code check
+#      nuget licences, content, alias retention, code check, leak
 set -eu
 
 root=$(git rev-parse --show-toplevel)

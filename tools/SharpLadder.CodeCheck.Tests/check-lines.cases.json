@@ -1,0 +1,182 @@
+{
+  "$comment": "Result-line parser cases. A chunk is UTF-8 text or a list of pieces, each text or hex bytes with an optional repeat; a name is text or such a list of text pieces. Chunks are fed exactly as given, then the end of the stream.",
+  "cases": [
+    {
+      "name": "lf",
+      "declared": 2,
+      "chunks": ["#check pass first\n#check fail second\n"],
+      "checks": [
+        { "name": "first", "pass": true },
+        { "name": "second", "pass": false }
+      ],
+      "unrecorded": 0
+    },
+    {
+      "name": "crlf",
+      "declared": 2,
+      "chunks": ["#check pass first\r\n#check fail second\r\n"],
+      "checks": [
+        { "name": "first", "pass": true },
+        { "name": "second", "pass": false }
+      ],
+      "unrecorded": 0
+    },
+    {
+      "name": "only one cr before the line feed is removed",
+      "declared": 1,
+      "chunks": ["#check pass first\r\r\n"],
+      "checks": [{ "name": "first\r", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "final line without a line feed",
+      "declared": 2,
+      "chunks": ["#check pass first\n#check fail last"],
+      "checks": [
+        { "name": "first", "pass": true },
+        { "name": "last", "pass": false }
+      ],
+      "unrecorded": 0
+    },
+    {
+      "name": "result line split mid-prefix",
+      "declared": 1,
+      "chunks": ["#che", "ck pa", "ss split\n"],
+      "checks": [{ "name": "split", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "four-byte name character split across three chunks",
+      "declared": 1,
+      "chunks": [
+        [{ "text": "#check pass " }, { "hex": "f0" }],
+        [{ "hex": "9f98" }],
+        [{ "hex": "80" }, { "text": "\n" }]
+      ],
+      "checks": [{ "name": "😀", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "non-ascii name",
+      "declared": 1,
+      "chunks": ["#check fail café naïve λ\n"],
+      "checks": [{ "name": "café naïve λ", "pass": false }],
+      "unrecorded": 0
+    },
+    {
+      "name": "non-bmp name of 100 utf-16 units",
+      "declared": 1,
+      "chunks": [[{ "text": "#check pass " }, { "text": "😀", "repeat": 50 }, { "text": "\n" }]],
+      "checks": [{ "name": [{ "text": "😀", "repeat": 50 }], "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "non-bmp name of 101 utf-16 units",
+      "declared": 1,
+      "chunks": [[{ "text": "#check pass x" }, { "text": "😀", "repeat": 50 }, { "text": "\n" }]],
+      "checks": [],
+      "unrecorded": 1
+    },
+    {
+      "name": "name of 100 units before crlf",
+      "declared": 1,
+      "chunks": [[{ "text": "#check pass " }, { "text": "n", "repeat": 100 }, { "text": "\r\n" }]],
+      "checks": [{ "name": [{ "text": "n", "repeat": 100 }], "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "name of 101 units before crlf",
+      "declared": 1,
+      "chunks": [[{ "text": "#check pass " }, { "text": "n", "repeat": 101 }, { "text": "\r\n" }]],
+      "checks": [],
+      "unrecorded": 1
+    },
+    {
+      "name": "invalid bytes become one replacement per maximal subpart",
+      "declared": 1,
+      "chunks": [
+        [
+          { "text": "#check pass a" },
+          { "hex": "e282" },
+          { "text": "b" },
+          { "hex": "c0af" },
+          { "text": "c" },
+          { "hex": "eda080" },
+          { "text": "\n" }
+        ]
+      ],
+      "checks": [{ "name": "a�b��c���", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "sequence cut off by the end of the stream",
+      "declared": 1,
+      "chunks": [[{ "text": "#check pass z" }, { "hex": "f09f98" }]],
+      "checks": [{ "name": "z�", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "leading space",
+      "declared": 1,
+      "chunks": [" #check pass first\n"],
+      "checks": [],
+      "unrecorded": 0
+    },
+    {
+      "name": "longer verdict word",
+      "declared": 1,
+      "chunks": ["#check passed first\n"],
+      "checks": [],
+      "unrecorded": 0
+    },
+    {
+      "name": "verdict with no space and no name",
+      "declared": 2,
+      "chunks": ["#check pass\n#check fail\n"],
+      "checks": [],
+      "unrecorded": 0
+    },
+    {
+      "name": "empty name",
+      "declared": 1,
+      "chunks": ["#check pass \n"],
+      "checks": [{ "name": "", "pass": true }],
+      "unrecorded": 0
+    },
+    {
+      "name": "past the declared count",
+      "declared": 1,
+      "chunks": ["#check pass one\n#check fail two\n#check pass three\n"],
+      "checks": [{ "name": "one", "pass": true }],
+      "unrecorded": 2
+    },
+    {
+      "name": "lines of 10000 characters",
+      "declared": 2,
+      "chunks": [
+        [
+          { "text": "#check pass " },
+          { "text": "x", "repeat": 10000 },
+          { "text": "\n" },
+          { "text": "y", "repeat": 10000 },
+          { "text": "\n#check pass after\n#check fail next\n" }
+        ]
+      ],
+      "checks": [
+        { "name": "after", "pass": true },
+        { "name": "next", "pass": false }
+      ],
+      "unrecorded": 1
+    },
+    {
+      "name": "interleaved ordinary output",
+      "declared": 3,
+      "chunks": ["hello\n#check pass a\nnoise #check pass b\n#check fail c\nbye"],
+      "checks": [
+        { "name": "a", "pass": true },
+        { "name": "c", "pass": false }
+      ],
+      "unrecorded": 0
+    }
+  ]
+}

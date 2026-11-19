@@ -3,11 +3,14 @@ namespace SharpLadder.Content;
 // Usage: SharpLadder.Content <schema folder> <content root> <output folder>
 //        SharpLadder.Content generate|compare|update|test-records <schema folder> <content root>
 //            <compiled folder> <generated folder> <staging folder>
+//        SharpLadder.Content index <schema folder> <content root> (practice/problems.yml on
+//            standard output)
 //        SharpLadder.Content validate <schema folder> (one JSON document on standard input)
 //        SharpLadder.Content retain <schema folder> <compiled folder> (the earlier compiled
 //            alias record on standard input)
 // Exit codes: 0 success, 1 content errors, drift or invalid input, 2 usage or environment error.
-// test-records reports on standard error only; standard output carries the envelope alone.
+// test-records and index report on standard error only; standard output carries the envelope or
+// the index alone.
 internal static class Cli
 {
     private static readonly string[] PayloadModeNames = ["generate", "compare", "update", "test-records"];
@@ -18,8 +21,8 @@ internal static class Cli
     // betweenDestinations runs after update publishes the first destination; tests change the file system there.
     public static int Run(IReadOnlyList<string> args, CliStreams io, Action? betweenDestinations = null)
     {
-        var mode = args.Count > 0 && (PayloadModeNames.Contains(args[0], StringComparer.Ordinal) || args[0] is "validate" or "retain") ? args[0] : null;
-        var report = string.Equals(mode, "test-records", StringComparison.Ordinal) ? io.Error : io.Output;
+        var mode = args.Count > 0 && (PayloadModeNames.Contains(args[0], StringComparer.Ordinal) || args[0] is "validate" or "retain" or "index") ? args[0] : null;
+        var report = mode is "test-records" or "index" ? io.Error : io.Output;
         var stage = mode is null ? "content compiler" : "content " + mode;
         try
         {
@@ -28,6 +31,7 @@ internal static class Cli
                 null => Compile(args, report, stage),
                 "validate" => Validate(args, io, stage),
                 "retain" => Retain(args, io, stage),
+                "index" => Index(args, io, stage),
                 _ => Paths(args, 6, report, stage) ?? PayloadModes.Run(mode, args.Skip(1).ToList(), io, report, stage, betweenDestinations),
             };
         }
@@ -106,6 +110,37 @@ internal static class Cli
 
         output.WriteLine($"{result.Files.Count} files, output digest sha256:{OutputDigest.Compute(result.Files)}");
         output.WriteLine("PASS " + stage);
+        return 0;
+    }
+
+    // Writes into no root: the caller puts the printed bytes in practice/problems.yml.
+    private static int Index(IReadOnlyList<string> args, CliStreams io, string stage)
+    {
+        if (Paths(args, 3, io.Error, stage) is { } refused)
+        {
+            return refused;
+        }
+
+        using var schemaFolder = Folder.OpenRoot(args[1], args[1]);
+        using var contentRoot = Folder.OpenRoot(args[2], ContentCompiler.DisplayPath(Environment.CurrentDirectory, args[2]));
+        var (schema, schemaProblems) = SchemaSet.Load(InputTree.Read(schemaFolder));
+        if (schema is null)
+        {
+            return Fail(io.Error, stage, 2, schemaProblems.Select(p => "schema: " + p));
+        }
+
+        var (diagnostics, index) = ContentCompiler.Index(InputTree.ReadContent(contentRoot), schema);
+        if (diagnostics.Count > 0)
+        {
+            return Fail(io.Error, stage, 1, diagnostics.Select(d => d.ToString()));
+        }
+
+        using (var output = io.OpenStandardOutput())
+        {
+            output.Write(index);
+        }
+
+        io.Error.WriteLine("PASS " + stage);
         return 0;
     }
 

@@ -96,6 +96,13 @@ const content: readonly CaseKey[] = [
 ];
 // An entry is rendered like a chapter or part and has no audio slot to recompute.
 const rendered: readonly CaseKey[] = [...content, "glossary", "error"];
+// A practice record is not rendered yet, but its statement speech has a slot.
+const spoken: readonly CaseKey[] = [
+  ...content,
+  "hints-catalogue",
+  "problem",
+  "drill",
+];
 
 /** Every list a record of each kind must pass; a case missing from any of them fails. */
 export const caseLists: readonly CaseList[] = [
@@ -108,7 +115,7 @@ export const caseLists: readonly CaseList[] = [
   {
     file: speechFile,
     suite: speechSuite,
-    kinds: [...content, "hints-catalogue"],
+    kinds: spoken,
     cases: ["recomputes every audio slot from its segment texts"],
   },
   {

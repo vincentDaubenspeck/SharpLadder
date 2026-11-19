@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Xml;
+using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,11 +9,19 @@ using Microsoft.CodeAnalysis.MSBuild;
 namespace SharpLadder.Policy;
 
 // Every pragma and suppression attribute must carry an AnalyzerPolicy record for its own ID.
-// Files are read through the projects' own compilations, and anything the check cannot
-// read or bind fails rather than being skipped.
+// Files are read through the projects' own compilations, or from syntax alone where no project
+// compiles them on purpose, and anything the check cannot read or bind fails rather than being skipped.
 internal static class SuppressionCheck
 {
     private const string RecordDelimiter = "// ";
+    private const string PracticeFolder = "practice";
+    private const string FixturesFolder = "fixtures";
+
+    // The repository's content roots, relative to its top folder.
+    private static readonly string[] ContentRoots = ["content"];
+
+    // The language version the content targets.
+    private static readonly CSharpParseOptions SyntaxOnlyOptions = new(LanguageVersion.CSharp14);
 
     private static readonly string[] AttributeTypes =
     [
@@ -72,10 +82,99 @@ internal static class SuppressionCheck
         }
 
         problems.InsertRange(0, loadFailures);
-        problems.AddRange(tracked
-            .Where(t => !seen.Contains(Path.GetFullPath(Path.Combine(root, t))))
-            .Select(t => t + ": in no project of " + Path.GetFileName(solutionPath) + "; the check cannot read it"));
+        Orphans(
+            root,
+            tracked.Where(t => !seen.Contains(Path.GetFullPath(Path.Combine(root, t)))),
+            Admitted(root, solution),
+            Path.GetFileName(solutionPath),
+            problems);
         return problems.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    // Practice suites and test fixtures are kept out of every compilation on purpose, so only
+    // those places are read from syntax alone; any other file in no project stays unreadable.
+    internal static void Orphans(
+        string root,
+        IEnumerable<string> orphans,
+        IReadOnlyList<string> admitted,
+        string solutionName,
+        List<string> problems)
+    {
+        foreach (var file in orphans)
+        {
+            if (admitted.Any(a => file.StartsWith(a, StringComparison.Ordinal)))
+            {
+                SyntaxOnly(root, file, problems);
+            }
+            else
+            {
+                problems.Add(file + ": in no project of " + solutionName + "; the check cannot read it");
+            }
+        }
+    }
+
+    // Root-relative folders with a trailing slash: each content root's practice folder, and the
+    // fixtures folder of each test project that removes it from Compile.
+    private static List<string> Admitted(string root, Solution solution)
+    {
+        List<string> admitted = [.. ContentRoots.Select(r => r + "/" + PracticeFolder + "/")];
+        foreach (var file in solution.Projects.Select(p => p.FilePath).OfType<string>().Distinct(StringComparer.Ordinal))
+        {
+            if (Path.GetFileNameWithoutExtension(file).EndsWith(".Tests", StringComparison.Ordinal) && RemovesFixtures(file))
+            {
+                admitted.Add(Relative(root, Path.Combine(Path.GetDirectoryName(file)!, FixturesFolder)) + "/");
+            }
+        }
+
+        return admitted;
+    }
+
+    // Only the plain item counts; a conditional one may not apply, and anything else is not admitted.
+    private static bool RemovesFixtures(string projectFile)
+    {
+        XDocument project;
+        try
+        {
+            project = XDocument.Load(projectFile);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or XmlException)
+        {
+            return false;
+        }
+
+        return project.Root?.Elements("ItemGroup")
+            .Where(g => g.Attribute("Condition") is null)
+            .Elements("Compile")
+            .Any(c => c.Attribute("Condition") is null
+                && string.Equals((string?)c.Attribute("Remove"), FixturesFolder + "/**", StringComparison.Ordinal)) ?? false;
+    }
+
+    // No semantic model exists here, so an attribute's meaning cannot be bound; a name filter
+    // would miss aliases, so every attribute is refused.
+    private static void SyntaxOnly(string root, string file, List<string> problems)
+    {
+        var path = Path.GetFullPath(Path.Combine(root, file));
+        string text;
+        try
+        {
+            text = File.ReadAllText(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            problems.Add(file + ": cannot be read: " + e.Message);
+            return;
+        }
+
+        var tree = CSharpSyntaxTree.ParseText(text, SyntaxOnlyOptions, path);
+        var node = tree.GetRoot();
+        problems.AddRange(tree.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .Select(d => Where(root, d.Location, file) + "does not parse: " + d.Id + " "
+                + d.GetMessage(CultureInfo.InvariantCulture)));
+        Inactive(root, node, problems);
+        Pragmas(root, node, problems);
+        problems.AddRange(node.DescendantNodes().OfType<AttributeSyntax>().Select(a => At(root, a)
+            + "attribute " + a.Name + " in a file no project compiles; the check cannot tell what it suppresses"));
     }
 
     // Each target framework is its own project, so one project file is evaluated once.

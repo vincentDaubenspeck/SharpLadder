@@ -81,7 +81,7 @@ public sealed class TreeCleanupTests(CompilerFixture fixture) : IClassFixture<Co
         using var locked = new FileStream(Path.Combine(folder.Path, "locked"), FileMode.CreateNew, FileAccess.Write, FileShare.None);
 
         var clock = Stopwatch.StartNew();
-        var problem = Assert.Throws<ToolProblem>(() => GroupRunner.DeleteRunFolder(folder.Path, Deadline.After(DeletionLimit)));
+        var problem = Assert.Throws<ToolProblem>(() => ChildRun.DeleteRunFolder(folder.Path, Deadline.After(DeletionLimit)));
         var elapsed = clock.Elapsed;
 
         var cause = Assert.IsType<IOException>(problem.InnerException);

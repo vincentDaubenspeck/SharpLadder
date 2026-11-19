@@ -7,9 +7,12 @@ internal sealed class InputTree
 {
     private readonly Dictionary<string, List<InputEntry>> _children = new(StringComparer.Ordinal);
 
-    private InputTree(Folder root)
+    private readonly long _fileLimit;
+
+    private InputTree(Folder root, long fileLimit)
     {
         Root = root;
+        _fileLimit = fileLimit;
         FolderIds.Add(root.Id);
     }
 
@@ -19,9 +22,10 @@ internal sealed class InputTree
     // would write into the tree, whatever path reached it.
     public HashSet<FileIdentity> FolderIds { get; } = [];
 
-    public static InputTree Read(Folder root)
+    // Only the leak scan bounds a file; the bound holds at every depth, before the file is read.
+    public static InputTree Read(Folder root, long fileLimit = long.MaxValue)
     {
-        var tree = new InputTree(root);
+        var tree = new InputTree(root, fileLimit);
         tree.Walk(root, string.Empty, null);
         return tree;
     }
@@ -30,7 +34,7 @@ internal sealed class InputTree
     // name, but its bytes are never read and it is never entered.
     public static InputTree ReadContent(Folder root)
     {
-        var tree = new InputTree(root);
+        var tree = new InputTree(root, long.MaxValue);
         tree.Walk(root, string.Empty, RootAdmission.Admits);
         return tree;
     }
@@ -59,7 +63,7 @@ internal sealed class InputTree
             }
             else
             {
-                entries.Add(new InputEntry(name, path, folder.ChildDisplay(name), folder.ReadFile(name)));
+                entries.Add(new InputEntry(name, path, folder.ChildDisplay(name), folder.ReadFile(name, _fileLimit)));
             }
         }
     }

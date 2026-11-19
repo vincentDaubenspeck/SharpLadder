@@ -70,6 +70,57 @@ export function exec(cmd, args, opts = {}) {
   return { code: r.status, signal, out, stdout, stderr };
 }
 
+// Well below the Windows limit of 32,767 characters, which leaves room for launchers such as
+// Python's console scripts that start the interpreter on a longer command line of their own.
+export const commandBound = 24_000;
+
+// At most what Windows quoting makes of an argument: one that is empty or holds a space, tab
+// or quote is wrapped in quotes, and each quote or backslash in it may gain an escape.
+const quotedLength = (arg) => (arg === "" || /[ \t"]/.test(arg) ? 2 * arg.length + 2 : arg.length);
+export const commandLength = (args) => args.reduce((n, a) => n + quotedLength(a) + 1, 0);
+
+// Each batch's output starts on its own line, so the last line of one never runs into the next.
+const joinOutputs = (parts) =>
+  parts.reduce((all, p) => (all === "" || all.endsWith("\n") ? all + p : `${all}\n${p}`), "");
+
+// Runs cmd with fixed arguments over files in batches whose whole command line stays within
+// bound; outputs are joined in order. The result fails when any batch fails or cannot start,
+// or when one file cannot fit at all. An empty list runs once, as an unbatched call would.
+export function execBatched(cmd, fixed, files, opts = {}, bound = commandBound) {
+  const base = commandLength([cmd, ...fixed]);
+  const batches = [[]];
+  let length = base;
+  for (const f of files) {
+    const add = commandLength([f]);
+    if (base + add > bound) {
+      const error = `${f}: too long for one command line of at most ${String(bound)} characters`;
+      return { code: null, signal: null, out: error, stdout: "", stderr: "", error };
+    }
+    if (length + add > bound) {
+      batches.push([]);
+      length = base;
+    }
+    batches.at(-1).push(f);
+    length += add;
+  }
+  const runs = [];
+  for (const batch of batches) {
+    const r = exec(cmd, [...fixed, ...batch], opts);
+    runs.push(r);
+    // A tool that could not start or was killed cannot check the batches after it either.
+    if (r.code === null) break;
+  }
+  const failed = runs.find((r) => r.code !== 0);
+  return {
+    code: failed === undefined ? 0 : failed.code,
+    signal: failed?.signal ?? null,
+    out: joinOutputs(runs.map((r) => r.out)),
+    stdout: joinOutputs(runs.map((r) => r.stdout)),
+    stderr: joinOutputs(runs.map((r) => r.stderr)),
+    ...(failed?.error === undefined ? {} : { error: failed.error }),
+  };
+}
+
 // Returns null when the tool runs at the pinned version, else the problem text.
 export function toolProblem(cmd, args, pattern, want) {
   const r = exec(cmd, args);

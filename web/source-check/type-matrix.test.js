@@ -164,11 +164,11 @@ describe("type-test matrix records", () => {
     }
   });
 
-  it("records 18 type-expressible negatives, 7 schema-only rows and the positives", () => {
+  it("records 19 type-expressible negatives, 7 schema-only rows and the positives", () => {
     const negative = rows.filter((row) => row.typescript);
-    expect(negative).toHaveLength(18);
+    expect(negative).toHaveLength(19);
     expect(negative.filter((row) => row.validator === "refused")).toHaveLength(
-      17,
+      18,
     );
     expect(
       rows.filter((row) => !row.typescript && row.validator === "refused"),
@@ -243,7 +243,9 @@ describe("type-test program", () => {
       expect(lineOf(file, inside[0].start)).toBe(
         lineOf(file, owned[0].start) + 1,
       );
-      expect(owned[0].text).toContain(`Row ${Number(name.slice(3))}: `);
+      // Labels drop the zero padding and keep a letter suffix: row05b is Row 5b.
+      const label = name.slice(3).replace(/^0+(?=\d)/, "");
+      expect(owned[0].text).toContain(`Row ${label}: `);
     },
   );
 

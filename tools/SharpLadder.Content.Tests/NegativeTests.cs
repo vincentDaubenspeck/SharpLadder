@@ -96,6 +96,7 @@ public sealed class NegativeTests
     [InlineData("id: ch-test", "id: test")]
     [InlineData("slug: test\n", "")]
     [InlineData("csharp: 14", "csharp: 13")]
+    [InlineData("dotnet: 10", "dotnet: 9")]
     public void SchemaViolationFails(string from, string to)
     {
         var chapter = Chapter.Replace(from, to, StringComparison.Ordinal);

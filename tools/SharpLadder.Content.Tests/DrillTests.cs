@@ -18,7 +18,7 @@ public sealed class DrillTests
     [Fact]
     public void ADrillPartCompilesToRungsWithProseAndLabelledDrills()
     {
-        var result = Run((Part, Head + Warm + Easy));
+        var result = Run([(Part, Head + Warm + Easy), .. PracticeClosure.WithProblem, .. PracticeClosure.Drill("drill-count", "warm-up"), .. PracticeClosure.Drill("drill-pair", "warm-up"), .. PracticeClosure.Drill("drill-join", "easy")]);
 
         Assert.Empty(result.Diagnostics);
         var part = Json(result, "chapters/c/drill.json");
@@ -42,7 +42,7 @@ public sealed class DrillTests
     [Fact]
     public void TheDrillPartStatesItsPartKind()
     {
-        var result = Run((Part, Head + Warm));
+        var result = Run([(Part, Head + Warm), .. PracticeClosure.WithProblem, .. PracticeClosure.Drill("drill-count", "warm-up"), .. PracticeClosure.Drill("drill-pair", "warm-up")]);
 
         var part = result.Files.Single(f => string.Equals(f.RelativePath, "chapters/c/drill.json", StringComparison.Ordinal));
         Assert.Equal(RecordKind.Part, part.Kind);
@@ -54,10 +54,12 @@ public sealed class DrillTests
     {
         foreach (var rung in new[] { "foundations", "warm-up", "easy", "medium", "hard" })
         {
-            Assert.Empty(Run((Part, Head + $"## R {{#ramp-a rung={rung}}}\n\nProse.\n\n1. [Label](#drill-a)\n")).Diagnostics);
+            Assert.Equal($"{Part}:11: drill link target \"#drill-a\" names no drill file", Shown(Run((Part, Head + $"## R {{#ramp-a rung={rung}}}\n\nProse.\n\n1. [Label](#drill-a)\n"))));
         }
 
-        Assert.Empty(Run((Part, Head + "## A {#ramp-a rung=foundations}\n\nP.\n\n1. [L](#drill-a)\n\n## B {#ramp-b rung=hard}\n\nP.\n\n1. [L](#drill-b)\n")).Diagnostics);
+        Assert.Equal(
+            $"{Part}:11: drill link target \"#drill-a\" names no drill file\n{Part}:17: drill link target \"#drill-b\" names no drill file",
+            Shown(Run((Part, Head + "## A {#ramp-a rung=foundations}\n\nP.\n\n1. [L](#drill-a)\n\n## B {#ramp-b rung=hard}\n\nP.\n\n1. [L](#drill-b)\n"))));
     }
 
     [Theory]
@@ -99,10 +101,12 @@ public sealed class DrillTests
     public void OnlyADrillFileTakesTheDrillPrefix() =>
         Refused("id \"drill-x\" starts with drill-, which only a drill file may", (Part, Head + Warm), (Syntax, SyntaxHead + "Text.\n\n## Other {#drill-x}\n\nText.\n"));
 
-    // Drill files arrive in a later stage, so an ordinary link to one has nothing to reach yet.
+    // An ordinary link names an anchor of its own file, and a drill is none.
     [Fact]
     public void AnOrdinaryLinkToADrillIsRefused() =>
         Assert.NotEmpty(Run((Part, Head + Warm), (Syntax, SyntaxHead + "See [it](#drill-count).\n")).Diagnostics);
+
+    private static string Shown(CompileResult result) => string.Join('\n', result.Diagnostics.Select(d => d.ToString()));
 
     private static JsonNode Json(CompileResult result, string path) =>
         JsonNode.Parse(result.Files.Single(f => string.Equals(f.RelativePath, path, StringComparison.Ordinal)).Bytes)!;

@@ -83,7 +83,7 @@ const rendererWithheld = new Map([["content/hints.ts", ["selectHints"]]]);
 export const helperPins = new Map([
   [
     "content/approach.ts",
-    "a4e3ccae7fa087dd9d0d38ea23e9cb88d4fee72e9fb6e814bcbf7685b7efa441",
+    "e5df359a458100a251e87a5819a464ed91e85a55a26cccaabfe9a6ff87b1ac54",
   ],
   [
     "content/assertNever.ts",

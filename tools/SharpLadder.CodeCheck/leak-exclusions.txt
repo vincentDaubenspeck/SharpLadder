@@ -1,0 +1,4 @@
+# Lines the leak scan never compares: generic lines that may sit in a reference solution and, by
+# chance, in a run of shipped text. An entry is one line of source text, compared after whitespace
+# runs become one space and both ends are trimmed. Lines starting with # are comments, and every
+# entry needs its own comment line directly above it saying why the line is generic.

@@ -1,0 +1,95 @@
+// SharpLadder.Content witness emitter output, grammar 2. Do not edit.
+
+import type { ContentDoc } from "../../../content.ts";
+
+export const witness = {
+  type: "drill",
+  id: "drill-fix-largest",
+  chapter: "ch-fixture",
+  rung: "warm-up",
+  title: "Keep the largest of three",
+  move: "Keep the best value seen so far",
+  ideas: [],
+  prerequisites: [],
+  prepares: ["prob-9001"],
+  variationOf: null,
+  ladders: ["ladder-lone-word"],
+  statement: [
+    {
+      type: "paragraph",
+      blockId: "drill-fix-largest/statement/b1",
+      content: [
+        {
+          type: "text",
+          text: "Given three whole numbers, return the largest of them.",
+        },
+      ],
+    },
+  ],
+  examples: [
+    {
+      type: "text",
+      blockId: "drill-fix-largest/examples/b1",
+      spoken: "1, 2 and 8 give 8",
+      source: "1, 2, 8 gives 8",
+    },
+  ],
+  constraints: [
+    {
+      type: "list",
+      blockId: "drill-fix-largest/constraints/b1",
+      ordered: false,
+      items: [
+        {
+          blockId: "drill-fix-largest/constraints/b1.i1",
+          content: [
+            {
+              type: "text",
+              text: "Any of the numbers may be below zero.",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  starter: {
+    id: "drill-fix-largest-starter",
+    spoken: "The method to fill in",
+    source:
+      "using System;\n\npublic static class Solution\n{\n    public static int Largest(int a, int b, int c) =\u003E\n        throw new NotImplementedException();\n}",
+  },
+  spoken: {
+    segments: [
+      {
+        target: {
+          type: "block",
+          blockId: "drill-fix-largest/statement/b1",
+        },
+        text: "Given three whole numbers, return the largest of them.",
+      },
+      {
+        target: {
+          type: "block",
+          blockId: "drill-fix-largest/examples/b1",
+        },
+        text: "1, 2 and 8 give 8",
+      },
+      {
+        target: {
+          type: "block",
+          blockId: "drill-fix-largest/constraints/b1.i1",
+        },
+        text: "Any of the numbers may be below zero.",
+      },
+    ],
+    audio:
+      "sha256:10d9873532353edebd5e1ce650e4877d54284b664faad8f0d6641ad28e3777ea",
+  },
+  tests: {
+    text: "using System;\n\nvar failed = 0;\nCheck(\u0022keeps the first when it is largest\u0022, () =\u003E Solution.Largest(9, 2, 3) == 9);\nCheck(\u0022keeps the last when it is largest\u0022, () =\u003E Solution.Largest(1, 2, 8) == 8);\nCheck(\u0022edge: all negative keeps the largest\u0022,\n    () =\u003E Solution.Largest(-5, -2, -9) == -2);\nreturn failed == 0 ? 0 : 1;\n\n// Each check runs alone, so one that throws fails and the rest still report.\nvoid Check(string name, Func\u003Cbool\u003E test)\n{\n    var passed = false;\n    try\n    {\n        passed = test();\n    }\n    catch (Exception)\n    {\n        passed = false;\n    }\n\n    Console.WriteLine((passed ? \u0022#check pass \u0022 : \u0022#check fail \u0022) \u002B name);\n    failed \u002B= passed ? 0 : 1;\n}\n",
+    version: 1,
+    hash: "sha256:7831beb7c29a099be88325315cf87afa398803c3f33983c33828703ca80113c2",
+    count: 3,
+    review: [],
+  },
+} satisfies ContentDoc;

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -37,7 +38,15 @@ internal static class ContentCompiler
         return Compile(InputTree.ReadContent(root), schema);
     }
 
-    public static CompileResult Compile(InputTree tree, IContentSchema schema) => Run(tree, schema, requireChapters: true).Result;
+    public static CompileResult Compile(InputTree tree, IContentSchema schema) => Run(tree, schema, requireChapters: true, checkIndex: true).Result;
+
+    // Every check of a compile except the comparison with the committed index, which this
+    // regenerates; the index is empty when there are diagnostics or no problems.
+    public static (IReadOnlyList<Diagnostic> Diagnostics, byte[] Index) Index(InputTree tree, IContentSchema schema)
+    {
+        var (result, parsed) = Run(tree, schema, requireChapters: true, checkIndex: false);
+        return (result.Diagnostics, result.Diagnostics.Count > 0 ? [] : ProblemsIndex.Write(Problems(parsed)));
+    }
 
     public static byte[] Serialize(object model) =>
         StrictUtf8.GetBytes(JsonSerializer.Serialize(model, model.GetType(), Json) + "\n");
@@ -55,10 +64,10 @@ internal static class ContentCompiler
     // none when anything failed. A root without chapters is no error here: it has no code to run.
     public static ExecutionPlan Plan(InputTree tree, IContentSchema schema)
     {
-        var (result, parsed) = Run(tree, schema, requireChapters: false);
+        var (result, parsed) = Run(tree, schema, requireChapters: false, checkIndex: true);
         if (result.Diagnostics.Count > 0)
         {
-            return new ExecutionPlan(result.Diagnostics, []);
+            return new ExecutionPlan(result.Diagnostics, [], []);
         }
 
         var blocks = parsed
@@ -80,13 +89,29 @@ internal static class ContentCompiler
                     s.Container,
                     order)))
             .ToList();
-        return new ExecutionPlan([], blocks);
+        var subjects = parsed
+            .Select(p => p.File.Model switch
+            {
+                ProblemFile m => new PracticeSubject(m.Id, RecordKind.Problem, p.Display, m.Starter.Source, m.Tests.Text, m.Tests.Count, [.. m.Tests.Review.Select(r => r.Check)]),
+                DrillFile m => new PracticeSubject(m.Id, RecordKind.Drill, p.Display, m.Starter.Source, m.Tests.Text, m.Tests.Count, [.. m.Tests.Review.Select(r => r.Check)]),
+                _ => null,
+            })
+            .OfType<PracticeSubject>()
+            .OrderBy(s => s.Id, StringComparer.Ordinal)
+            .ToList();
+        return new ExecutionPlan([], blocks, subjects);
     }
 
-    private static (CompileResult Result, List<Parsed> Parsed) Run(InputTree tree, IContentSchema schema, bool requireChapters)
+    internal static bool IsChapter(string relative) =>
+        relative.StartsWith("chapters/", StringComparison.Ordinal) && string.Equals(Path.GetFileName(relative), ChapterSource, StringComparison.Ordinal);
+
+    private static IEnumerable<ProblemFile> Problems(List<Parsed> parsed) => parsed.Select(p => p.File.Model).OfType<ProblemFile>();
+
+    private static (CompileResult Result, List<Parsed> Parsed) Run(InputTree tree, IContentSchema schema, bool requireChapters, bool checkIndex)
     {
         var diagnostics = new List<Diagnostic>();
         var sources = Collect(tree, requireChapters, diagnostics);
+        var practice = CollectPractice(tree);
         if (diagnostics.Count > 0)
         {
             return (new CompileResult(diagnostics, []), []);
@@ -94,6 +119,7 @@ internal static class ContentCompiler
 
         var parsed = sources
             .Select(s => Read(s.Relative, s.Bytes, s.Display, diagnostics))
+            .Concat(practice.Select(p => ReadPractice(p, diagnostics)))
             .OfType<Parsed>()
             .ToList();
 
@@ -115,6 +141,22 @@ internal static class ContentCompiler
         }
 
         CheckChapters(parsed, diagnostics);
+        CheckNumbers(parsed, diagnostics);
+        PracticeChecks.Check(parsed, patterns?.Select(p => p.Record.Id), diagnostics);
+        var files = Emit(parsed, aliases, patterns, tree, schema, diagnostics);
+
+        // Judged only on content that compiled, so the index it is compared with is the one the
+        // index mode prints.
+        if (checkIndex && diagnostics.Count == 0)
+        {
+            ProblemsIndex.Check(tree, Problems(parsed), diagnostics);
+        }
+
+        return (diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files), parsed);
+    }
+
+    private static List<OutputFile> Emit(List<Parsed> parsed, AliasesFile? aliases, List<(PatternRecord Record, int Line)>? patterns, InputTree tree, IContentSchema schema, List<Diagnostic> diagnostics)
+    {
         var files = new List<OutputFile>();
         foreach (var file in parsed.Where(p => p.File.Model is not null))
         {
@@ -139,7 +181,7 @@ internal static class ContentCompiler
             Add(files, Registries.PatternsOutput, ordered, RecordKind.Patterns, RegistryDisplay(tree, Registries.PatternsSource), schema, diagnostics);
         }
 
-        return (diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files), parsed);
+        return files;
     }
 
     private static void Add(List<OutputFile> files, string relative, object model, RecordKind kind, string display, IContentSchema schema, List<Diagnostic> diagnostics, string? part = null)
@@ -181,8 +223,43 @@ internal static class ContentCompiler
         return new Parsed(relative, display, file);
     }
 
-    private static bool IsChapter(string relative) =>
-        relative.StartsWith("chapters/", StringComparison.Ordinal) && string.Equals(Path.GetFileName(relative), ChapterSource, StringComparison.Ordinal);
+    // The Markdown file and its suite are read together; either refused leaves the subject unread.
+    private static Parsed? ReadPractice(PracticeSource source, List<Diagnostic> diagnostics)
+    {
+        var (text, refusal) = TextAdmission.Read(source.Bytes, source.Display);
+        var (suite, suiteRefusal) = TextAdmission.Read(source.Suite.Bytes!, source.Suite.Display);
+        diagnostics.AddRange(new[] { refusal, suiteRefusal }.OfType<Diagnostic>());
+        if (text is null || suite is null)
+        {
+            return null;
+        }
+
+        var stem = Path.GetFileName(source.Relative)[..^RootAdmission.MarkdownExtension.Length];
+        return new Parsed(source.Relative, source.Display, SourceFile.ParsePractice(source.Display, text, source.Kind, stem, (source.Suite.Display, suite), diagnostics));
+    }
+
+    // Root admission has refused every entry that is not a pair, so each Markdown file found here
+    // has its suite beside it.
+    private static List<PracticeSource> CollectPractice(InputTree tree)
+    {
+        var found = new List<PracticeSource>();
+        var practice = tree.Children(string.Empty).FirstOrDefault(e => e.IsFolder && string.Equals(e.Name, RootAdmission.PracticeFolder, StringComparison.Ordinal));
+        foreach (var (name, kind) in practice is null ? [] : RootAdmission.SubjectFolders)
+        {
+            var folder = tree.Children(practice!.Relative).FirstOrDefault(e => e.IsFolder && string.Equals(e.Name, name, StringComparison.Ordinal));
+            var entries = folder is null ? [] : tree.Children(folder.Relative);
+            foreach (var file in entries.Where(e => !e.IsFolder && e.Name.EndsWith(RootAdmission.MarkdownExtension, StringComparison.Ordinal)))
+            {
+                var suiteName = file.Name[..^RootAdmission.MarkdownExtension.Length] + RootAdmission.SuiteExtension;
+                if (entries.FirstOrDefault(e => !e.IsFolder && string.Equals(e.Name, suiteName, StringComparison.Ordinal)) is { } suite)
+                {
+                    found.Add(new PracticeSource(file.Relative, file.Display, file.Bytes!, kind, suite));
+                }
+            }
+        }
+
+        return found;
+    }
 
     // Accepts chapters/<chapter>/<file>.md only, in ordinal path order; any other entry under
     // chapters/ is an error, and so is finding no file at all where chapters are required.
@@ -271,7 +348,8 @@ internal static class ContentCompiler
             (SourceFile.TermPrefix, EntryIds(parsed, RecordKind.Glossary), "a glossary entry id"),
             (SourceFile.ErrorPrefix, EntryIds(parsed, RecordKind.Error), "an error entry id"),
             (SourceFile.LadderPrefix, LadderIds(parsed), "a ladder id"),
-            (SourceFile.DrillPrefix, [], "a drill file"),
+            (SourceFile.ProblemPrefix, PracticeIds(parsed, RecordKind.Problem), "a problem file"),
+            (SourceFile.DrillPrefix, PracticeIds(parsed, RecordKind.Drill), "a drill file"),
             (SourceFile.WalkPrefix, parsed.SelectMany(p => p.File.WalkIds).ToHashSet(StringComparer.Ordinal), "a walk-it block"),
         };
         foreach (var (id, display, line) in uses)
@@ -313,6 +391,23 @@ internal static class ContentCompiler
     private static HashSet<string> EntryIds(List<Parsed> parsed, RecordKind kind) =>
         parsed.Where(p => p.File.Entry == kind).Select(p => p.File.EntryId).OfType<string>().ToHashSet(StringComparer.Ordinal);
 
+    private static HashSet<string> PracticeIds(List<Parsed> parsed, RecordKind kind) =>
+        parsed.Select(p => p.File.Practice).OfType<PracticeFile>().Where(p => p.Kind == kind).SelectMany(p => new[] { p.Id, p.StarterId }).ToHashSet(StringComparer.Ordinal);
+
+    // A problem's number is its public name, so two problems never share one.
+    private static void CheckNumbers(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    {
+        var seen = new Dictionary<int, string>();
+        foreach (var file in parsed.Where(p => p.File.Model is ProblemFile).OrderBy(p => p.Relative, StringComparer.Ordinal))
+        {
+            var number = ((ProblemFile)file.File.Model!).Number;
+            if (!seen.TryAdd(number, file.Display))
+            {
+                diagnostics.Add(new Diagnostic(file.Display, file.File.Practice!.KeyLines["number"], string.Create(CultureInfo.InvariantCulture, $"problem number {number} is used twice (first used at {seen[number]})")));
+            }
+        }
+    }
+
     private static HashSet<string> LadderIds(List<Parsed> parsed) =>
         parsed.SelectMany(p => p.File.Ladders.Select(l => l.Ladder.Id)).ToHashSet(StringComparer.Ordinal);
 
@@ -342,8 +437,8 @@ internal static class ContentCompiler
         }
     }
 
-    // A bare or current-chapter target must name an anchor of the same source file; a sibling
-    // file's anchors and other chapters need cross-file checks, which do not exist yet.
+    // A bare or current-chapter target must name an anchor of the same file; another chapter's
+    // anchors are not resolved by this check.
     // A retired id is refused in every link, another chapter's included, and names its successor.
     // An error entry is told from an anchor by what the id names; a Term, by its reserved prefix,
     // must then name a live glossary entry.
@@ -364,7 +459,7 @@ internal static class ContentCompiler
                 }
                 else if (ladders.Contains(link.Id))
                 {
-                    // Opening a ladder is a reveal, and no reveal exists yet.
+                    // A ladder opens only through its reveal control (4.9), never through a link.
                     diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names the ladder \"{link.Id}\", which cannot be linked"));
                 }
                 else if (link.Term is { } term)
@@ -440,5 +535,7 @@ internal static class ContentCompiler
         }
     }
 
-    private sealed record Parsed(string Relative, string Display, SourceFile File);
+    internal sealed record Parsed(string Relative, string Display, SourceFile File);
+
+    private sealed record PracticeSource(string Relative, string Display, byte[] Bytes, RecordKind Kind, InputEntry Suite);
 }

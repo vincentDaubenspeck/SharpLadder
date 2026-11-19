@@ -9,6 +9,8 @@ export const recordKinds = [
   "glossary",
   "error",
   "hints-catalogue",
+  "problem",
+  "drill",
 ] as const;
 export type RecordKind = (typeof recordKinds)[number];
 

@@ -1,8 +1,9 @@
 namespace SharpLadder.CodeCheck;
 
 // A started child. From Start on, the backend drains standard output and standard error
-// concurrently, counting each against RunLimits.OutputCapBytes. A failure of the OS or of a proof
-// throws ToolProblem; the runner then cleans up, and the run exits 2.
+// concurrently, counting each against RunLimits.OutputCapBytes, and hands standard output up to
+// that cap to the sink it was started with. A failure of the OS, of a proof or of the sink throws
+// ToolProblem; the runner then cleans up, and the run exits 2.
 internal interface IRunningChild : IDisposable
 {
     int ProcessId { get; }
@@ -20,5 +21,6 @@ internal interface IRunningChild : IDisposable
     void Terminate(Deadline cleanup);
 
     // Called after Terminate, so the readers can finish; the stream that passed its cap, if any.
+    // On return the sink has received every chunk it will ever receive.
     OutputStream? AwaitReaders(Deadline cleanup);
 }

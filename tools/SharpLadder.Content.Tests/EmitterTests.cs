@@ -117,7 +117,7 @@ public sealed class EmitterTests
             Assert.EndsWith(";\n", text, StringComparison.Ordinal);
         }
 
-        Assert.Contains("import type {\n  AnchoredTextBlock,\n  Block,\n  BlockId,\n  Body,\n  CodeBlock,\n  ErrorId,\n  Id,\n  ItemId,\n  LinkContent,\n  ListItem,\n  ParagraphBlock,\n  SectionId,\n  Spans,\n  Speech,\n} from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
+        Assert.Contains("import type {\n  AnchoredTextBlock,\n  Block,\n  BlockId,\n  Body,\n  CodeBlock,\n  ErrorId,\n  Id,\n  ItemId,\n  LinkContent,\n  ListItem,\n  ParagraphBlock,\n  PracticeBody,\n  PracticeExamples,\n  PracticeSpeech,\n  SectionId,\n  Spans,\n  Speech,\n  Spoken,\n  WalkId,\n} from \"./body.ts\";\n", modules["content.ts"], StringComparison.Ordinal);
         Assert.DoesNotContain("import", modules["body.ts"], StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(modules["content.ts"], "export type ContentDoc ="));
     }

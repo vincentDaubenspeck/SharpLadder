@@ -23,4 +23,10 @@ internal enum RecordKind
 
     /// <summary>The public cues of one hints part, each with its speech; never a rung or a technique.</summary>
     HintsCatalogue,
+
+    /// <summary>One numbered problem: its fields, starter and suite; never its reference solution.</summary>
+    Problem,
+
+    /// <summary>One drill on a ramp rung: its fields, starter and suite; never its reference solution.</summary>
+    Drill,
 }
