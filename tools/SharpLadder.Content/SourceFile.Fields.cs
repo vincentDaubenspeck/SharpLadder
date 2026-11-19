@@ -18,7 +18,7 @@ internal sealed partial class SourceFile
 
     // Reads a bullet list as fields in the order of labels; which of them must be present, and
     // how much each may hold, is the caller's rule. Null after reporting.
-    private Dictionary<string, List<BodyBlock>>? Fields(ListBlock list, string[] labels, Func<string> nextId)
+    private Dictionary<string, List<BodyBlock>>? Fields(ListBlock list, string[] labels, Func<string> nextId, ContainerKind container)
     {
         var written = string.Join(", ", labels);
         if (list.IsOrdered || !NoAttributes(list, list.Line + 1))
@@ -47,7 +47,7 @@ internal sealed partial class SourceFile
             {
                 Error(line, $"field \"{label}\" is out of order; the order is {written}");
             }
-            else if (FieldBlocks(item, label, nextId) is { } blocks)
+            else if (FieldBlocks(item, label, nextId, container) is { } blocks)
             {
                 fields[label] = blocks;
                 last = index;
@@ -58,7 +58,7 @@ internal sealed partial class SourceFile
     }
 
     // The text after the label is the field's first paragraph; the item's further blocks follow.
-    private List<BodyBlock>? FieldBlocks(ListItemBlock item, string label, Func<string> nextId)
+    private List<BodyBlock>? FieldBlocks(ListItemBlock item, string label, Func<string> nextId, ContainerKind container)
     {
         var line = item.Line + 1;
         var paragraph = (ParagraphBlock)item[0];
@@ -98,7 +98,7 @@ internal sealed partial class SourceFile
 
         foreach (var block in item.Skip(1))
         {
-            if (Body(block, nextId(), block.Line + 1) is { } node)
+            if (Body(block, nextId(), block.Line + 1, container) is { } node)
             {
                 blocks.Add(node);
             }

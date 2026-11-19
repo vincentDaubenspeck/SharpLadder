@@ -163,9 +163,19 @@ jobs:
       - name: Compile the fixture and compare the golden digest
         shell: bash
         run: node tools/checks/content.mjs
+      - name: Run the code blocks of the content
+        shell: bash
+        run: node tools/checks/code-check.mjs
       - name: Content compiler tests (CRLF and LF sources, golden digest)
         shell: bash
         run: dotnet test --project tools/SharpLadder.Content.Tests/SharpLadder.Content.Tests.csproj
+      # Linux runs this project in the check job's solution tests.
+      - name: Code check tests (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: >-
+          dotnet test
+          --project tools/SharpLadder.CodeCheck.Tests/SharpLadder.CodeCheck.Tests.csproj
 
   workflows:
     runs-on: ubuntu-24.04

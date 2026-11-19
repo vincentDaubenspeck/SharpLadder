@@ -1,0 +1,76 @@
+---
+kind: build
+chapter: ch-fixture
+order: 3
+---
+
+## Nested emphasis {#build-fix-nest}
+
+Spans nest: *outer **middle *inner* middle** outer*.
+
+```walk-it {#walk-fix-nest}
+title: Replace a word
+cells: ["old"]
+sequences:
+  - name: once
+    intro: The cell holds a word.
+    steps:
+      - { dst: 0, value: "new", note: A new word takes its place. }
+```
+
+## Two ways to total {#build-fix-total}
+
+Both ways add the same numbers; pick one to read.
+
+```csharp {#build-fix-lead1 group=fix-lead spoken="Lists the numbers"}
+var numbers = new[] { 70, 4 };
+```
+
+### Add them in a loop {#build-fix-loop approach="a loop"}
+
+Walk the numbers and keep a running total.
+
+```csharp {#build-fix-loop1 group=fix-loop spoken="Adds each number to the total"}
+var total = 0;
+foreach (var n in new[] { 70, 4 }) total += n;
+```
+
+### Ask the library {#build-fix-sum approach="the library"}
+
+- One call does the walk.
+- The result is the same.
+
+| Call | Result                         |
+| ---- | ------------------------------ |
+| Sum  | 74                             |
+| Each | one [loop](#term-fixture-loop) |
+
+```walk-it {#walk-fix-sum}
+title: Store the total
+cells: [0]
+sequences:
+  - name: once
+    intro: The total starts at zero.
+    steps:
+      - { dst: 0, value: 74, note: The call stores the whole total at once. }
+```
+
+```csharp {#build-fix-sum1 group=fix-sum-call spoken="Sums in one call"}
+var total = new[] { 70, 4 }.Sum();
+```
+
+## Three ways with no lead {#build-fix-three}
+
+### First {#build-fix-first approach="first"}
+
+Only a paragraph, with [a link](#build-fix-nest).
+
+### Second {#build-fix-second approach="second, with a comma"}
+
+```text {#build-fix-second1 spoken="A note for the second way"}
+second
+```
+
+### Third? {#build-fix-third approach="third"}
+
+The last one.

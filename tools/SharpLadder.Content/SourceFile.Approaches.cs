@@ -7,7 +7,7 @@ internal sealed partial class SourceFile
 {
     private const string ApproachForm = "an approach heading is written ### Title {#id approach=\"label\"}, with one line of shown text as the label and nothing else";
 
-    private readonly Dictionary<string, (string Owner, int Line)> _groups = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (BlockOwner Owner, int Line)> _groups = new(StringComparer.Ordinal);
     private bool _build;
     private List<Approach> _approaches = [];
     private List<BodyBlock>? _approachBody;
@@ -116,16 +116,17 @@ internal sealed partial class SourceFile
     }
 
     // A group is one program, and only one approach is ever shown, so no group reaches across one.
-    private void OwnGroup(string group, int line)
+    private void OwnGroup(string group, BlockOwner owner, int line)
     {
-        var owner = _approachBody is null ? string.Empty : _approachId;
         if (!_groups.TryGetValue(group, out var first))
         {
             _groups[group] = (owner, line);
         }
-        else if (!string.Equals(first.Owner, owner, StringComparison.Ordinal))
+        else if (first.Owner != owner)
         {
             Error(line, $"group \"{Shown(group)}\" is also used at line {first.Line.ToString(System.Globalization.CultureInfo.InvariantCulture)}; the code of an approach forms groups of its own");
         }
     }
+
+    private BlockOwner CodeOwner() => _approachBody is null ? BlockOwner.Outside : new BlockOwner.InApproach(_approachId);
 }

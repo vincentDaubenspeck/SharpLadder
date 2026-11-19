@@ -51,6 +51,9 @@ internal sealed partial class SourceFile
 
     public List<(string Id, int Line)> Ids { get; } = [];
 
+    // Each csharp block with what only parsing knows, its lines and owner, for the code check.
+    public List<CodeSite> CodeSites { get; } = [];
+
     // The IDs the renderer writes as id attributes for this file: sections and code or text blocks.
     public List<string> Anchors { get; } = [];
 
@@ -439,7 +442,8 @@ internal sealed partial class SourceFile
             }
 
             var prefix = inSection ? _current!.Id : ContentIds.IntroPrefix;
-            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{++number}"), line);
+            var container = !inSection ? ContainerKind.Intro : _approachBody is null ? ContainerKind.Section : ContainerKind.Approach;
+            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{++number}"), line, container);
             if (node is not null)
             {
                 body.Add(node);
@@ -630,7 +634,7 @@ internal sealed partial class SourceFile
         return id;
     }
 
-    private BodyBlock? Body(Block block, string blockId, int line)
+    private BodyBlock? Body(Block block, string blockId, int line, ContainerKind container)
     {
         switch (block)
         {
@@ -658,7 +662,10 @@ internal sealed partial class SourceFile
                 };
                 if (node is CodeNode grouped)
                 {
-                    OwnGroup(grouped.Group, line);
+                    var owner = CodeOwner();
+                    OwnGroup(grouped.Group, owner, line);
+                    var firstCodeLine = fence.Lines.Count > 0 ? fence.Lines.Lines[0].Line + 1 : fence.Line + 2;
+                    CodeSites.Add(new CodeSite(grouped, fence.Line + 1, firstCodeLine, owner, container));
                 }
 
                 if (fenceId is not null)

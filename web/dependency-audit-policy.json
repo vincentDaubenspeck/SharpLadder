@@ -1,17 +1,3 @@
 {
-  "exceptions": [
-    {
-      "advisoryId": "GHSA-fc5q-39xc-vjpf",
-      "package": "picomatch",
-      "versions": ["2.3.2", "4.0.7"],
-      "reason": "No verified patched release is available. The high-severity finding affects picomatch 4.0.7 in the build-tool dependency tree. Version 2.3.2 is used only by the Markdown linter and is included because this audit still checks the whole tree. Exploitation requires an attacker-controlled glob pattern; the reviewed build path uses trusted repository configuration. Checked against the CISA Known Exploited Vulnerabilities catalogue on 2026-11-17 with no entry found.",
-      "removeWhen": "A published stable picomatch version is outside the advisory's current affected range and newer than at least one recorded version, or the matching advisory or exact installed vulnerable-version set changes.",
-      "addedOn": "2026-11-17",
-      "references": [
-        "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
-        "https://www.cve.org/CVERecord?id=CVE-2026-112366",
-        "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
-      ]
-    }
-  ]
+  "exceptions": []
 }

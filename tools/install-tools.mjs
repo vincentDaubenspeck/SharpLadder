@@ -1,6 +1,7 @@
-// Installs the pinned check tools into .tools/ after verifying each download.
+// Installs the pinned check tools and the .NET reference assemblies into .tools/ after verifying each download.
 // Usage: node tools/install-tools.mjs [--python <python executable>]
-// Pins and digests live in tools/tool-pins.json; nothing is fetched to learn them.
+// Pins and digests live in tools/tool-pins.json, the reference DLL names in tools/reference-dlls.json; nothing is
+// fetched to learn them. The Python builds the yamllint environment and unpacks the reference pack.
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -8,6 +9,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -153,7 +155,7 @@ async function installNode(ctx) {
 }
 
 // The SDK archive has no top-level folder, so the whole work directory becomes .tools/dotnet.
-async function installDotnet(ctx) {
+export async function installDotnet(ctx) {
   const { pins, dest } = ctx;
   const asset = pins.dotnet.assets[platform];
   if (!asset) throw new Error(`dotnet: no pinned build for ${platform}`);
@@ -179,6 +181,95 @@ async function installDotnet(ctx) {
   console.log(`installed dotnet SDK ${pins.dotnet.version}`);
 }
 
+// A list written for another pack version would pass files that this pack never vouched for.
+function referencePin(ctx) {
+  const pin = ctx.pins["dotnet-ref"];
+  const list = ctx.referenceList;
+  if (!pin) throw new Error("dotnet-ref: tools/tool-pins.json has no dotnet-ref pin");
+  const files = list?.files;
+  if (typeof list?.folder !== "string" || !Array.isArray(files) || !files.every((f) => typeof f === "string")) {
+    throw new Error("dotnet-ref: tools/reference-dlls.json needs a folder and a list of file names");
+  }
+  if (new Set(files).size !== files.length) throw new Error("dotnet-ref: tools/reference-dlls.json names a file twice");
+  if (list.version !== pin.version) {
+    throw new Error(`dotnet-ref: tools/reference-dlls.json is for ${list.version}, the pin is ${pin.version}`);
+  }
+  return { pin, list };
+}
+
+// Kept outside ref-net10, so that folder holds the listed DLLs and nothing else.
+const referenceStamp = (ctx) => join(ctx.dest, "dotnet-ref.stamp.json");
+
+function referenceStampOk(ctx, pin) {
+  const file = referenceStamp(ctx);
+  if (!existsSync(file)) return false;
+  let stamp;
+  try {
+    stamp = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    // A stamp that cannot be read vouches for nothing, so the pack is installed again.
+    return false;
+  }
+  return stamp?.version === pin.version && stamp?.sha512 === pin.sha512;
+}
+
+// The checker runs content on the runtime the reference pack describes, so the SDK must carry that runtime.
+function checkRuntime(ctx, version) {
+  const sdk = join(ctx.dest, "dotnet");
+  for (const path of [join(sdk, "shared", "Microsoft.NETCore.App", version), join(sdk, win ? "dotnet.exe" : "dotnet")]) {
+    if (!existsSync(path)) throw new Error(`dotnet-ref: the SDK does not provide runtime ${version}: ${path} is missing`);
+  }
+}
+
+// The pack is a zip, which GNU tar cannot read; -I keeps the Python from loading code from the working directory.
+function extractZip(python, file, into) {
+  const r = spawnSync(python, ["-I", "-m", "zipfile", "-e", file, into], { stdio: "inherit" });
+  if (r.status !== 0) throw new Error("dotnet-ref: extracting the package failed");
+}
+
+export async function installReference(ctx) {
+  const { pin, list } = referencePin(ctx);
+  if (!referenceStampOk(ctx, pin)) {
+    const { work, file } = await download(ctx, "dotnet-ref", pin);
+    const target = join(ctx.dest, "ref-net10");
+    const aside = join(ctx.dest, `tmp-dotnet-ref-old-${process.pid}`);
+    try {
+      const extractRoot = join(work, "package");
+      extractZip(ctx.python, file, extractRoot);
+      const from = join(extractRoot, ...list.folder.split("/"));
+      const found = existsSync(from)
+        ? readdirSync(from, { withFileTypes: true })
+            .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".dll"))
+            .map((e) => e.name)
+        : [];
+      const missing = list.files.filter((n) => !found.includes(n));
+      const extra = found.filter((n) => !list.files.includes(n));
+      if (missing.length > 0 || extra.length > 0) {
+        throw new Error(
+          `dotnet-ref: the package's ${list.folder} DLLs differ from tools/reference-dlls.json ` +
+            `(missing: ${missing.join(", ") || "none"}; not listed: ${extra.join(", ") || "none"})`,
+        );
+      }
+      const staged = join(work, "ref-net10");
+      mkdirSync(staged);
+      for (const name of list.files) renameSync(join(from, name), join(staged, name));
+      if (existsSync(target)) renameSync(target, aside);
+      try {
+        renameSync(staged, target);
+      } catch (err) {
+        if (existsSync(aside)) renameSync(aside, target);
+        throw err;
+      }
+      rmSync(aside, { recursive: true, force: true });
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+    writeFileSync(referenceStamp(ctx), `${JSON.stringify({ version: pin.version, sha512: pin.sha512 })}\n`);
+    console.log(`installed dotnet-ref ${pin.version}`);
+  }
+  checkRuntime(ctx, pin.version);
+}
+
 function installYamllint(ctx, python) {
   const { pins, dest } = ctx;
   const venv = join(dest, "venv");
@@ -194,12 +285,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const pins = JSON.parse(readFileSync(join(root, "tools/tool-pins.json"), "utf8"));
     const pyFlag = process.argv.indexOf("--python");
     const python = pyFlag > 0 ? process.argv[pyFlag + 1] : win ? "python" : "python3";
-    const ctx = { pins, dest: join(root, ".tools"), pause: sleep };
+    const referenceList = JSON.parse(readFileSync(join(root, "tools/reference-dlls.json"), "utf8"));
+    const ctx = { pins, referenceList, python, dest: join(root, ".tools"), pause: sleep };
     mkdirSync(join(ctx.dest, "bin"), { recursive: true });
     await installNode(ctx);
     for (const name of ["shfmt", "shellcheck", "ec", "cyclonedx"]) await installBinary(ctx, name);
     installYamllint(ctx, python);
     await installDotnet(ctx);
+    // After the SDK, so the runtime check sees the SDK this run installed.
+    await installReference(ctx);
   } catch (err) {
     console.error(`install-tools: ${err.message}`);
     process.exit(1);

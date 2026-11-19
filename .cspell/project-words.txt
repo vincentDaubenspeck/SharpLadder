@@ -22,10 +22,12 @@ cfghjmpqrvwx
 cgrep
 CISA
 cmap
+CODECHECK
 codehead
 colr
 Consolas
 contentless
+coreclr
 cqmax
 cqmin
 CREAT
@@ -44,9 +46,11 @@ eblc
 ebsc
 edia
 ehint
+ENOENT
 ENOLOCK
 ENOSYS
 esac
+ESRCH
 EXDEV
 extensionless
 extractall
@@ -61,7 +65,9 @@ fsutil
 fvar
 gdef
 gethighcontrast
+getpgid
 getpgrp
+getsid
 glat
 globalconfig
 gloc
@@ -86,6 +92,7 @@ hsty
 ictcp
 idat
 idents
+IDISP
 iend
 ihdr
 isexe
@@ -100,8 +107,10 @@ LASTEXITCODE
 lcar
 lede
 libc
+libcoreclr
 liga
 lightningcss
+Linq
 loca
 lpsz
 ltsh
@@ -119,8 +128,11 @@ morx
 mountvol
 mport
 msbuild
+mscorlib
 msvc
+muxer
 namelist
+netstandard
 Newtonsoft
 noconcurrent
 nologo
@@ -151,9 +163,12 @@ PATHEXT
 pathspec
 pclt
 pcss
+pgid
+pgrp
 pipefail
 popovertarget
 popovertargetaction
+ppid
 prophoto
 prss
 pscustomobject
@@ -173,6 +188,7 @@ Roslynator
 rrggbb
 rsuser
 runneradmin
+runtimeconfig
 sarif
 sbix
 scanlines
@@ -184,6 +200,7 @@ Setext
 sethighcontrast
 setpgrp
 setpriv
+setsid
 sfnt
 SharpLadder
 ShellCheck
@@ -217,6 +234,7 @@ unlayered
 unlinkat
 unminified
 userconfig
+USERPROFILE
 vdmx
 venv
 vhea

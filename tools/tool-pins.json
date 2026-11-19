@@ -126,6 +126,11 @@
       }
     }
   },
+  "dotnet-ref": {
+    "version": "10.0.15",
+    "url": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/10.0.15/microsoft.netcore.app.ref.10.0.15.nupkg",
+    "sha512": "7d2f91fce944ec012ab274391731d8500479770e25de3178797a6693c74209ab3404545de0b365a7367805870ba0e398dc833b26e12817fd60c1d82bf2b7c5f1"
+  },
   "playwright": {
     "version": "1.65.0",
     "packages": {

@@ -1,0 +1,9 @@
+patterns:
+  - id: pat-fixture-two-pass
+    title: "Two passes: count, then read"
+    summary: |
+      Count everything first.
+      Then answer from the counts.
+  - id: pat-fixture-seen-set
+    title: Remember what was seen
+    summary: Keep a set of earlier values and ask it about each new one.

@@ -1,21 +1,36 @@
 // Tool installer cases for tools/install-tools.mjs: downloads come from a local server and pauses are
 // recorded instead of waited, so the retry rules are tested without the network or real delays.
+// The reference pack cases build stand-in archives with the Python of the installed yamllint environment.
 // Usage: node tools/tests/install-tools-cases.mjs <empty work directory>
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
-import { join, resolve } from "node:path";
-import { download, installBinary } from "../install-tools.mjs";
+import { dirname, join, resolve } from "node:path";
+import { download, installBinary, installDotnet, installReference } from "../install-tools.mjs";
 
 const tools = join(import.meta.dirname, "..");
 if (!process.argv[2]) throw new Error("usage: node tools/tests/install-tools-cases.mjs <empty work directory>");
 const work = resolve(process.argv[2]);
 mkdirSync(work, { recursive: true });
 const platform = `${process.platform}-${process.arch}`;
+const win = process.platform === "win32";
 const name = "stand-in-tool";
 const archive = Buffer.from("stand-in archive bytes\n".repeat(64));
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
+const sha512 = (data) => createHash("sha512").update(data).digest("hex");
+// The installer creates this interpreter in every installed tree; the cases only run it and install into their own folders.
+const python = join(tools, "..", ".tools", "venv", win ? "Scripts/python.exe" : "bin/python");
+if (!existsSync(python)) throw new Error(`no Python at ${python}; install the pinned tools first`);
 
 let failed = 0;
 function check(label, problems) {
@@ -38,6 +53,8 @@ function dropMidBody(res) {
 }
 
 const requests = [];
+// Bodies for the reference pack cases, by request path.
+const served = new Map();
 const server = createServer((req, res) => {
   requests.push(req.url);
   switch (req.url) {
@@ -55,7 +72,8 @@ const server = createServer((req, res) => {
       send(res, 200, archive);
       break;
     default:
-      send(res, 404, "no such case");
+      if (served.has(req.url)) send(res, 200, served.get(req.url));
+      else send(res, 404, "no such case");
   }
 });
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
@@ -200,6 +218,157 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const installed = readdirSync(join(r.dest, "bin"));
   expect(p, same(left, ["bin"]) && installed.length === 0, `left behind: ${JSON.stringify([...left, ...installed])}`);
   check("a complete body with the wrong digest installs nothing and is not fetched again", p);
+}
+
+// Reference pack cases: a stand-in pack, list, pin and SDK in each case's own folder.
+const stand = join(work, "stand-in");
+const refVersion = "1.2.3";
+const runtimeOf = (dest) => join(dest, "dotnet", "shared", "Microsoft.NETCore.App", refVersion);
+const muxer = win ? "dotnet.exe" : "dotnet";
+const list = { package: "Stand.In.Ref", version: refVersion, folder: "ref/net10.0", files: ["Alpha.dll", "Beta.dll"] };
+
+// Built with Python's zipfile or tarfile from a folder holding only the given files, so the archive has nothing else.
+function pack(module, file, entries) {
+  const folder = join(stand, `${file}-src`);
+  for (const [rel, text] of Object.entries(entries)) {
+    mkdirSync(dirname(join(folder, rel)), { recursive: true });
+    writeFileSync(join(folder, rel), text);
+  }
+  const top = [...new Set(Object.keys(entries).map((rel) => rel.split("/")[0]))];
+  const r = spawnSync(python, ["-I", "-m", module, "-c", join(stand, file), ...top], { cwd: folder, stdio: "inherit" });
+  if (r.status !== 0) throw new Error(`building the stand-in ${file} failed`);
+  return readFileSync(join(stand, file));
+}
+
+const goodPack = pack("zipfile", "good.nupkg", {
+  "ref/net10.0/Alpha.dll": "alpha",
+  "ref/net10.0/Beta.dll": "beta",
+  "ref/net10.0/Alpha.xml": "docs",
+  "analyzers/dotnet/cs/Gamma.dll": "analyzer",
+  "stand-in.nuspec": "<package />",
+});
+served.set("/ref/good.nupkg", goodPack);
+const refPin = (path, digested) => ({ version: refVersion, url: `${base}${path}`, sha512: sha512(digested) });
+const refCtx = (ctx, pin, more = {}) => ({ ...ctx, python, referenceList: list, pins: { "dotnet-ref": pin }, ...more });
+
+function sdkFolder(dest) {
+  mkdirSync(runtimeOf(dest), { recursive: true });
+  writeFileSync(join(dest, "dotnet", muxer), "muxer");
+}
+
+// The reference install by file name and content, and the stamp text; null where absent.
+function referenceState(dest) {
+  const dir = join(dest, "ref-net10");
+  const stamp = join(dest, "dotnet-ref.stamp.json");
+  return {
+    files: existsSync(dir) ? readdirSync(dir).sort().map((n) => `${n} ${sha256(readFileSync(join(dir, n)))}`) : null,
+    stamp: existsSync(stamp) ? readFileSync(stamp, "utf8") : null,
+  };
+}
+const leftovers = (dest) => readdirSync(dest).filter((n) => n.startsWith("tmp-"));
+const seeded = (p, r) => expect(p, r.error === null, `the earlier install failed: ${r.error?.message}`);
+
+{
+  const p = [];
+  const pin = refPin("/ref/good.nupkg", goodPack);
+  const sdk = (tag) => {
+    const data = pack("tarfile", `sdk-${tag}.tar.gz`, {
+      [muxer]: "muxer",
+      [`shared/Microsoft.NETCore.App/${refVersion}/build.txt`]: tag,
+    });
+    served.set(`/i1/sdk-${tag}.tar.gz`, data);
+    return { version: `0.0.0-${tag}`, assets: { [platform]: { url: `${base}/i1/sdk-${tag}.tar.gz`, sha256: sha256(data) } } };
+  };
+  const both = (dotnet) =>
+    call("i1", async (ctx) => {
+      const c = refCtx(ctx, pin, { pins: { dotnet, "dotnet-ref": pin } });
+      await installDotnet(c);
+      await installReference(c);
+    });
+  const first = await both(sdk("a"));
+  const installed = referenceState(first.dest);
+  expect(p, first.error === null, `first install rejected: ${first.error?.message}`);
+  expect(p, same(first.requests, ["/i1/sdk-a.tar.gz", "/ref/good.nupkg"]), `requests ${JSON.stringify(first.requests)}`);
+  expect(p, same(installed.files, [`Alpha.dll ${sha256("alpha")}`, `Beta.dll ${sha256("beta")}`]),
+    `installed ${JSON.stringify(installed.files)}, expected the two listed DLLs only`);
+  expect(p, installed.stamp === `{"version":"${refVersion}","sha512":"${pin.sha512}"}\n`, `stamp: ${installed.stamp}`);
+  const second = await both(sdk("b"));
+  expect(p, second.error === null, `install after the SDK reinstall rejected: ${second.error?.message}`);
+  expect(p, same(second.requests, ["/i1/sdk-b.tar.gz"]), `requests after the SDK reinstall ${JSON.stringify(second.requests)}`);
+  const build = join(runtimeOf(second.dest), "build.txt");
+  expect(p, existsSync(build) && readFileSync(build, "utf8") === "b", "the selected runtime is not the reinstalled SDK's");
+  expect(p, same(referenceState(second.dest), installed), "the SDK reinstall changed the reference install or stamp");
+  expect(p, leftovers(second.dest).length === 0, `left behind: ${JSON.stringify(leftovers(second.dest))}`);
+  check("the reference pack installs the listed DLLs and stays installed when an SDK reinstall brings the runtime", p);
+}
+
+{
+  const p = [];
+  const r = await call("i2", (ctx) => {
+    sdkFolder(ctx.dest);
+    return installReference(refCtx(ctx, refPin("/ref/good.nupkg", Buffer.from("other"))));
+  });
+  expect(p, r.error?.message.startsWith("dotnet-ref: SHA-512 mismatch") === true, `rejection: ${r.error?.message ?? "none"}`);
+  expect(p, r.requests.length === 1, `requests ${r.requests.length}, expected 1`);
+  const left = readdirSync(r.dest).sort();
+  expect(p, same(left, ["bin", "dotnet"]), `left behind: ${JSON.stringify(left)}`);
+  check("a reference pack with the wrong digest is never unpacked and installs nothing", p);
+}
+
+{
+  const p = [];
+  const pin = refPin("/ref/good.nupkg", goodPack);
+  const seed = await call("i3", (ctx) => {
+    sdkFolder(ctx.dest);
+    return installReference(refCtx(ctx, pin));
+  });
+  seeded(p, seed);
+  const before = referenceState(seed.dest);
+  const r = await call("i3", (ctx) => installReference(refCtx(ctx, pin, { referenceList: { ...list, version: "1.2.4" } })));
+  const want = `dotnet-ref: tools/reference-dlls.json is for 1.2.4, the pin is ${refVersion}`;
+  expect(p, r.error?.message === want, `rejection: ${r.error?.message ?? "none"}`);
+  expect(p, r.requests.length === 0, `requests ${r.requests.length}, expected none`);
+  expect(p, before.stamp !== null && same(referenceState(r.dest), before), "the existing install or stamp changed");
+  check("a reference list for another version is refused, also when the stamp is current", p);
+}
+
+{
+  const p = [];
+  const otherPack = pack("zipfile", "other.nupkg", { "ref/net10.0/Alpha.dll": "alpha", "ref/net10.0/Delta.dll": "delta" });
+  served.set("/ref/other.nupkg", otherPack);
+  const seed = await call("i4", (ctx) => {
+    sdkFolder(ctx.dest);
+    return installReference(refCtx(ctx, refPin("/ref/good.nupkg", goodPack)));
+  });
+  seeded(p, seed);
+  const before = referenceState(seed.dest);
+  const r = await call("i4", (ctx) => installReference(refCtx(ctx, refPin("/ref/other.nupkg", otherPack))));
+  const want =
+    "dotnet-ref: the package's ref/net10.0 DLLs differ from tools/reference-dlls.json " +
+    "(missing: Beta.dll; not listed: Delta.dll)";
+  expect(p, r.error?.message === want, `rejection: ${r.error?.message ?? "none"}`);
+  expect(p, r.requests.length === 1, `requests ${r.requests.length}, expected 1`);
+  expect(p, before.stamp !== null && same(referenceState(r.dest), before), "the previous install or its stamp changed");
+  expect(p, leftovers(r.dest).length === 0, `left behind: ${JSON.stringify(leftovers(r.dest))}`);
+  check("a pack whose DLLs differ from the list is refused and the previous install stays", p);
+}
+
+{
+  const p = [];
+  const pin = refPin("/ref/good.nupkg", goodPack);
+  const seed = await call("i5", (ctx) => {
+    sdkFolder(ctx.dest);
+    return installReference(refCtx(ctx, pin));
+  });
+  seeded(p, seed);
+  // Another runtime stays, so only the selected version can satisfy the check.
+  rmSync(runtimeOf(seed.dest), { recursive: true });
+  mkdirSync(join(seed.dest, "dotnet", "shared", "Microsoft.NETCore.App", "1.2.2"));
+  const r = await call("i5", (ctx) => installReference(refCtx(ctx, pin)));
+  const want = `dotnet-ref: the SDK does not provide runtime ${refVersion}: ${runtimeOf(seed.dest)} is missing`;
+  expect(p, r.error?.message === want, `rejection: ${r.error?.message ?? "none"}`);
+  expect(p, r.requests.length === 0, `requests ${r.requests.length}, expected none`);
+  check("an SDK without the selected runtime is refused, also when the stamp is current", p);
 }
 
 server.closeAllConnections();

@@ -98,7 +98,7 @@ internal sealed partial class SourceFile
         foreach (var block in intro)
         {
             var blockLine = block.Line + 1;
-            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), blockLine);
+            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), blockLine, ContainerKind.Drill);
             if (node is not null)
             {
                 body.Add(node);

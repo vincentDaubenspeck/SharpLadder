@@ -18,9 +18,12 @@
 #   k. Asset licence cases (tools/tests/asset-licence-cases.mjs): a repeated JSON key fails closed
 #   l. PSScriptAnalyzer installer cases (tools/tests/pssa-cases.mjs): a wrong checksum is rejected before extraction
 #   m. Browser provisioning cases (tools/tests/browser-cases.mjs): unverified archives are never extracted or launched
-#   n. Tool installer cases (tools/tests/install-tools-cases.mjs): dropped downloads are retried, a wrong digest installs nothing
+#   n. Tool installer cases (tools/tests/install-tools-cases.mjs): dropped downloads are retried, a wrong digest installs nothing,
+#      and the reference pack installs, but not with a wrong digest, a list for another version, other DLLs or no runtime
+#   o. Code check cases (tools/tests/code-check-cases.mjs): a fixture whose code runs passes, a false check fails at its line
 # Usage: sh tools/tests/run.sh
-# Parts g, h and j need the pinned .NET SDK and nuget.org. The PowerShell cases in parts d and e fail without PowerShell.
+# Parts g, h, j and o need the pinned .NET SDK and nuget.org. Parts n and o need the tools installed by
+# tools/install-tools.mjs. The PowerShell cases in parts d and e fail without PowerShell.
 set -eu
 
 started=$(date +%s)
@@ -274,7 +277,7 @@ mkdir -p "$repo/web"
 cp "$src/tools/check.sh" "$src/tools/tool-pins.json" "$repo/tools/"
 cp "$src/tools/checks/lib.mjs" "$src/tools/checks/run.mjs" "$src/tools/checks/shell.mjs" \
   "$src/tools/checks/dotnet.mjs" "$src/tools/checks/csharp.mjs" "$src/tools/checks/content.mjs" \
-  "$src/tools/checks/web.mjs" "$src/tools/checks/audit-exceptions.mjs" \
+  "$src/tools/checks/code-check.mjs" "$src/tools/checks/web.mjs" "$src/tools/checks/audit-exceptions.mjs" \
   "$src/tools/checks/ps-suppressions.ps1" "$src/tools/checks/pssa.ps1" "$repo/tools/checks/"
 cp "$src/web/package.json" "$src/web/.nvmrc" "$src/web/.licensee.json" "$repo/web/"
 cp "$src/global.json" "$src/Directory.Build.props" "$src/Directory.Packages.props" "$repo/"
@@ -312,7 +315,8 @@ for want in 'FAIL shell suppression reasons' '  web/node_modules not found; run 
   '  global.json SDK 10.0.402 differs from tools/tool-pins.json 10.0.404' \
   '  PSScriptAnalyzer 0.0.0 not found; install it with:' \
   '  web/x.sh:2: shellcheck directive needs a reason comment on the line above' \
-  '  needs .NET config (see above)' 'FAIL nuget vulnerabilities' 'FAIL nuget licences'; do
+  '  needs .NET config (see above)' 'FAIL nuget vulnerabilities' 'FAIL nuget licences' \
+  'FAIL code check'; do
   if [ "$rc" -ne 0 ] && grep -qxF "$want" "$tmp/out"; then
     pass "check.sh exit $rc with: $want"
   else
@@ -434,6 +438,10 @@ else
   rc=0
   "$node" "$src/tools/tests/work-dir-cases.mjs" "$tmp/workdir" > "$tmp/out" 2>&1 || rc=$?
   count_lines "work dir cases" "$rc" "$tmp/out"
+
+  rc=0
+  "$node" "$src/tools/tests/code-check-cases.mjs" "$tmp/code-check" > "$tmp/out" 2>&1 || rc=$?
+  count_lines "code check cases" "$rc" "$tmp/out"
 fi
 
 if [ -z "$node" ]; then

@@ -12,6 +12,7 @@ import {
   toolProblem,
   win,
 } from "./lib.mjs";
+import { codeCheckChecks } from "./code-check.mjs";
 import { contentChecks } from "./content.mjs";
 import { csharpChecks } from "./csharp.mjs";
 import { dotnetChecks } from "./dotnet.mjs";
@@ -94,6 +95,8 @@ else {
   report("YAML (yamllint)", r.code === 0 ? [] : [r.out]);
 }
 
-contentChecks(root, csharpChecks(root, dotnetChecks(root)));
+const built = csharpChecks(root, dotnetChecks(root));
+contentChecks(root, built);
+codeCheckChecks(root, built);
 
 setExitCode();

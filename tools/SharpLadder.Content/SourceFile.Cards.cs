@@ -137,7 +137,7 @@ internal sealed partial class SourceFile
         var (id, title, line) = _card!.Value;
         _card = null;
         var section = _current!.Id;
-        var fields = Fields(list, CardLabels, () => string.Create(CultureInfo.InvariantCulture, $"{section}/b{++_cardBlocks}"));
+        var fields = Fields(list, CardLabels, () => string.Create(CultureInfo.InvariantCulture, $"{section}/b{++_cardBlocks}"), ContainerKind.Card);
         if (fields is null)
         {
             return;

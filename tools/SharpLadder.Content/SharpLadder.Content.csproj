@@ -16,5 +16,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SharpLadder.Content.Tests" />
+    <InternalsVisibleTo Include="SharpLadder.CodeCheck" />
   </ItemGroup>
 </Project>

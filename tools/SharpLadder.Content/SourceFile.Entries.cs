@@ -257,7 +257,7 @@ internal sealed partial class SourceFile
             {
                 definitions.OfType<LinkReferenceDefinition>().ToList().ForEach(d => Target(d.Url, d.Title, d.Line + 1));
             }
-            else if (Body(block, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), line) is { } node)
+            else if (Body(block, string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), line, ContainerKind.GlossaryEntry) is { } node)
             {
                 body.Add(node);
             }
@@ -275,7 +275,7 @@ internal sealed partial class SourceFile
         }
 
         var number = 0;
-        var fields = Fields(list, ErrorFields, () => string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"));
+        var fields = Fields(list, ErrorFields, () => string.Create(CultureInfo.InvariantCulture, $"{id}/b{++number}"), ContainerKind.ErrorEntry);
         var missing = fields is null ? [] : ErrorFields.Where(f => !fields.ContainsKey(f)).ToList();
         missing.ForEach(f => Error(list.Line + 1, $"an error entry needs the field \"{f}\"; {ErrorBodyRule}"));
         return missing.Count == 0 ? fields : null;

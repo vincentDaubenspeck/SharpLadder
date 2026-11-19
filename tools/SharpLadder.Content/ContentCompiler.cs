@@ -37,13 +37,59 @@ internal static class ContentCompiler
         return Compile(InputTree.ReadContent(root), schema);
     }
 
-    public static CompileResult Compile(InputTree tree, IContentSchema schema)
+    public static CompileResult Compile(InputTree tree, IContentSchema schema) => Run(tree, schema, requireChapters: true).Result;
+
+    public static byte[] Serialize(object model) =>
+        StrictUtf8.GetBytes(JsonSerializer.Serialize(model, model.GetType(), Json) + "\n");
+
+    // How diagnostics name path: relative to displayBase when below it, with / separators.
+    public static string DisplayPath(string displayBase, string path)
+    {
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        var relative = Path.GetRelativePath(Path.GetFullPath(displayBase), full);
+        var shown = Path.IsPathRooted(relative) || relative.StartsWith("..", StringComparison.Ordinal) ? full : relative;
+        return shown.Replace('\\', '/');
+    }
+
+    // The code check reads the blocks of this same compilation, never a second parse, and gets
+    // none when anything failed. A root without chapters is no error here: it has no code to run.
+    public static ExecutionPlan Plan(InputTree tree, IContentSchema schema)
+    {
+        var (result, parsed) = Run(tree, schema, requireChapters: false);
+        if (result.Diagnostics.Count > 0)
+        {
+            return new ExecutionPlan(result.Diagnostics, []);
+        }
+
+        var blocks = parsed
+            .OrderBy(p => p.Relative, StringComparer.Ordinal)
+            .SelectMany(p => p.File.CodeSites
+                .OrderBy(s => s.FenceLine)
+                .Select((s, order) => new ExecutableBlock(
+                    p.Relative,
+                    s.Node.Id,
+                    s.Node.Group,
+                    p.Display,
+                    s.FenceLine,
+                    s.SourceLine,
+                    s.Owner,
+                    s.Node.Source,
+                    s.Node.Check,
+                    s.Node.Throws,
+                    s.Node.Fail,
+                    s.Container,
+                    order)))
+            .ToList();
+        return new ExecutionPlan([], blocks);
+    }
+
+    private static (CompileResult Result, List<Parsed> Parsed) Run(InputTree tree, IContentSchema schema, bool requireChapters)
     {
         var diagnostics = new List<Diagnostic>();
-        var sources = Collect(tree, diagnostics);
+        var sources = Collect(tree, requireChapters, diagnostics);
         if (diagnostics.Count > 0)
         {
-            return new CompileResult(diagnostics, []);
+            return (new CompileResult(diagnostics, []), []);
         }
 
         var parsed = sources
@@ -93,19 +139,7 @@ internal static class ContentCompiler
             Add(files, Registries.PatternsOutput, ordered, RecordKind.Patterns, RegistryDisplay(tree, Registries.PatternsSource), schema, diagnostics);
         }
 
-        return diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files);
-    }
-
-    public static byte[] Serialize(object model) =>
-        StrictUtf8.GetBytes(JsonSerializer.Serialize(model, model.GetType(), Json) + "\n");
-
-    // How diagnostics name path: relative to displayBase when below it, with / separators.
-    public static string DisplayPath(string displayBase, string path)
-    {
-        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-        var relative = Path.GetRelativePath(Path.GetFullPath(displayBase), full);
-        var shown = Path.IsPathRooted(relative) || relative.StartsWith("..", StringComparison.Ordinal) ? full : relative;
-        return shown.Replace('\\', '/');
+        return (diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files), parsed);
     }
 
     private static void Add(List<OutputFile> files, string relative, object model, RecordKind kind, string display, IContentSchema schema, List<Diagnostic> diagnostics, string? part = null)
@@ -151,8 +185,8 @@ internal static class ContentCompiler
         relative.StartsWith("chapters/", StringComparison.Ordinal) && string.Equals(Path.GetFileName(relative), ChapterSource, StringComparison.Ordinal);
 
     // Accepts chapters/<chapter>/<file>.md only, in ordinal path order; any other entry under
-    // chapters/ is an error, and so is finding no file at all.
-    private static List<(string Relative, string Display, byte[] Bytes)> Collect(InputTree tree, List<Diagnostic> diagnostics)
+    // chapters/ is an error, and so is finding no file at all where chapters are required.
+    private static List<(string Relative, string Display, byte[] Bytes)> Collect(InputTree tree, bool requireChapters, List<Diagnostic> diagnostics)
     {
         RootAdmission.Check(tree, diagnostics);
         var sources = new List<(string Relative, string Display, byte[] Bytes)>();
@@ -188,7 +222,7 @@ internal static class ContentCompiler
             }
         }
 
-        if (sources.Count == 0 && diagnostics.Count == 0)
+        if (requireChapters && sources.Count == 0 && diagnostics.Count == 0)
         {
             diagnostics.Add(new Diagnostic(tree.Root.Display, null, "no content files found under chapters/"));
         }
