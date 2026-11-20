@@ -122,6 +122,20 @@ public sealed class EntryTests
     public void GlossaryFrontMatterOutsideItsRulesIsRefused(string yaml, string expected) =>
         Refused(expected, ("glossary/term-a.md", "---\n" + yaml + "---\n\nBody.\n"));
 
+    // A refusal names the line that holds what it refuses: a field's later line, or the see item
+    // itself when the list is written one item to a line.
+    [Theory]
+    [InlineData("errors/err-a.md", ErrorHead + "- cause: One\n  two <b>.\n- hint: Two.\n", "errors/err-a.md:10: raw HTML is not allowed")]
+    [InlineData("glossary/term-a.md", "---\nid: term-a\nterm: A\nshort: S.\nsee:\n  - syn-a\n  - term-a\n---\n", "glossary/term-a.md:7: see names the entry's own id \"term-a\"")]
+    [InlineData("glossary/term-a.md", "---\nid: term-a\nterm: A\nshort: S.\nsee:\n  - syn-a\n  - syn-missing\n---\n", "glossary/term-a.md:7: see names \"syn-missing\", which is no live section, chapter, card, glossary entry or error entry")]
+    public void ALaterLineIsReportedOnItsOwnLine(string path, string text, string expected)
+    {
+        var result = Run((path, text));
+
+        Assert.Equal(expected, Assert.Single(result.Diagnostics).ToString());
+        Assert.Empty(result.Files);
+    }
+
     [Fact]
     public void AShortTextIsAtMostTwoHundredCharacters()
     {

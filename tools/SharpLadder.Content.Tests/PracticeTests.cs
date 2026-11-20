@@ -19,7 +19,7 @@ public sealed partial class PracticeTests
     private const string Suite = "using System;\n\nConsole.WriteLine(\"#check pass one\");\n";
     private const string LinkRefused = "links and reparse points are not accepted at or below a root folder";
 
-    private const string ProblemFront = "---\nid: prob-0001\nchapter: ch-test\nnumber: 1\nlink: https://example.com/fixture-problem-1\ntitle: Vowel words\n"
+    private const string ProblemFront = "---\nid: prob-0001\nchapter: ch-test\nnumber: 1\ntitle: Vowel words\n"
         + "patternTags: [pat-a]\nladders: [ladder-a]\ntests:\n  file: prob-0001.tests.cs\n  version: 1\n  count: 2\n"
         + "reference: prob-0001.reference.cs\nparaphraseCheckedAt: 2026-11-01\n---\n";
 
@@ -31,7 +31,7 @@ public sealed partial class PracticeTests
     private const string Examples = "\n## Examples\n\n```text {spoken=\"One example\"}\n[apple, pear] gives 1\n```\n";
     private const string Constraints = "\n## Constraints\n\nAt most ten words.\n";
 
-    private static readonly string[] ProblemKeys = ["type", "id", "chapter", "number", "link", "title", "patternTags", "ladders", "statement", "examples", "constraints", "starter", "spoken", "tests"];
+    private static readonly string[] ProblemKeys = ["type", "id", "chapter", "number", "title", "patternTags", "ladders", "statement", "examples", "constraints", "starter", "spoken", "tests"];
     private static readonly string[] DrillKeys = ["type", "id", "chapter", "rung", "title", "move", "ideas", "prerequisites", "prepares", "variationOf", "ladders", "statement", "examples", "constraints", "starter", "spoken", "tests"];
     private static readonly string[] SuiteKeys = ["text", "version", "hash", "count", "review"];
     private static readonly string[] StarterKeys = ["id", "spoken", "source"];
@@ -72,10 +72,10 @@ public sealed partial class PracticeTests
         { "  count: 2\n", "  count: 2\n  review:\n    a: { sectionId: sec-a, label: A }\n    b: { sectionId: sec-a, label: B }\n    c: { sectionId: sec-a, label: C }\n", "tests.review has 3 entries; at most tests.count (2) are allowed" },
         { "  file: prob-0001.tests.cs\n", "  file: other.tests.cs\n", "tests.file is \"other.tests.cs\"; it must be \"prob-0001.tests.cs\"" },
         { "reference: prob-0001.reference.cs\n", "reference: prob-0001.cs\n", "reference is \"prob-0001.cs\"; it must be \"prob-0001.reference.cs\"" },
-        { "link: https://example.com/fixture-problem-1\n", "link: http://example.com/x\n", "link \"http://example.com/x\" is not an https:// address" },
+        { "number: 1\n", "number: 1\nlink: https://example.com/fixture-problem-1\n", $"{ProblemPath}:5: front matter: Property 'link' not found" },
         { "paraphraseCheckedAt: 2026-11-01\n", "paraphraseCheckedAt: 2026-13-01\n", "paraphraseCheckedAt is \"2026-13-01\"; write a date as YYYY-MM-DD" },
-        { "title: Vowel words\n", "title: Vowel words\nnotes: kept\n", $"{ProblemPath}:7: front matter: Property 'notes' not found" },
-        { "  count: 2\n", "  count: 2\n  hash: sha256:00\n", $"{ProblemPath}:13: front matter: Property 'hash' not found" },
+        { "title: Vowel words\n", "title: Vowel words\nnotes: kept\n", $"{ProblemPath}:6: front matter: Property 'notes' not found" },
+        { "  count: 2\n", "  count: 2\n  hash: sha256:00\n", $"{ProblemPath}:12: front matter: Property 'hash' not found" },
     };
 
     [Fact]
@@ -157,6 +157,16 @@ public sealed partial class PracticeTests
     public void ABodyOutsideTheFourFieldsIsRefused(string body, string expected) =>
         Refused(expected, (ProblemPath, ProblemFront + body));
 
+    // A list item is spoken on its own, so its refusal names its own line, not the list's.
+    [Fact]
+    public void ALaterListItemThatCannotBeStoredIsRefusedOnItsOwnLine()
+    {
+        var result = Run((ProblemPath, Problem.Replace("- Two items.", "- Two a￾b items.", StringComparison.Ordinal)));
+
+        Assert.Equal($"{ProblemPath}:21: spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)", Assert.Single(result.Diagnostics).ToString());
+        Assert.Empty(result.Files);
+    }
+
     [Fact]
     public void AStarterInAChapterFileIsRefused() =>
         Refused("a starter block stands only under ## Starter in a practice file", ("chapters/c/part.md", "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n## Title {#syn-a}\n\n```csharp {#syn-a1 group=g starter spoken=\"S\"}\nx();\n```\n"));
@@ -182,6 +192,24 @@ public sealed partial class PracticeTests
 
         Assert.Equal(passes, result.Diagnostics.Count == 0);
         Assert.Equal(passes ? string.Empty : $"{DrillPath}:39: line is 87 characters; at most 86 are allowed", string.Join('\n', result.Diagnostics.Select(d => d.ToString())));
+    }
+
+    // The starter's own checks read only the starter, so a refusal elsewhere in the body leaves
+    // its line standing.
+    [Fact]
+    public void AnEmptyStarterIsReportedBesideAnUnrelatedRefusal()
+    {
+        var empty = "\n## Starter\n\n```csharp {#prob-0001-starter starter spoken=\"The starting method\"}\n```\n";
+        var result = Run((ProblemPath, ProblemFront + Statement + "\n[bad]: https://example.com\n" + Examples + Constraints + empty));
+
+        Assert.Equal(
+            [
+                $"{ProblemPath}:23: link target \"https://example.com\" is not an internal target; write [text](#id) or [text](ch-chapter#id)",
+                $"{ProblemPath}:37: the starter holds no code",
+            ],
+            result.Diagnostics.Select(d => d.ToString()),
+            StringComparer.Ordinal);
+        Assert.Empty(result.Files);
     }
 
     // Boundary: every entry under practice/ is an expected name or a refusal.
@@ -227,7 +255,7 @@ public sealed partial class PracticeTests
             segments);
     }
 
-    // The 8.3 vector fixes the slot as the SHA-256 of the texts as a compact JSON array; plain ASCII
+    // The shared vectors fix the slot as the SHA-256 of the texts as a compact JSON array; plain ASCII
     // texts need no escaping, so the same rule recomputes the record's slot from its segments.
     [Fact]
     public void SlotIsTheSpeechContractOverTheSegmentTexts()

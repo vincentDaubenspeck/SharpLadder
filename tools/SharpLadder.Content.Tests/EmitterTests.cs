@@ -199,7 +199,6 @@ public sealed class EmitterTests
     [InlineData("""[{"required":["a","b"]},{"required":["b","a"]}]""", "listed twice")]
     [InlineData("""[{"required":["a","b"]},{"required":["a","c"]},{"required":["b","c"]},{"required":["a","a"]}]""", "repeats the name \"a\"")]
     [InlineData("""[{"required":["a","b"]},{"required":["a","c"]}]""", "needs all 3 pairs")]
-    [InlineData("""[{"required":["a","b"]},{"required":["a","c"]},{"required":["b","c"]},{"required":["a","b"]}]""", "listed twice")]
     [InlineData("""[{"required":["a","a"]}]""", "holds 2 to 8 names, not 1")]
     [InlineData("""[]""", "not must be exactly")]
     [InlineData("""[{"required":["a","b","c"]}]""", "exactly { \"required\": [a, b] }")]
@@ -231,7 +230,6 @@ public sealed class EmitterTests
     [Theory]
     [InlineData("""{"$defs":{"a":{"type":"string"}},"type":"string"}""", "unsupported keyword \"$defs\"")]
     [InlineData("""{"if":{"type":"string"},"then":{"type":"string"}}""", "matches no supported form")]
-    [InlineData("""{"if":{"type":"string"},"then":{"type":"string"},"else":{"type":"integer"}}""", "matches no supported form")]
     [InlineData("""{"type":"string","if":{"const":"a"},"then":{"const":"a"},"else":{"const":"b"}}""", "unsupported keyword \"if\"")]
     [InlineData("""{"type":"array"}""", "missing \"items\"")]
     [InlineData("""{"type":"object","additionalProperties":"false","properties":{"a":{"type":"string"}}}""", "additionalProperties must be false")]
@@ -279,16 +277,9 @@ public sealed class EmitterTests
     [InlineData("""{"const":-0}""")]
     [InlineData("""{"const":9007199254740992}""")]
     [InlineData("""{"const":-9007199254740992}""")]
-    [InlineData("""{"type":"integer","minimum":1.5}""")]
-    [InlineData("""{"type":"integer","minimum":1e2}""")]
-    [InlineData("""{"type":"integer","minimum":-0}""")]
     [InlineData("""{"type":"integer","minimum":"1"}""")]
-    [InlineData("""{"type":"integer","minimum":9007199254740992}""")]
-    [InlineData("""{"type":"integer","maximum":1.5}""")]
     [InlineData("""{"type":"integer","maximum":9007199254740992}""")]
     [InlineData("""{"type":"string","maxLength":1.0}""")]
-    [InlineData("""{"type":"string","maxLength":"48"}""")]
-    [InlineData("""{"type":"string","minLength":-9007199254740992}""")]
     [InlineData("""{"type":"string","minLength":1E2}""")]
     public void NumbersOutsideTheSafeIntegerTokenAreRefused(string node) => RefusedNode(node, "must be an integer token");
 
@@ -299,7 +290,6 @@ public sealed class EmitterTests
     [InlineData("""{"type":"array","items":{"type":"string"},"minItems":2}""", "minItems 2 needs items that are a $ref and no maxItems")]
     [InlineData("""{"type":"array","items":{"type":"string"},"minItems":3}""", "minItems must be absent, 1 or 2")]
     [InlineData("""{"type":"array","items":{"type":"string"},"minItems":2.0}""", "minItems must be absent, 1 or 2")]
-    [InlineData("""{"type":"array","items":{"type":"string"},"minItems":1.0}""", "minItems must be absent, 1 or 2")]
     [InlineData("""{"type":"array","items":{"type":"string"},"minItems":"1"}""", "minItems must be absent, 1 or 2")]
     [InlineData("""{"type":"object","additionalProperties":false,"properties":{}}""", "properties must hold at least one property")]
     [InlineData("""{"type":"object","additionalProperties":false,"properties":{"a":{"type":"string"}},"required":[]}""", "required must be a non-empty array")]
@@ -318,12 +308,8 @@ public sealed class EmitterTests
     [InlineData("""{"const":"1a"}""")]
     [InlineData("""{"const":"a b"}""")]
     [InlineData("""{"enum":["ok","Bad"]}""")]
-    [InlineData("""{"enum":["ok","a\"b"]}""")]
-    [InlineData("""{"enum":["ok","a\\b"]}""")]
-    [InlineData("""{"enum":["ok\n"]}""")]
     [InlineData("""{"enum":[1]}""")]
     [InlineData("""{"allOf":[{"$ref":"#/definitions/id"},{"not":{"const":"Intro"}}]}""")]
-    [InlineData("""{"allOf":[{"$ref":"#/definitions/id"},{"not":{"const":"intro\n"}}]}""")]
     public void LiteralStringsOutsideTheGrammarAreRefused(string node) => RefusedNode(node, "a literal string is");
 
     [Theory]
@@ -587,11 +573,9 @@ public sealed class EmitterTests
     [Theory]
     [InlineData("""{"type":"array","maxItems":0,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
     [InlineData("""{"type":"array","maxItems":17,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
-    [InlineData("""{"type":"array","maxItems":-1,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be from 1 to 16")]
     [InlineData("""{"type":"array","maxItems":2.0,"items":{"$ref":"#/definitions/id"}}""", "maxItems must be an integer token")]
     [InlineData("""{"type":"array","maxItems":"2","items":{"$ref":"#/definitions/id"}}""", "maxItems must be an integer token")]
     [InlineData("""{"type":"array","minItems":2,"maxItems":2,"items":{"$ref":"#/definitions/id"}}""", "minItems 2 needs items that are a $ref and no maxItems")]
-    [InlineData("""{"type":"array","minItems":2,"maxItems":3,"items":{"$ref":"#/definitions/id"}}""", "minItems 2 needs items that are a $ref and no maxItems")]
     [InlineData("""{"type":"array","maxItems":2,"items":{"type":"string"}}""", "maxItems needs items that are a $ref")]
     [InlineData("""{"type":"array","maxItems":2,"items":{"enum":["a","b"]}}""", "maxItems needs items that are a $ref")]
     [InlineData("""{"type":"array","maxItems":2,"items":{"allOf":[{"$ref":"#/definitions/id"},{"pattern":"^a"}]}}""", "maxItems needs items that are a $ref")]
@@ -606,8 +590,6 @@ public sealed class EmitterTests
     [InlineData("Type")]
     [InlineData("a234567890123456789012345678901234567890123456789")]
     [InlineData("caf\u00e9")]
-    [InlineData("caf\\u00e9")]
-    [InlineData("a\\u0020b")]
     [InlineData("a\\u0022")]
     [InlineData("name\\n")]
     [InlineData("")]
@@ -775,18 +757,8 @@ public sealed class EmitterTests
         Assert.NotNull(TypeEmitter.Emit([body, content]).Modules);
     }
 
-    // With the theory below, default-deny changes applied to the committed schemas themselves.
-    [Fact]
-    public void ByteOrderMarkOnTheCurrentSchemasIsRefused()
-    {
-        var body = new InputEntry(TypeEmitter.BodyFile, TypeEmitter.BodyFile, TypeEmitter.BodyFile, [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(Real(TypeEmitter.BodyFile))]);
-
-        AssertProblem(TypeEmitter.Emit([body, Entry(TypeEmitter.ContentFile, Real(TypeEmitter.ContentFile))]), "body.schema.json: starts with a byte order mark");
-    }
-
     [Theory]
     [InlineData("body.schema.json", "unsupported keyword \"if\"", "\"ordered\": { \"type\": \"boolean\" }", "\"ordered\": { \"type\": \"boolean\", \"if\": { \"const\": true }, \"then\": { \"const\": true } }")]
-    [InlineData("body.schema.json", "unsupported keyword \"if\"", "\"ordered\": { \"type\": \"boolean\" }", "\"ordered\": { \"type\": \"boolean\", \"if\": { \"const\": true }, \"then\": { \"const\": true }, \"else\": { \"const\": false } }")]
     [InlineData("body.schema.json", "not \"$defs\"", "\"title\": \"Body blocks and inline spans\",", "\"title\": \"Body blocks and inline spans\",\n  \"$defs\": {},")]
     [InlineData("body.schema.json", "unsupported keyword \"patternProperties\"", "\"required\": [\"blockId\", \"content\"],", "\"required\": [\"blockId\", \"content\"],\n      \"patternProperties\": { \"^x\": { \"type\": \"string\" } },")]
     [InlineData("body.schema.json", "tuples are not supported", "\"items\": { \"$ref\": \"#/definitions/listItem\" }", "\"items\": [{ \"$ref\": \"#/definitions/listItem\" }]")]

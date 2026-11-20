@@ -545,16 +545,12 @@
     "problemFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "id", "chapter", "number", "link", "title", "patternTags", "ladders", "statement", "examples", "constraints", "starter", "spoken", "tests"],
+      "required": ["type", "id", "chapter", "number", "title", "patternTags", "ladders", "statement", "examples", "constraints", "starter", "spoken", "tests"],
       "properties": {
         "type": { "const": "problem" },
         "id": { "$ref": "#/definitions/problemId" },
         "chapter": { "$ref": "#/definitions/chapterId" },
         "number": { "type": "integer", "minimum": 1 },
-        "link": {
-          "type": "string",
-          "pattern": "^https://\\S+(?![\\s\\S])"
-        },
         "title": { "$ref": "#/definitions/shownText" },
         "patternTags": {
           "type": "array",

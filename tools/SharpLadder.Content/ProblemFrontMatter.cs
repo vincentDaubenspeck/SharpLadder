@@ -9,8 +9,6 @@ public sealed class ProblemFrontMatter
 
     public int? Number { get; set; }
 
-    public string? Link { get; set; }
-
     public string? Title { get; set; }
 
     public IList<string?>? PatternTags { get; set; }

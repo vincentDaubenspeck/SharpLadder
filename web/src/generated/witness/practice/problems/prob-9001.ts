@@ -7,7 +7,6 @@ export const witness = {
   id: "prob-9001",
   chapter: "ch-fixture",
   number: 9001,
-  link: "https://example.com/fixture-problem-9001",
   title: "Matching ends",
   patternTags: ["pat-fixture-two-pass"],
   ladders: ["ladder-lone-word", "ladder-lone-word-alt"],

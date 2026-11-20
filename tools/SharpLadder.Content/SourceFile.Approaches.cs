@@ -16,6 +16,12 @@ internal sealed partial class SourceFile
     private int _approachSegments;
     private bool _approachFailed;
 
+    // A refused block or spoken segment may be the one the open approach lacks.
+    private bool _approachRefused;
+
+    // A refused approach heading may be the second approach of the open section.
+    private bool _approachHeadingRefused;
+
     // True when the heading opened an approach, or tried to: a section heading is never read as one.
     private bool ApproachHeading(HeadingBlock heading, bool inSection)
     {
@@ -38,12 +44,14 @@ internal sealed partial class SourceFile
         var title = label is null ? null : Title(heading, line);
         if (label is null || title is null)
         {
+            _approachHeadingRefused = true;
             return true;
         }
 
         if (string.IsNullOrWhiteSpace(SpokenText.Flatten(title)))
         {
             Error(line, "an approach title holds text");
+            _approachHeadingRefused = true;
             return true;
         }
 
@@ -53,6 +61,7 @@ internal sealed partial class SourceFile
         _approaches.Add(new Approach { Id = id!, Title = title, Label = label, Body = _approachBody });
         (_approachId, _approachLine, _approachSegments, _approachFailed) = (id!, line, _segments.Count, false);
         _spokenPrefix = $"Approach: {label}. ";
+        _spokenPrefixLine = line;
         return true;
     }
 
@@ -82,27 +91,30 @@ internal sealed partial class SourceFile
         return label;
     }
 
+    // An absence line waits for the next run while a refusal in the approach may be what it lacks.
     private void EndApproach()
     {
-        if (_approachBody is { Count: 0 })
+        if (_approachBody is { Count: 0 } && !_approachRefused)
         {
             Error(_approachLine, $"approach \"{_approachId}\" has no blocks");
         }
-        else if (_approachBody is not null && _current is { Summary: null } && _segments.Count == _approachSegments)
+        else if (_approachBody is not null && !_approachRefused && _current is { Summary: null } && _segments.Count == _approachSegments)
         {
             Error(_approachLine, $"approach \"{_approachId}\" has nothing spoken");
         }
 
         _approachBody = null;
         _approachFailed = false;
+        _approachRefused = false;
         _spokenPrefix = null;
     }
 
-    // Closes the open section: one approach alone is no alternative, so it is refused.
+    // Closes the open section: one approach alone is no alternative, so it is refused, unless a
+    // refused approach heading may be the second.
     private void CloseApproaches()
     {
         EndApproach();
-        if (_current is not null && _approaches.Count == 1)
+        if (_current is not null && _approaches.Count == 1 && !_approachHeadingRefused)
         {
             Error(_approachLine, $"approach \"{_approachId}\" stands alone; a section with approaches holds at least two");
         }
@@ -112,6 +124,7 @@ internal sealed partial class SourceFile
         }
 
         _approaches = [];
+        _approachHeadingRefused = false;
         Speak();
     }
 

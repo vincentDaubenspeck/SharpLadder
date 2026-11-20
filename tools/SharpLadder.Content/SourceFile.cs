@@ -32,14 +32,25 @@ internal sealed partial class SourceFile
         .WithDuplicateKeyChecking()
         .Build();
 
+    // Markdown parsed from the file itself counts its lines from 0 at the file's first line.
+    private static readonly LineOrigin InFile = new(1, Fixed: false);
+
     private readonly List<Diagnostic> _diagnostics;
     private readonly string _path;
+
+    // Compiler-only provenance: the source line each span's text came from, by offset in the
+    // span, and the line of each construct that is spoken on its own. Nothing here is emitted.
+    private readonly Dictionary<Span, List<(int Offset, int Line)>> _spanLines = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<object, int> _constructLines = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<TableNode, int[]> _rowLines = new(ReferenceEqualityComparer.Instance);
+
     private string[] _lines = [];
     private int[] _lineStarts = [];
     private Section? _current;
     private List<Segment> _segments = [];
     private int _headingLine;
     private string? _spokenPrefix;
+    private int _spokenPrefixLine;
 
     private SourceFile(string path, List<Diagnostic> diagnostics)
     {
@@ -89,16 +100,28 @@ internal sealed partial class SourceFile
             _ => false,
         });
 
-    private static void AddText(List<Span> spans, string text)
+    // The first span in source order, containers before their content, that matches.
+    private static Span? FirstSpan(IEnumerable<Span> spans, Func<Span, bool> match)
     {
-        if (spans.Count > 0 && spans[^1] is TextSpan last)
+        foreach (var span in spans)
         {
-            spans[^1] = new TextSpan { Text = last.Text + text };
+            var found = match(span)
+                ? span
+                : span switch
+                {
+                    EmphasisSpan emphasis => FirstSpan(emphasis.Content, match),
+                    StrongSpan strong => FirstSpan(strong.Content, match),
+                    LinkSpan link => FirstSpan(link.Content, match),
+                    TermSpan term => FirstSpan(term.Content, match),
+                    _ => null,
+                };
+            if (found is not null)
+            {
+                return found;
+            }
         }
-        else
-        {
-            spans.Add(new TextSpan { Text = text });
-        }
+
+        return null;
     }
 
     private static string Shown(string text) =>
@@ -443,16 +466,24 @@ internal sealed partial class SourceFile
 
             var prefix = inSection ? _current!.Id : ContentIds.IntroPrefix;
             var container = !inSection ? ContainerKind.Intro : _approachBody is null ? ContainerKind.Section : ContainerKind.Approach;
-            var node = Body(block, string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{++number}"), line, container);
-            if (node is not null)
-            {
-                body.Add(node);
-                Segments(node, line);
-            }
+            BodyBlockOf(body, block, string.Create(CultureInfo.InvariantCulture, $"{prefix}/b{++number}"), line, container);
         }
 
         CloseApproaches();
         return _diagnostics.Count == before;
+    }
+
+    private void BodyBlockOf(List<BodyBlock> body, Block block, string blockId, int line, ContainerKind container)
+    {
+        var reported = _diagnostics.Count;
+        var node = Body(block, blockId, line, container);
+        if (node is not null)
+        {
+            body.Add(node);
+            Segments(node, line);
+        }
+
+        _approachRefused |= _approachBody is not null && _diagnostics.Count > reported;
     }
 
     private void Open(Section? section, int line, List<Section> sections)
@@ -480,12 +511,12 @@ internal sealed partial class SourceFile
         switch (node)
         {
             case ParagraphNode paragraph:
-                Segment(new BlockTarget { BlockId = paragraph.BlockId }, SpokenText.Flatten(paragraph.Content), line);
+                Spans(new BlockTarget { BlockId = paragraph.BlockId }, paragraph.Content, line);
                 break;
             case ListNode list:
                 foreach (var item in list.Items)
                 {
-                    Segment(new BlockTarget { BlockId = item.BlockId }, SpokenText.Flatten(item.Content), line);
+                    Spans(new BlockTarget { BlockId = item.BlockId }, item.Content, _constructLines.GetValueOrDefault(item, line));
                 }
 
                 break;
@@ -496,16 +527,16 @@ internal sealed partial class SourceFile
                 Segment(new BlockTarget { BlockId = text.BlockId }, text.Spoken, line);
                 break;
             case TableNode table:
-                Segment(new BlockTarget { BlockId = table.BlockId }, SpokenText.Table(table), line);
+                Segment(new BlockTarget { BlockId = table.BlockId }, SpokenText.Table(table), line, _ => TableLine(table, line));
                 break;
             case WalkItNode walk:
-                Segment(new BlockTarget { BlockId = walk.BlockId }, SpokenText.Flatten(walk.Title), line);
+                Spans(new BlockTarget { BlockId = walk.BlockId }, walk.Title, _constructLines.GetValueOrDefault(walk.Title, line));
                 foreach (var sequence in walk.Sequences)
                 {
-                    Segment(new BlockTarget { BlockId = sequence.IntroBlockId }, SpokenText.Flatten(sequence.Intro), line);
+                    Spans(new BlockTarget { BlockId = sequence.IntroBlockId }, sequence.Intro, _constructLines.GetValueOrDefault(sequence.Intro, line));
                     foreach (var step in sequence.Steps)
                     {
-                        Segment(new BlockTarget { BlockId = step.BlockId }, SpokenText.Flatten(step.Note), line);
+                        Spans(new BlockTarget { BlockId = step.BlockId }, step.Note, _constructLines.GetValueOrDefault(step.Note, line));
                     }
                 }
 
@@ -518,7 +549,11 @@ internal sealed partial class SourceFile
         }
     }
 
-    private void Segment(SegmentTarget target, string raw, int line)
+    private void Spans(SegmentTarget target, IReadOnlyList<Span> spans, int line) =>
+        Segment(target, SpokenText.Flatten(spans), line, index => LineAt(spans, index, line));
+
+    // line is the construct's own; lineAt names the source of a refused character in raw.
+    private void Segment(SegmentTarget target, string raw, int line, Func<int, int>? lineAt = null)
     {
         string text;
         try
@@ -527,7 +562,8 @@ internal sealed partial class SourceFile
         }
         catch (ArgumentException)
         {
-            Error(line, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
+            var index = AudioSlot.FirstNotStorable(raw);
+            Error(index >= 0 && lineAt is not null ? lineAt(index) : line, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
             return;
         }
 
@@ -543,7 +579,7 @@ internal sealed partial class SourceFile
             _spokenPrefix = null;
             if (!AudioSlot.IsStorable(prefix))
             {
-                Error(line, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
+                Error(_spokenPrefixLine, "spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)");
                 return;
             }
 
@@ -639,12 +675,12 @@ internal sealed partial class SourceFile
         switch (block)
         {
             case ParagraphBlock paragraph:
-                if (!NoAttributes(paragraph, line) || !NoReservedPipe(paragraph, line))
+                if (!NoAttributes(paragraph, line) || !NoReservedPipe(paragraph))
                 {
                     return null;
                 }
 
-                var content = Inlines(paragraph.Inline, line);
+                var content = Inlines(paragraph.Inline, InFile);
                 return content is null ? null : new ParagraphNode { BlockId = blockId, Content = content };
             case ListBlock list:
                 return List(list, blockId, line);
@@ -703,15 +739,17 @@ internal sealed partial class SourceFile
                 continue;
             }
 
-            var plain = NoAttributes(item, itemLine) && NoAttributes(paragraph, itemLine) && NoReservedPipe(paragraph, paragraph.Line + 1);
-            var content = plain ? Inlines(paragraph.Inline, itemLine) : null;
+            var plain = NoAttributes(item, itemLine) && NoAttributes(paragraph, paragraph.Line + 1) && NoReservedPipe(paragraph);
+            var content = plain ? Inlines(paragraph.Inline, InFile) : null;
             if (content is null)
             {
                 ok = false;
                 continue;
             }
 
-            items.Add(new ListItemNode { BlockId = string.Create(CultureInfo.InvariantCulture, $"{blockId}.i{items.Count + 1}"), Content = content });
+            var listItem = new ListItemNode { BlockId = string.Create(CultureInfo.InvariantCulture, $"{blockId}.i{items.Count + 1}"), Content = content };
+            _constructLines[listItem] = itemLine;
+            items.Add(listItem);
         }
 
         if (!ok)
@@ -731,7 +769,7 @@ internal sealed partial class SourceFile
     // A heading is a landmark read before its definitions, so a title never opens one.
     private List<Span>? Title(HeadingBlock heading, int line)
     {
-        var title = Inlines(heading.Inline, line);
+        var title = Inlines(heading.Inline, InFile);
         if (title is not null && HoldsTerm(title))
         {
             Error(line, "a heading title may not hold a Term; link the term in the text below it");
@@ -741,12 +779,102 @@ internal sealed partial class SourceFile
         return title;
     }
 
-    private List<Span>? Inlines(ContainerInline? container, int line)
+    private void AddText(List<Span> spans, string text, int line)
+    {
+        if (spans.Count > 0 && spans[^1] is TextSpan last)
+        {
+            var merged = new TextSpan { Text = last.Text + text };
+            var parts = _spanLines.Remove(last, out var earlier) ? earlier : [(0, line)];
+            parts.Add((last.Text.Length, line));
+            _spanLines[merged] = parts;
+            spans[^1] = merged;
+        }
+        else
+        {
+            spans.Add(Located(new TextSpan { Text = text }, line));
+        }
+    }
+
+    // Records the line of a block spoken on its own, apart from its container's line.
+    private BodyBlock Placed(BodyBlock node, int line)
+    {
+        _constructLines[node] = line;
+        return node;
+    }
+
+    private T Located<T>(T span, int line)
+        where T : Span
+    {
+        _spanLines[span] = [(0, line)];
+        return span;
+    }
+
+    // The line a span starts on; a span built after parsing has none and takes the fallback.
+    private int SpanLine(Span span, int fallback) => _spanLines.TryGetValue(span, out var parts) ? parts[0].Line : fallback;
+
+    // The source line of the character at index in SpokenText.Flatten(spans), whose order and
+    // concatenation this follows.
+    private int LineAt(IReadOnlyList<Span> spans, int index, int fallback)
+    {
+        var start = 0;
+        foreach (var (text, line) in Runs(spans, fallback))
+        {
+            if (index < start + text.Length)
+            {
+                return line;
+            }
+
+            start += text.Length;
+        }
+
+        return fallback;
+    }
+
+    private IEnumerable<(string Text, int Line)> Runs(IReadOnlyList<Span> spans, int fallback)
+    {
+        foreach (var span in spans)
+        {
+            var line = SpanLine(span, fallback);
+            IEnumerable<(string Text, int Line)> runs = span switch
+            {
+                TextSpan text => TextRuns(text, line),
+                CodeSpan code => [(code.Text, line)],
+                EmphasisSpan emphasis => Runs(emphasis.Content, line),
+                StrongSpan strong => Runs(strong.Content, line),
+                LinkSpan link => Runs(link.Content, line),
+                TermSpan term => Runs(term.Content, line),
+                _ => [],
+            };
+            foreach (var run in runs)
+            {
+                yield return run;
+            }
+        }
+    }
+
+    private IEnumerable<(string Text, int Line)> TextRuns(TextSpan span, int line)
+    {
+        if (!_spanLines.TryGetValue(span, out var parts))
+        {
+            yield return (span.Text, line);
+            yield break;
+        }
+
+        for (var i = 0; i < parts.Count; i++)
+        {
+            var end = i + 1 < parts.Count ? parts[i + 1].Offset : span.Text.Length;
+            yield return (span.Text[parts[i].Offset..end], parts[i].Line);
+        }
+    }
+
+    // Each node is reported on its own mapped line; children map through the same origin.
+    private List<Span>? Inlines(ContainerInline? container, LineOrigin origin)
     {
         var spans = new List<Span>();
         var ok = true;
         foreach (var inline in container ?? Enumerable.Empty<Inline>())
         {
+            var line = origin.Of(inline.Line);
             if (!NoAttributes(inline, line))
             {
                 ok = false;
@@ -756,31 +884,31 @@ internal sealed partial class SourceFile
             switch (inline)
             {
                 case LiteralInline literal:
-                    AddText(spans, literal.Content.ToString());
+                    AddText(spans, literal.Content.ToString(), line);
                     break;
                 case HtmlEntityInline entity:
-                    AddText(spans, entity.Transcoded.ToString());
+                    AddText(spans, entity.Transcoded.ToString(), line);
                     break;
                 case LineBreakInline { IsHard: false }:
-                    AddText(spans, " ");
+                    AddText(spans, " ", line);
                     break;
                 case CodeInline code:
-                    spans.Add(new CodeSpan { Text = code.Content });
+                    spans.Add(Located(new CodeSpan { Text = code.Content }, line));
                     break;
                 case EmphasisInline { DelimiterCount: 1 or 2 } emphasis when emphasis.DelimiterChar is '*' or '_':
-                    var inner = Inlines(emphasis, line);
+                    var inner = Inlines(emphasis, origin);
                     if (inner is null)
                     {
                         ok = false;
                     }
                     else
                     {
-                        spans.Add(emphasis.DelimiterCount == 1 ? new EmphasisSpan { Content = inner } : new StrongSpan { Content = inner });
+                        spans.Add(Located<Span>(emphasis.DelimiterCount == 1 ? new EmphasisSpan { Content = inner } : new StrongSpan { Content = inner }, line));
                     }
 
                     break;
                 case LinkInline { IsImage: false } link:
-                    ok = Link(spans, link, line) && ok;
+                    ok = Link(spans, link, origin) && ok;
                     break;
                 case HtmlInline:
                     Error(line, "raw HTML is not allowed");
@@ -796,8 +924,9 @@ internal sealed partial class SourceFile
         return ok ? spans : null;
     }
 
-    private bool Link(List<Span> spans, LinkInline link, int line)
+    private bool Link(List<Span> spans, LinkInline link, LineOrigin origin)
     {
+        var line = origin.Of(link.Line);
         if (NestedLink(_path, line, link) is { } nested)
         {
             _diagnostics.Add(nested);
@@ -811,7 +940,7 @@ internal sealed partial class SourceFile
             return false;
         }
 
-        var content = Inlines(link, line);
+        var content = Inlines(link, origin);
         if (target is null || content is null)
         {
             return false;
@@ -828,13 +957,13 @@ internal sealed partial class SourceFile
 
             var term = new TermSpan { Id = target.Id, Content = content };
             Links.Add(target with { Term = term });
-            spans.Add(term);
+            spans.Add(Located(term, line));
             return true;
         }
 
         var span = new LinkSpan { Id = target.Id, Chapter = target.Chapter, Content = content };
         Links.Add(target with { Span = span });
-        spans.Add(span);
+        spans.Add(Located(span, line));
         return true;
     }
 
@@ -886,4 +1015,11 @@ internal sealed partial class SourceFile
     }
 
     private void Error(int line, string message) => _diagnostics.Add(new Diagnostic(_path, line, message));
+
+    // Maps a line of parsed text, counted from 0, to the source line a diagnostic names. A fixed
+    // origin names its one line for every node of text with no proven line-for-line map.
+    private readonly record struct LineOrigin(int Base, bool Fixed)
+    {
+        public int Of(int parsed) => Fixed ? Base : Base + parsed;
+    }
 }

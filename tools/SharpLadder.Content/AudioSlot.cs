@@ -29,6 +29,30 @@ internal static class AudioSlot
         return text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Normalize(NormalizationForm.FormC);
     }
 
+    // The index of the first lone surrogate or noncharacter Normalise refuses, or -1; a valid
+    // surrogate pair is read as its one character.
+    public static int FirstNotStorable(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            var paired = char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]);
+            if (char.IsSurrogate(text[i]) && !paired)
+            {
+                return i;
+            }
+
+            var point = paired ? char.ConvertToUtf32(text[i], text[i + 1]) : text[i];
+            if ((point & 0xFFFE) == 0xFFFE || point is >= 0xFDD0 and <= 0xFDEF)
+            {
+                return i;
+            }
+
+            i += paired ? 1 : 0;
+        }
+
+        return -1;
+    }
+
     // Whether text is well formed and holds no noncharacter, whatever its line endings and form.
     public static bool IsStorable(string text)
     {

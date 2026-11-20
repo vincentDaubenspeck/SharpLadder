@@ -14,7 +14,7 @@ internal sealed partial class SourceFile
     private const string HeadingRule = "a practice file holds the headings ## Statement, ## Examples, ## Constraints and ## Starter, in that order, and no others";
     private static readonly string[] PracticeFields = ["Statement", "Examples", "Constraints", "Starter"];
     private static readonly string[] PracticeFieldIds = ["statement", "examples", "constraints"];
-    private static readonly string[] ProblemKeys = ["id", "chapter", "number", "link", "title", "patternTags", "ladders", "tests", "reference", "paraphraseCheckedAt"];
+    private static readonly string[] ProblemKeys = ["id", "chapter", "number", "title", "patternTags", "ladders", "tests", "reference", "paraphraseCheckedAt"];
     private static readonly string[] DrillKeys = ["id", "chapter", "rung", "title", "type", "ideas", "prerequisites", "prepares", "variationOf", "ladders", "tests", "reference"];
 
     // Set only when the file compiled to its record.
@@ -65,7 +65,6 @@ internal sealed partial class SourceFile
         var chapter = IdValue(meta.Chapter, "chapter", lines["chapter"]);
         ChapterId = chapter;
         var number = Whole(meta.Number, "number", lines["number"], 1, null);
-        var link = Link(meta.Link, lines["link"]);
         var title = Plain(meta.Title, "title", lines["title"], null);
         var tags = IdList(meta.PatternTags, "patternTags", lines["patternTags"], atLeastOne: true);
         var ladders = IdList(meta.Ladders, "ladders", lines["ladders"], atLeastOne: true);
@@ -73,7 +72,7 @@ internal sealed partial class SourceFile
         SourceName(meta.Reference, "reference", id, ".reference.cs", lines["reference"]);
         CheckedAt(meta.ParaphraseCheckedAt, lines["paraphraseCheckedAt"]);
         var body = id is null ? null : PracticeBody(blocks, id);
-        if (_diagnostics.Count == before && id is not null && chapter is not null && number is int n && link is not null && title is not null
+        if (_diagnostics.Count == before && id is not null && chapter is not null && number is int n && title is not null
             && tags is not null && ladders is not null && tests is not null && body is not null)
         {
             Model = new ProblemFile
@@ -81,7 +80,6 @@ internal sealed partial class SourceFile
                 Id = id,
                 Chapter = chapter,
                 Number = n,
-                Link = link,
                 Title = title,
                 PatternTags = tags,
                 Ladders = ladders,
@@ -250,24 +248,6 @@ internal sealed partial class SourceFile
         return number;
     }
 
-    private string? Link(string? value, int line)
-    {
-        const string Scheme = "https://";
-        if (value is null)
-        {
-            Error(line, "front matter states no link");
-            return null;
-        }
-
-        if (!value.StartsWith(Scheme, StringComparison.Ordinal) || value.Length == Scheme.Length || value.Any(char.IsWhiteSpace) || !Storable(value))
-        {
-            Error(line, $"link \"{Shown(value)}\" is not an https:// address without spaces");
-            return null;
-        }
-
-        return value;
-    }
-
     // The schema's rampRung, checked here so the refusal names the rungs.
     private string? PracticeRung(string? value, int line)
     {
@@ -404,23 +384,29 @@ internal sealed partial class SourceFile
         _segments = [];
         var next = ReadPracticeFields(blocks, id, fields, numbers, headingLines, starters);
         PracticeFieldRules(id, next, numbers, headingLines, starters);
-        if (_diagnostics.Count > before || starters is not [(PracticeStarter starter, var starterLine, var firstCodeLine)])
+
+        // The starter's own checks read only the one accepted starter, so a refusal elsewhere in
+        // the body does not hide them.
+        if (starters is [(PracticeStarter only, var onlyLine, var firstCodeLine)])
+        {
+            if (only.Source.Length == 0)
+            {
+                Error(onlyLine, "the starter holds no code");
+            }
+
+            foreach (var (at, length) in PracticePayload.LongLines(only.Source))
+            {
+                Error(firstCodeLine + at - 1, LongLine(length));
+            }
+        }
+
+        if (_diagnostics.Count > before || starters is not [(PracticeStarter starter, var starterLine, _)])
         {
             return null;
         }
 
-        if (starter.Source.Length == 0)
-        {
-            Error(starterLine, "the starter holds no code");
-        }
-
-        foreach (var (at, length) in PracticePayload.LongLines(starter.Source))
-        {
-            Error(firstCodeLine + at - 1, LongLine(length));
-        }
-
         var spoken = new SectionSpeech { Segments = _segments, Audio = AudioSlot.Of([.. _segments.Select(s => s.Text)]) };
-        return _diagnostics.Count > before ? null : new PracticeBodyParts(fields[0], fields[1], fields[2], starter, starterLine, spoken);
+        return new PracticeBodyParts(fields[0], fields[1], fields[2], starter, starterLine, spoken);
     }
 
     // Returns how many of the four headings were found in order.
@@ -578,12 +564,12 @@ internal sealed partial class SourceFile
         switch (node)
         {
             case ParagraphNode paragraph:
-                Segment(new BlockTarget { BlockId = paragraph.BlockId }, SpokenText.Flatten(paragraph.Content), line);
+                Spans(new BlockTarget { BlockId = paragraph.BlockId }, paragraph.Content, line);
                 break;
             case ListNode list:
                 foreach (var item in list.Items)
                 {
-                    Segment(new BlockTarget { BlockId = item.BlockId }, SpokenText.Flatten(item.Content), line);
+                    Spans(new BlockTarget { BlockId = item.BlockId }, item.Content, _constructLines.GetValueOrDefault(item, line));
                 }
 
                 break;

@@ -17,7 +17,7 @@ internal static class ProblemsIndex
     // No problems, no file: the index mode then prints nothing.
     public static byte[] Write(IEnumerable<ProblemFile> problems)
     {
-        var rows = problems.OrderBy(p => p.Number).Select(p => new Row(p.Id, p.Number, p.Link, p.Title, p.Chapter, p.Ladders)).ToList();
+        var rows = problems.OrderBy(p => p.Number).Select(p => new Row(p.Id, p.Number, p.Title, p.Chapter, p.Ladders)).ToList();
         if (rows.Count == 0)
         {
             return [];
@@ -62,8 +62,7 @@ internal static class ProblemsIndex
     private sealed record Row(
         [property: YamlMember(Order = 0)] string Id,
         [property: YamlMember(Order = 1)] int Number,
-        [property: YamlMember(Order = 2)] string Link,
-        [property: YamlMember(Order = 3)] string Title,
-        [property: YamlMember(Order = 4)] string Chapter,
-        [property: YamlMember(Order = 5)] IReadOnlyList<string> Ladders);
+        [property: YamlMember(Order = 2)] string Title,
+        [property: YamlMember(Order = 3)] string Chapter,
+        [property: YamlMember(Order = 4)] IReadOnlyList<string> Ladders);
 }

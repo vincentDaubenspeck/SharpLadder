@@ -355,27 +355,42 @@ public sealed class WalkItSpeechTests
     // The same block in the chapter intro, where nothing is spoken, compiles, so each refusal is
     // speech's own and not an earlier YAML or Markdown one.
     [Theory]
-    [InlineData("title", "\"&#32;\"", EmptyText)]
-    [InlineData("note", "\"&#32;\"", EmptyText)]
-    [InlineData("intro", "\"\\uFDD0\"", CannotStore)]
-    public void UnspeakableWalkTextIsRefusedAtTheBlockLine(string field, string value, string problem)
+    [InlineData("title", "\"&#32;\"", EmptyText, "10")]
+    [InlineData("note", "\"&#32;\"", EmptyText, "16")]
+    [InlineData("intro", "\"\\uFDD0\"", CannotStore, "14")]
+    public void UnspeakableWalkTextIsRefusedAtTheFieldLine(string field, string value, string problem, string line)
     {
         var walk = Fence("walk-bad", Mini(Pick("title", "Plan"), Pick("intro", "Intro."), Pick("note", "Note.")));
 
         Assert.Equal(string.Empty, Shown(Compile((ChapterPath, Chapter + "\n" + walk))));
         var result = Compile((PartPath, SyntaxHead + "## Title {#syn-a}\n\n" + walk));
-        Assert.Equal(PartPath + ":9: " + problem, Shown(result));
+        Assert.Equal(PartPath + ":" + line + ": " + problem, Shown(result));
         Assert.Empty(result.Files);
 
         string Pick(string name, string otherwise) => string.Equals(name, field, StringComparison.Ordinal) ? value : otherwise;
     }
 
     [Fact]
-    public void UnspeakableWalkTextInACardIsRefusedAtTheCardLine()
+    public void UnspeakableWalkTextInACardIsRefusedAtTheFieldLine()
     {
         var result = Compile((PartPath, CardsHead + "### One {#card-one}\n\n- reach: R.\n- build: B.\n- why:\n\n" + Fence("walk-bad", Mini("\"&#32;\"", "Intro.", "Note."), "  ")));
 
-        Assert.Equal(PartPath + ":9: " + EmptyText, Shown(result));
+        Assert.Equal(PartPath + ":16: " + EmptyText, Shown(result));
+        Assert.Empty(result.Files);
+    }
+
+    // A literal note keeps its lines as written, its leading blank line included, so a refusal
+    // names the line that holds the refused text, not the line of note: |.
+    [Theory]
+    [InlineData("then a￾b", CannotStore)]
+    [InlineData("| then", "a line that starts with | is read as a table and this one is not a table; write a table as one header row, one row of dashes and one or more data rows, each line starting and ending with |, with a blank line or a heading above it and a blank line or the end of the file below it, or start the line with \\| to show a pipe")]
+    public void LiteralNoteIsRefusedOnTheLineThatHoldsTheText(string text, string problem)
+    {
+        var walk = Fence("walk-bad", "title: Plan\ncells: [1, 2]\nsequences:\n  - name: only\n    intro: Intro.\n    steps:\n      - dst: 0\n        src: 1\n        note: |\n\n          fine\n          " + text + "\n");
+
+        var result = Compile((PartPath, SyntaxHead + "## Title {#syn-a}\n\n" + walk));
+
+        Assert.Equal(PartPath + ":21: " + problem, Shown(result));
         Assert.Empty(result.Files);
     }
 

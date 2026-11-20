@@ -8,6 +8,8 @@ public sealed class LinkTests
 {
     private const string Chapter = "---\nid: ch-test\nslug: test\ntitle: Test\norder: 1\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string PartHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n";
+    private const string OtherPath = "chapters/d/chapter.md";
+    private const string Other = "---\nid: ch-other\nslug: other\ntitle: Other\norder: 2\ntargets: { csharp: 14, dotnet: 10 }\n---\n\nIntro text.\n";
     private const string NotInternal = "is not an internal target; write [text](#id) or [text](ch-chapter#id)";
 
     // The section opens at line 7 of a part, so its first body block sits at line 9.
@@ -88,8 +90,12 @@ public sealed class LinkTests
     }
 
     [Fact]
-    public void FortyEightCharacterIdIsAdmittedByForm() =>
-        Assert.Empty(Compile(Part(Section + $"See [this](ch-other#{new string('a', 48)}).\n")).Diagnostics);
+    public void FortyEightCharacterIdIsAdmittedByForm()
+    {
+        var id = new string('a', 48);
+
+        Assert.Empty(Compile([.. Part(Section + $"See [this](ch-other#{id}).\n"), (OtherPath, Other + $"\n## Far {{#{id}}}\n\nText.\n")]).Diagnostics);
+    }
 
     [Fact]
     public void IntroTargetIsRefused() =>
@@ -160,15 +166,86 @@ public sealed class LinkTests
         Assert.Null(link["chapter"]);
     }
 
+    // The anchor stands in the linking file, so only a lookup scoped to the named chapter
+    // refuses it.
     [Fact]
-    public void OtherChapterTargetIsCheckedOnlyByForm()
+    public void OtherChapterTargetWithoutTheAnchorIsRefused()
     {
-        var result = Compile(Part(Section + "See [this](ch-elsewhere#not-yet-checked).\n"));
+        var result = Compile([.. Part(Section + "See [this](ch-other#syn-good).\n"), (OtherPath, Other)]);
+
+        Assert.Equal("chapters/c/part.md:9: link target \"ch-other#syn-good\" names no section or block id in chapter \"ch-other\"", Assert.Single(Lines(result)));
+        Assert.Empty(result.Files);
+    }
+
+    [Fact]
+    public void TargetInAChapterThatDoesNotExistIsRefused()
+    {
+        var result = Compile(Part(Section + "See [this](ch-elsewhere#syn-good).\n"));
+
+        Assert.Equal("chapters/c/part.md:9: link target \"ch-elsewhere#syn-good\" names no chapter", Assert.Single(Lines(result)));
+        Assert.Empty(result.Files);
+    }
+
+    // Each inline is reported on its own line, inside emphasis and a link label too, and never
+    // on the first line of the paragraph or list item that holds it.
+    [Theory]
+    [InlineData("See\n[this](ch-elsewhere#syn-good).\n", "chapters/c/part.md:10: link target \"ch-elsewhere#syn-good\" names no chapter")]
+    [InlineData("- one\n- two\n  [this](ch-elsewhere#syn-good)\n", "chapters/c/part.md:11: link target \"ch-elsewhere#syn-good\" names no chapter")]
+    [InlineData("*one\ntwo <b>*\n", "chapters/c/part.md:10: raw HTML is not allowed")]
+    [InlineData("[one\ntwo <b>](#syn-good)\n", "chapters/c/part.md:10: raw HTML is not allowed")]
+    public void ALaterLineInlineIsReportedOnItsOwnLine(string body, string expected)
+    {
+        var result = Compile(Part(Section + body));
+
+        Assert.Equal(expected, Assert.Single(Lines(result)));
+        Assert.Empty(result.Files);
+    }
+
+    [Fact]
+    public void TargetInARetiredChapterIsRefused()
+    {
+        var result = Compile([.. Part(Section + "See [this](ch-old#syn-good).\n"), ("aliases.yml", "slugs: {}\nids:\n  ch-old: syn-good\n")]);
+
+        Assert.Equal("chapters/c/part.md:9: link target \"ch-old#syn-good\" names no chapter", Assert.Single(Lines(result)));
+        Assert.Empty(result.Files);
+    }
+
+    [Fact]
+    public void OtherChapterTargetInOneOfItsPartsResolves()
+    {
+        var far = PartHead.Replace("ch-test", "ch-other", StringComparison.Ordinal) + "## Far {#syn-far}\n\nText.\n";
+
+        var result = Compile([.. Part(Section + "See [this](ch-other#syn-far).\n"), (OtherPath, Other), ("chapters/d/syntax.md", far)]);
 
         Assert.Empty(result.Diagnostics);
         var link = Paragraph(result, 0)[1]!;
-        Assert.Equal("ch-elsewhere", (string?)link["chapter"]);
-        Assert.Equal("not-yet-checked", (string?)link["id"]);
+        Assert.Equal("ch-other", (string?)link["chapter"]);
+        Assert.Equal("syn-far", (string?)link["id"]);
+    }
+
+    [Fact]
+    public void ProblemTargetInASectionOfItsOwnChapterResolves()
+    {
+        var result = Compile(ProblemLinking("ch-test#syn-good"));
+
+        Assert.Empty(result.Diagnostics);
+        var problem = JsonNode.Parse(result.Files.Single(f => string.Equals(f.RelativePath, "practice/problems/prob-0001.json", StringComparison.Ordinal)).Bytes)!;
+        var link = Assert.Single(Links(problem));
+        Assert.Equal("ch-test", (string?)link["chapter"]);
+        Assert.Equal("syn-good", (string?)link["id"]);
+    }
+
+    // The problem names its chapter, but its own anchors are not on that chapter's page.
+    [Fact]
+    public void ProblemTargetOnlyInTheProblemFileIsRefused()
+    {
+        var result = Compile(ProblemLinking("#ex-count", "ch-test#ex-count"));
+
+        // The bare link raises nothing, so ex-count is a real anchor of the problem file.
+        var lines = Lines(result);
+        Assert.DoesNotContain(lines, l => l.Contains("\"#ex-count\"", StringComparison.Ordinal));
+        Assert.Equal("practice/problems/prob-0001.md:18: link target \"ch-test#ex-count\" names no section or block id in chapter \"ch-test\"", Assert.Single(lines));
+        Assert.Empty(result.Files);
     }
 
     [Fact]
@@ -307,6 +384,19 @@ public sealed class LinkTests
         Assert.NotNull(Repository.Schema.Validate(document.ToJsonString()));
     }
 
+    // A refused alias registry stops the run before any link is checked against it.
+    [Fact]
+    public void ARefusedAliasRegistryStopsBeforeLinksAreChecked()
+    {
+        var result = Compile(
+            ("patterns.yml", "patterns: []\n"),
+            ("aliases.yml", "slugs: []\nids:\n  old-a: sec-a\n"),
+            ("chapters/c/chapter.md", Chapter.Replace("Intro text.", "## A {#sec-a}\n\n[Old](#old-a)", StringComparison.Ordinal)));
+
+        Assert.Equal(["aliases.yml:1: slugs must be a mapping of old to new; write {} for none"], Lines(result), StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
+
     private static (JsonNode Document, JsonObject Link) CompiledLink()
     {
         var result = Compile(Part(Section + "See [this](ch-test#syn-good).\n"));
@@ -373,6 +463,18 @@ public sealed class LinkTests
     private static List<string> Lines(CompileResult result) => [.. result.Diagnostics.Select(d => d.ToString())];
 
     private static (string Path, string Text)[] Part(string body) => [("chapters/c/chapter.md", Chapter), ("chapters/c/part.md", PartHead + body)];
+
+    // The chapter and the problem both hold an anchor, so each outcome turns only on which page
+    // is searched.
+    private static (string Path, string Text)[] ProblemLinking(params string[] targets) =>
+    [
+        .. Part(Section + "Text.\n"),
+        .. PracticeClosure.WithProblem.Select(f => f.Path.EndsWith("prob-0001.md", StringComparison.Ordinal)
+            ? (f.Path, f.Text
+                .Replace("```text {", "```text {#ex-count ", StringComparison.Ordinal)
+                .Replace("Count the words.", $"Count the {string.Join(" and ", targets.Select(t => $"[words]({t})"))}.", StringComparison.Ordinal))
+            : f),
+    ];
 
     private static CompileResult Compile(params (string Path, string Text)[] files)
     {

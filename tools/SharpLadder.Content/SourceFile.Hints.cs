@@ -85,9 +85,9 @@ internal sealed partial class SourceFile
         {
             problem = "a ladder heading takes its {#id} and nothing else";
         }
-        else if (problem is null && !id!.StartsWith(LadderPrefix, StringComparison.Ordinal))
+        else if (problem is null && (!id!.StartsWith(LadderPrefix, StringComparison.Ordinal) || id.Length == LadderPrefix.Length))
         {
-            problem = $"ladder id \"{id}\" must start with {LadderPrefix}";
+            problem = $"ladder id \"{id}\" must start with {LadderPrefix} and go on after it";
         }
 
         if (problem is not null)
@@ -147,7 +147,7 @@ internal sealed partial class SourceFile
                     text.Append('\n');
                     break;
                 default:
-                    Error(line, "the cue, pattern and approach lines are plain text");
+                    Error(inline.Line + 1, "the cue, pattern and approach lines are plain text");
                     return null;
             }
         }
@@ -268,7 +268,7 @@ internal sealed partial class SourceFile
             return null;
         }
 
-        var content = Inlines(paragraph.Inline, line);
+        var content = Inlines(paragraph.Inline, InFile);
         if (content is null)
         {
             return null;
@@ -276,7 +276,7 @@ internal sealed partial class SourceFile
 
         if (!IsPlainContent(content))
         {
-            Error(line, "a rung holds text, code, *em* and **strong** only");
+            Error(FirstSpan(content, s => s is LinkSpan or TermSpan) is { } offending ? SpanLine(offending, line) : line, "a rung holds text, code, *em* and **strong** only");
             return null;
         }
 

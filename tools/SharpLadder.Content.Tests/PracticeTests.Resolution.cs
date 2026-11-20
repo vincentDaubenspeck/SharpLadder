@@ -14,8 +14,8 @@ public sealed partial class PracticeTests
 
     public static TheoryData<string, string, string, string> ResolutionRefusals() => new()
     {
-        { ProblemPath, "ladders: [ladder-a]", "ladders: [ladder-zz]", $"{ProblemPath}:8: ladders names \"ladder-zz\", which is no ladder" },
-        { ProblemPath, "patternTags: [pat-a]", "patternTags: [pat-zz]", $"{ProblemPath}:7: patternTags names \"pat-zz\", which is no pattern in patterns.yml" },
+        { ProblemPath, "ladders: [ladder-a]", "ladders: [ladder-zz]", $"{ProblemPath}:7: ladders names \"ladder-zz\", which is no ladder" },
+        { ProblemPath, "patternTags: [pat-a]", "patternTags: [pat-zz]", $"{ProblemPath}:6: patternTags names \"pat-zz\", which is no pattern in patterns.yml" },
         { ProblemPath, "chapter: ch-test", "chapter: ch-zz", $"{ProblemPath}:3: chapter names \"ch-zz\", which is no chapter" },
         { DrillPath, "ideas: [term-a]", "ideas: [term-zz]", $"{DrillPath}:7: ideas names \"term-zz\", which is no glossary entry" },
         { DrillPath, "prerequisites: []", "prerequisites: [drill-zz]", $"{DrillPath}:8: prerequisites names \"drill-zz\", which is no drill file" },
@@ -25,7 +25,7 @@ public sealed partial class PracticeTests
         { DrillPath, "prerequisites: []", "prerequisites: [drill-a]", $"{DrillPath}:8: prerequisites form a cycle: drill-a -> drill-a" },
         { DrillPartPath, "(#drill-a)", "(#drill-zz)", $"{DrillPartPath}:11: drill link target \"#drill-zz\" names no drill file\n{DrillPath}:3: drill \"drill-a\" is listed in no drill part of the chapter \"ch-test\"; list it once under the rung warm-up" },
         { DrillPartPath, "rung=warm-up", "rung=easy", $"{DrillPartPath}:11: drill \"drill-a\" is a warm-up drill, listed under the rung easy" },
-        { ProblemPath, "  count: 2\n", "  count: 2\n  review:\n    one: { sectionId: sec-zz, label: L }\n", $"{ProblemPath}:9: tests.review \"one\" sectionId \"sec-zz\" names no section" },
+        { ProblemPath, "  count: 2\n", "  count: 2\n  review:\n    one: { sectionId: sec-zz, label: L }\n", $"{ProblemPath}:8: tests.review \"one\" sectionId \"sec-zz\" names no section" },
         { IndexPath, "Vowel words", "Old words", $"{IndexPath}: the problem index differs from the problem files; write the output of SharpLadder.Content index <schema folder> <content root> to it" },
     };
 
@@ -34,15 +34,16 @@ public sealed partial class PracticeTests
     public void ANameThatDoesNotResolveIsRefused(string path, string from, string to, string expected) =>
         Exactly(expected, (path, Basis.Single(b => string.Equals(b.Path, path, StringComparison.Ordinal)).Text!.Replace(from, to, StringComparison.Ordinal)));
 
-    // A link that names the record's own chapter must name an anchor of the file, as a bare one must.
+    // A bare link must name an anchor of the file; one that names the record's own chapter, an anchor
+    // of that chapter's page, since the record is not on it.
     [Theory]
-    [InlineData(ProblemPath, 19, "#sec-definitely-missing")]
-    [InlineData(ProblemPath, 19, "ch-test#sec-definitely-missing")]
-    [InlineData(DrillPath, 21, "#sec-definitely-missing")]
-    [InlineData(DrillPath, 21, "ch-test#sec-definitely-missing")]
-    public void AnOwnChapterLinkToNoAnchorIsRefused(string path, int line, string target) =>
+    [InlineData(ProblemPath, 18, "#sec-definitely-missing", "this file")]
+    [InlineData(ProblemPath, 18, "ch-test#sec-definitely-missing", "chapter \"ch-test\"")]
+    [InlineData(DrillPath, 21, "#sec-definitely-missing", "this file")]
+    [InlineData(DrillPath, 21, "ch-test#sec-definitely-missing", "chapter \"ch-test\"")]
+    public void AnOwnChapterLinkToNoAnchorIsRefused(string path, int line, string target, string scope) =>
         Exactly(
-            $"{path}:{line}: link target \"{target}\" names no section or block id in this file",
+            $"{path}:{line}: link target \"{target}\" names no section or block id in {scope}",
             (path, Basis.Single(b => string.Equals(b.Path, path, StringComparison.Ordinal)).Text!.Replace("start with a vowel.", $"start with a vowel. See [missing]({target}).", StringComparison.Ordinal)));
 
     [Fact]
@@ -51,7 +52,7 @@ public sealed partial class PracticeTests
         var second = "\n## Track what came back {#ladder-b}\n\ncue: You want the earliest word seen once.\npattern: pat-a\napproach: Tally first\n\n1. {#r1} Which words came back?\n";
 
         Exactly(
-            $"{ProblemPath}:8: ladders \"ladder-a\" and \"ladder-b\" share the approach label \"Tally first\"; each ladder of a subject needs its own",
+            $"{ProblemPath}:7: ladders \"ladder-a\" and \"ladder-b\" share the approach label \"Tally first\"; each ladder of a subject needs its own",
             ("chapters/c/hints.md", PracticeClosure.Hints + second),
             (ProblemPath, Problem.Replace("ladders: [ladder-a]", "ladders: [ladder-a, ladder-b]", StringComparison.Ordinal)));
     }
@@ -90,7 +91,7 @@ public sealed partial class PracticeTests
     {
         Assert.Empty(Run((ProblemPath, Problem.Replace("  count: 2\n", Review, StringComparison.Ordinal)), (DrillPartPath, DrillPart.Replace("\n1. [", Walk + "\n1. [", StringComparison.Ordinal))).Diagnostics);
         Exactly(
-            $"{ProblemPath}:9: tests.review \"one\" walkId \"walk-x\" names no walk-it inside the section \"ramp-a\"",
+            $"{ProblemPath}:8: tests.review \"one\" walkId \"walk-x\" names no walk-it inside the section \"ramp-a\"",
             (ProblemPath, Problem.Replace("  count: 2\n", Review, StringComparison.Ordinal)),
             ("chapters/c/chapter.md", Chapter + Walk));
     }

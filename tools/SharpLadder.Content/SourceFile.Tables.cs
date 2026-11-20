@@ -132,7 +132,7 @@ internal sealed partial class SourceFile
             foreach (var cell in rows[r].Cast<TableCell>())
             {
                 var plain = NoAttributes(rows[r], rowLine) && NoAttributes(cell, rowLine);
-                var content = cell.Count == 0 ? [] : plain && NoAttributes(cell[0], rowLine) ? Inlines(((ParagraphBlock)cell[0]).Inline, rowLine) : null;
+                var content = cell.Count == 0 ? [] : plain && NoAttributes(cell[0], rowLine) ? Inlines(((ParagraphBlock)cell[0]).Inline, InFile) : null;
                 if (content?.OfType<TextSpan>().Any(t => CellAttributes().IsMatch(t.Text)) == true)
                 {
                     Error(rowLine, "attributes are not supported in a table cell");
@@ -145,9 +145,23 @@ internal sealed partial class SourceFile
             read.Add(cells);
         }
 
-        return NoAttributes(table, line) && _diagnostics.Count == before
-            ? new TableNode { BlockId = blockId, Headers = read[0], Rows = [.. read.Skip(1)] }
-            : null;
+        if (!NoAttributes(table, line) || _diagnostics.Count != before)
+        {
+            return null;
+        }
+
+        var node = new TableNode { BlockId = blockId, Headers = read[0], Rows = [.. read.Skip(1)] };
+        _rowLines[node] = [.. Enumerable.Range(0, rows.Count).Select(r => line + (r == 0 ? 0 : r + 1))];
+        return node;
+    }
+
+    // The row a refused spoken character comes from: the header is spoken first, then each row
+    // in order, and no character pairs across cells, so the first row with one holds the first.
+    private int TableLine(TableNode table, int line)
+    {
+        var rows = new[] { table.Headers }.Concat(table.Rows).ToList();
+        var at = rows.FindIndex(cells => cells.Any(cell => AudioSlot.FirstNotStorable(SpokenText.Flatten(cell)) >= 0));
+        return at >= 0 && _rowLines.TryGetValue(table, out var lines) ? lines[at] : line;
     }
 
     // The table's own source lines: as many as its rows and the dashes, each with exactly the
@@ -172,10 +186,10 @@ internal sealed partial class SourceFile
 
     // A paragraph line that starts with a pipe is table syntax the parser did not take as a
     // table, so it is never shown as prose. A pipe inside a code span is that span's text.
-    private bool NoReservedPipe(ParagraphBlock paragraph, int line) => NoReservedPipe(paragraph, line, _lines, _lineStarts);
+    private bool NoReservedPipe(ParagraphBlock paragraph) => NoReservedPipe(paragraph, InFile, _lines, _lineStarts);
 
     // The lines are those of the text the paragraph was parsed from, with their start offsets.
-    private bool NoReservedPipe(ParagraphBlock paragraph, int line, string[] lines, int[] lineStarts)
+    private bool NoReservedPipe(ParagraphBlock paragraph, LineOrigin origin, string[] lines, int[] lineStarts)
     {
         var code = (paragraph.Inline?.Descendants<CodeInline>() ?? []).Select(c => c.Span).ToList();
         var start = lineStarts[paragraph.Line];
@@ -190,7 +204,7 @@ internal sealed partial class SourceFile
 
             if (at < end && lines[index][at - start] == '|' && !code.Exists(c => c.Start <= at && at <= c.End))
             {
-                Error(line + index - paragraph.Line, $"a line that starts with | is read as a table and this one is not a table; {TableRule}, or start the line with \\| to show a pipe");
+                Error(origin.Of(index), $"a line that starts with | is read as a table and this one is not a table; {TableRule}, or start the line with \\| to show a pipe");
                 return false;
             }
 

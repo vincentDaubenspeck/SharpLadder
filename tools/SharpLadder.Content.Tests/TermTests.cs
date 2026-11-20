@@ -78,6 +78,16 @@ public sealed class TermTests
     public void ATermOutsideItsRulesIsRefused(string text, string expected) =>
         Refused(expected, ("glossary/term-a.md", Glossary), (Part, PartHead + text));
 
+    // A Term to no entry ends the run before emit, so its record is never validated.
+    [Fact]
+    public void ATermToNoEntryStopsBeforeItsRecordIsValidated()
+    {
+        var result = Run(("glossary/term-a.md", Glossary), (Part, PartHead + "See [it](#term-b).\n"));
+
+        Assert.Equal(["chapters/c/part.md:9: Term target \"#term-b\" names no glossary entry"], result.Diagnostics.Select(d => d.ToString()), StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
+
     // An id alias ends at a section, so a retired Term id can only lead to one.
     [Fact]
     public void ATermToARetiredIdIsRefusedAndNamesItsSuccessor() =>

@@ -122,27 +122,34 @@ internal static class ContentCompiler
             .Concat(practice.Select(p => ReadPractice(p, diagnostics)))
             .OfType<Parsed>()
             .ToList();
-
         var patterns = Registries.ReadPatterns(tree, diagnostics);
-        AliasesFile? aliases = null;
 
-        // Anchor sets are built only from unique IDs, so a duplicate is reported, never collapsed.
-        // The alias registry is read against the same unique names, so it waits for them too.
-        if (CheckIds(parsed, patterns ?? [], tree, diagnostics) && CheckSlugs(parsed, diagnostics))
+        // Each step reads only what every earlier step accepted, so a step that reports anything
+        // ends the run before a later step can report on input it refused.
+        if (diagnostics.Count > 0 || patterns is null)
         {
-            aliases = patterns is null ? null : Registries.ReadAliases(tree, Live(parsed, patterns), diagnostics);
-            CheckLinks(parsed, aliases, diagnostics);
-            CheckSee(parsed, aliases, diagnostics);
+            return (new CompileResult(diagnostics, []), parsed);
         }
 
-        if (patterns is not null)
+        CheckNames(parsed, patterns, tree, diagnostics);
+        if (diagnostics.Count > 0)
         {
-            CheckLadders(parsed, patterns, diagnostics);
+            return (new CompileResult(diagnostics, []), parsed);
         }
 
-        CheckChapters(parsed, diagnostics);
-        CheckNumbers(parsed, diagnostics);
-        PracticeChecks.Check(parsed, patterns?.Select(p => p.Record.Id), diagnostics);
+        // The alias registry is read against the unique names the name checks accepted.
+        var aliases = Registries.ReadAliases(tree, Live(parsed, patterns), diagnostics);
+        if (diagnostics.Count > 0 || aliases is null)
+        {
+            return (new CompileResult(diagnostics, []), parsed);
+        }
+
+        CheckAcrossFiles(parsed, aliases, patterns, diagnostics);
+        if (diagnostics.Count > 0)
+        {
+            return (new CompileResult(diagnostics, []), parsed);
+        }
+
         var files = Emit(parsed, aliases, patterns, tree, schema, diagnostics);
 
         // Judged only on content that compiled, so the index it is compared with is the one the
@@ -155,9 +162,30 @@ internal static class ContentCompiler
         return (diagnostics.Count > 0 ? new CompileResult(diagnostics, []) : new CompileResult([], files), parsed);
     }
 
-    private static List<OutputFile> Emit(List<Parsed> parsed, AliasesFile? aliases, List<(PatternRecord Record, int Line)>? patterns, InputTree tree, IContentSchema schema, List<Diagnostic> diagnostics)
+    // Anchor sets are built only from unique IDs, so a duplicate is reported, never collapsed. No
+    // name check reads another's finding, so all three report in one run.
+    private static void CheckNames(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns, InputTree tree, List<Diagnostic> diagnostics)
+    {
+        CheckIds(parsed, patterns, tree, diagnostics);
+        CheckSlugs(parsed, diagnostics);
+        CheckChapters(parsed, diagnostics);
+    }
+
+    private static void CheckAcrossFiles(List<Parsed> parsed, AliasesFile aliases, List<(PatternRecord Record, int Line)> patterns, List<Diagnostic> diagnostics)
+    {
+        CheckLinks(parsed, aliases, diagnostics);
+        CheckSee(parsed, aliases, diagnostics);
+        CheckLadders(parsed, patterns, diagnostics);
+        CheckNumbers(parsed, diagnostics);
+        PracticeChecks.Check(parsed, patterns.Select(p => p.Record.Id), diagnostics);
+    }
+
+    private static List<OutputFile> Emit(List<Parsed> parsed, AliasesFile aliases, List<(PatternRecord Record, int Line)> patterns, InputTree tree, IContentSchema schema, List<Diagnostic> diagnostics)
     {
         var files = new List<OutputFile>();
+
+        // A part may be named like a hints catalogue, so two records can claim one output path.
+        var claimed = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in parsed.Where(p => p.File.Model is not null))
         {
             var kind = file.File.Entry ?? (file.File.Model is ChapterFile ? RecordKind.Chapter : RecordKind.Part);
@@ -167,25 +195,27 @@ internal static class ContentCompiler
                 HintsPartFile h => h.Kind,
                 _ => null,
             };
-            Add(files, Path.ChangeExtension(file.Relative, ".json"), file.File.Model!, kind, file.Display, schema, diagnostics, part);
+            Add(files, claimed, Path.ChangeExtension(file.Relative, ".json"), file.File.Model!, kind, file.Display, schema, diagnostics, part);
             if (file.File.Catalogue is { } catalogue)
             {
-                Add(files, Path.ChangeExtension(file.Relative, CatalogueExtension), catalogue, RecordKind.HintsCatalogue, file.Display, schema, diagnostics);
+                Add(files, claimed, Path.ChangeExtension(file.Relative, CatalogueExtension), catalogue, RecordKind.HintsCatalogue, file.Display, schema, diagnostics);
             }
         }
 
-        if (aliases is not null && patterns is not null)
-        {
-            var ordered = new PatternsFile { Patterns = [.. patterns.Select(p => p.Record).OrderBy(p => p.Id, StringComparer.Ordinal)] };
-            Add(files, Registries.AliasesOutput, aliases, RecordKind.Aliases, RegistryDisplay(tree, Registries.AliasesSource), schema, diagnostics);
-            Add(files, Registries.PatternsOutput, ordered, RecordKind.Patterns, RegistryDisplay(tree, Registries.PatternsSource), schema, diagnostics);
-        }
-
+        var ordered = new PatternsFile { Patterns = [.. patterns.Select(p => p.Record).OrderBy(p => p.Id, StringComparer.Ordinal)] };
+        Add(files, claimed, Registries.AliasesOutput, aliases, RecordKind.Aliases, RegistryDisplay(tree, Registries.AliasesSource), schema, diagnostics);
+        Add(files, claimed, Registries.PatternsOutput, ordered, RecordKind.Patterns, RegistryDisplay(tree, Registries.PatternsSource), schema, diagnostics);
         return files;
     }
 
-    private static void Add(List<OutputFile> files, string relative, object model, RecordKind kind, string display, IContentSchema schema, List<Diagnostic> diagnostics, string? part = null)
+    private static void Add(List<OutputFile> files, Dictionary<string, string> claimed, string relative, object model, RecordKind kind, string display, IContentSchema schema, List<Diagnostic> diagnostics, string? part = null)
     {
+        if (!claimed.TryAdd(relative, display))
+        {
+            diagnostics.Add(new Diagnostic(display, 1, $"compiles to \"{relative}\", which {claimed[relative]} also compiles to"));
+            return;
+        }
+
         var bytes = Serialize(model);
         var problem = schema.Validate(StrictUtf8.GetString(bytes), kind);
         if (problem is null)
@@ -328,11 +358,9 @@ internal static class ContentCompiler
         }
     }
 
-    // Top-level IDs are unique across every file; the first use in path order wins. False when
-    // any ID repeats.
-    private static bool CheckIds(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns, InputTree tree, List<Diagnostic> diagnostics)
+    // Top-level IDs are unique across every file; the first use in path order wins.
+    private static void CheckIds(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns, InputTree tree, List<Diagnostic> diagnostics)
     {
-        var before = diagnostics.Count;
         var seen = new Dictionary<string, (string Display, int Line)>(StringComparer.Ordinal);
         var uses = parsed.SelectMany(file => file.File.Ids.Select(i => (i.Id, file.Display, i.Line)));
         if (patterns.Count > 0)
@@ -368,14 +396,11 @@ internal static class ContentCompiler
                 diagnostics.Add(new Diagnostic(display, line, $"duplicate id \"{id}\" (first used at {first.Display}:{first.Line})"));
             }
         }
-
-        return diagnostics.Count == before;
     }
 
     // A slug names one chapter, so the alias registry can end at it without ambiguity.
-    private static bool CheckSlugs(List<Parsed> parsed, List<Diagnostic> diagnostics)
+    private static void CheckSlugs(List<Parsed> parsed, List<Diagnostic> diagnostics)
     {
-        var before = diagnostics.Count;
         var seen = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in parsed)
         {
@@ -384,8 +409,6 @@ internal static class ContentCompiler
                 diagnostics.Add(new Diagnostic(file.Display, 1, $"duplicate slug \"{slug}\" (first used at {seen[slug]})"));
             }
         }
-
-        return diagnostics.Count == before;
     }
 
     private static HashSet<string> EntryIds(List<Parsed> parsed, RecordKind kind) =>
@@ -394,7 +417,8 @@ internal static class ContentCompiler
     private static HashSet<string> PracticeIds(List<Parsed> parsed, RecordKind kind) =>
         parsed.Select(p => p.File.Practice).OfType<PracticeFile>().Where(p => p.Kind == kind).SelectMany(p => new[] { p.Id, p.StarterId }).ToHashSet(StringComparer.Ordinal);
 
-    // A problem's number is its public name, so two problems never share one.
+    // A problem's number is its place in the course order, never in a source list, so two problems
+    // never share one; reordering may change it, never the id.
     private static void CheckNumbers(List<Parsed> parsed, List<Diagnostic> diagnostics)
     {
         var seen = new Dictionary<int, string>();
@@ -415,19 +439,18 @@ internal static class ContentCompiler
     // word rule is hygiene, not proof: subtler hints are editorial work.
     private static void CheckLadders(List<Parsed> parsed, List<(PatternRecord Record, int Line)> patterns, List<Diagnostic> diagnostics)
     {
-        // A repeated pattern id is refused by the registry check; every title it carries still hides.
-        var titles = patterns.ToLookup(p => p.Record.Id, p => p.Record.Title, StringComparer.Ordinal);
+        var titles = patterns.ToDictionary(p => p.Record.Id, p => p.Record.Title, StringComparer.Ordinal);
         foreach (var file in parsed)
         {
             foreach (var (ladder, line, patternLine) in file.File.Ladders)
             {
-                if (!titles.Contains(ladder.Pattern))
+                if (!titles.TryGetValue(ladder.Pattern, out var title))
                 {
                     diagnostics.Add(new Diagnostic(file.Display, patternLine, $"pattern \"{ladder.Pattern}\" is not in {Registries.PatternsSource}"));
                     continue;
                 }
 
-                var hidden = LadderWords.Of(ladder.Approach).Concat(LadderWords.Of(ladder.Pattern)).Concat(titles[ladder.Pattern].SelectMany(LadderWords.Of)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var hidden = LadderWords.Of(ladder.Approach).Concat(LadderWords.Of(ladder.Pattern)).Concat(LadderWords.Of(title)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var shared = LadderWords.Of(ladder.Id).Where(hidden.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (shared.Count > 0)
                 {
@@ -437,23 +460,26 @@ internal static class ContentCompiler
         }
     }
 
-    // A bare or current-chapter target must name an anchor of the same file; another chapter's
-    // anchors are not resolved by this check.
+    // A bare target, or a chapter or part file's target in its own chapter, must name an anchor of
+    // the same file. Any other chapter target, a practice file's link to its own chapter included,
+    // lands on that chapter's route, so it must name a live chapter, never one found through the
+    // alias registry, and an anchor of its chapter.md or of one of its parts.
     // A retired id is refused in every link, another chapter's included, and names its successor.
     // An error entry is told from an anchor by what the id names; a Term, by its reserved prefix,
     // must then name a live glossary entry.
-    private static void CheckLinks(List<Parsed> parsed, AliasesFile? aliases, List<Diagnostic> diagnostics)
+    private static void CheckLinks(List<Parsed> parsed, AliasesFile aliases, List<Diagnostic> diagnostics)
     {
         var errors = EntryIds(parsed, RecordKind.Error);
         var ladders = LadderIds(parsed);
         var shorts = parsed.Select(p => p.File.Model).OfType<GlossaryFile>().ToDictionary(g => g.Id, g => g.Short, StringComparer.Ordinal);
+        var chapters = ChapterAnchors(parsed);
         foreach (var file in parsed.Where(p => p.File.Model is not null))
         {
             var anchors = file.File.Anchors.ToHashSet(StringComparer.Ordinal);
+            var current = file.File.Entry is null ? file.File.ChapterId : null;
             foreach (var link in file.File.Links)
             {
-                var local = link.Chapter is null || string.Equals(link.Chapter, file.File.ChapterId, StringComparison.Ordinal);
-                if (aliases is not null && aliases.Ids.TryGetValue(link.Id, out var successor))
+                if (aliases.Ids.TryGetValue(link.Id, out var successor))
                 {
                     diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names the retired id \"{link.Id}\"; link to \"{successor}\""));
                 }
@@ -485,17 +511,42 @@ internal static class ContentCompiler
                         diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names an error entry, which belongs to no chapter; write [text](#{link.Id})"));
                     }
                 }
-                else if (local && !anchors.Contains(link.Id))
+                else if (AnchorProblem(link, current, anchors, chapters) is { } problem)
                 {
-                    diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" names no section or block id in this file"));
+                    diagnostics.Add(new Diagnostic(file.Display, link.Line, $"link target \"{link.Target}\" {problem}"));
                 }
             }
         }
     }
 
+    private static string? AnchorProblem(LinkTarget link, string? chapter, HashSet<string> anchors, Dictionary<string, HashSet<string>> chapters)
+    {
+        if (link.Chapter is null || string.Equals(link.Chapter, chapter, StringComparison.Ordinal))
+        {
+            return anchors.Contains(link.Id) ? null : "names no section or block id in this file";
+        }
+
+        if (!chapters.TryGetValue(link.Chapter, out var targets))
+        {
+            return "names no chapter";
+        }
+
+        return targets.Contains(link.Id) ? null : $"names no section or block id in chapter \"{link.Chapter}\"";
+    }
+
+    // A problem or drill names a chapter too, but its anchors are not on the chapter's page.
+    private static Dictionary<string, HashSet<string>> ChapterAnchors(List<Parsed> parsed)
+    {
+        var live = parsed.Where(p => IsChapter(p.Relative)).Select(p => p.File.ChapterId).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        return parsed
+            .Where(p => p.File.Entry is null && p.File.ChapterId is { } id && live.Contains(id))
+            .GroupBy(p => p.File.ChapterId!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.SelectMany(p => p.File.Anchors).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+    }
+
     // Every see target is a live section, chapter, card, glossary entry or error entry, found by what
     // the id names; anything else, a retired id included, is refused.
-    private static void CheckSee(List<Parsed> parsed, AliasesFile? aliases, List<Diagnostic> diagnostics)
+    private static void CheckSee(List<Parsed> parsed, AliasesFile aliases, List<Diagnostic> diagnostics)
     {
         var admitted = parsed.SelectMany(p => p.File.SectionIds)
             .Concat(parsed.Where(p => IsChapter(p.Relative)).Select(p => p.File.ChapterId).OfType<string>())
@@ -507,7 +558,7 @@ internal static class ContentCompiler
         {
             foreach (var (id, line) in file.File.See)
             {
-                if (aliases is not null && aliases.Ids.TryGetValue(id, out var successor))
+                if (aliases.Ids.TryGetValue(id, out var successor))
                 {
                     diagnostics.Add(new Diagnostic(file.Display, line, $"see names the retired id \"{id}\"; name \"{successor}\""));
                 }

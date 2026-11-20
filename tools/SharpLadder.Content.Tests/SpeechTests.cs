@@ -122,14 +122,16 @@ public sealed class SpeechTests
         Assert.Equal([expected], Texts(Speech($"## Title {{#syn-a}}\n\n{markdown}\n", "syn-a")), StringComparer.Ordinal);
 
     [Theory]
-    [InlineData("a￾b")]
-    [InlineData("a﷐b")]
-    [InlineData("a\U0001FFFFb")]
-    [InlineData("- fine\n- a￿b")]
-    [InlineData("```text {spoken=\"a￾b\"}\nplain\n```")]
-    public void NoncharacterInSpokenTextIsAContentError(string markdown) =>
+    [InlineData("a￾b", 9)]
+    [InlineData("a﷐b", 9)]
+    [InlineData("a\U0001FFFFb", 9)]
+    [InlineData("- fine\n- a￿b", 10)]
+    [InlineData("```text {spoken=\"a￾b\"}\nplain\n```", 9)]
+    [InlineData("fine *and\nthen a￾b*", 10)]
+    [InlineData("| h |\n| - |\n| fine |\n| a￾b |", 12)]
+    public void NoncharacterInSpokenTextIsAContentError(string markdown, int line) =>
         Assert.Equal(
-            ["chapters/c/part.md:9: spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)"],
+            [$"chapters/c/part.md:{line}: spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)"],
             Diagnostics(Part($"## Title {{#syn-a}}\n\n{markdown}\n")),
             StringComparer.Ordinal);
 

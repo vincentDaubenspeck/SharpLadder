@@ -313,7 +313,7 @@ internal sealed class WalkItYaml
     private Text? ReadText(string what)
     {
         var line = Line;
-        return ReadScalar(what) is { } scalar ? new Text(scalar.Value, line) : null;
+        return ReadScalar(what) is { } scalar ? new Text(scalar.Value, line, scalar.Style) : null;
     }
 
     private Text? ReadName()
@@ -475,7 +475,12 @@ internal sealed class WalkItYaml
     // A cell index keeps its line, since only the compiler knows the cell count it is checked against.
     internal sealed record Slot(int Value, int Line);
 
-    internal sealed record Text(string Value, int Line);
+    // Line is where the scalar starts. Only a literal scalar keeps its lines as written, so only
+    // its decoded lines map one for one to the source, from the line after its header.
+    internal sealed record Text(string Value, int Line, ScalarStyle Style = ScalarStyle.Plain)
+    {
+        public int? FirstLine => Style == ScalarStyle.Literal ? Line + 1 : null;
+    }
 
     private sealed record Box(object? Value);
 }

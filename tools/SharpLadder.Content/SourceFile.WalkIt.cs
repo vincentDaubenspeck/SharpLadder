@@ -235,9 +235,16 @@ internal sealed partial class SourceFile
             return null;
         }
 
+        var origin = text.FirstLine is int first ? new LineOrigin(fenceLine + first, Fixed: false) : new LineOrigin(line, Fixed: true);
         var lines = text.Value.Split('\n');
-        return NoAttributes(paragraph, line) && NoReservedPipe(paragraph, line, lines, LineStarts(lines))
-            ? Inlines(paragraph.Inline, line)
+        var content = NoAttributes(paragraph, origin.Of(paragraph.Line)) && NoReservedPipe(paragraph, origin, lines, LineStarts(lines))
+            ? Inlines(paragraph.Inline, origin)
             : null;
+        if (content is not null)
+        {
+            _constructLines[content] = origin.Of(paragraph.Line);
+        }
+
+        return content;
     }
 }

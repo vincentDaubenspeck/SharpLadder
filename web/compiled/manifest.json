@@ -25,9 +25,9 @@
     { "path": "compiled/practice/drills/drill-fix-largest.json", "kind": "drill", "sha256": "e360732187aa37d82101ad58a66919f73e5ac5b6718b703ba8d777cdba92119c" },
     { "path": "compiled/practice/drills/drill-fix-pair-scores.json", "kind": "drill", "sha256": "91aa5c978375466f3d7b4aeda46414515bdce6f44b3447d72f7e7cbe48baf16a" },
     { "path": "compiled/practice/drills/drill-fix-stop-word.json", "kind": "drill", "sha256": "a4229f90170315bd2098dae4159990d1781b3cad3cf59a6cb6e8682553c552dd" },
-    { "path": "compiled/practice/problems/prob-9001.json", "kind": "problem", "sha256": "568514cd22671606c912f5d0077cb3d2dba768a960dca8eefbd76935ea01b901" },
+    { "path": "compiled/practice/problems/prob-9001.json", "kind": "problem", "sha256": "9e1c1953237151bc8209fd91ddbfcbae0085dbec476d7b740f1309512349b3c7" },
     { "path": "src/generated/body.ts", "sha256": "a3041f84723428a1940eede5610bfc2f94b8d6a91b31f165b896c54bb09e3d82" },
-    { "path": "src/generated/content.ts", "sha256": "80af3b2c48f3c1d6067f8eb5001d7d0745476cd860515fa59f92a468f3aa5aa1" },
+    { "path": "src/generated/content.ts", "sha256": "792abc64bdf6c96f5d5ad8450668f79137779bef0d98640576adeaaba1dd519a" },
     { "path": "src/generated/witness/chapters/fixture-basics/build.ts", "sha256": "05d54965bca4418961ff8dfecbcb6eeb1c009e0d459c51b680092b162a824fd8" },
     { "path": "src/generated/witness/chapters/fixture-basics/cards.ts", "sha256": "b6fb95f91e2f32302d021eb81ae223f6e26be1e5ce150739d0aecb9af3f3c606" },
     { "path": "src/generated/witness/chapters/fixture-basics/chapter.ts", "sha256": "bf6ddd37b1163eb737f790b1167a49c76134549a585a478219c49ea096d2efd8" },
@@ -49,6 +49,6 @@
     { "path": "src/generated/witness/practice/drills/drill-fix-largest.ts", "sha256": "d9c460bef59ccd302929e1738845db332a761390c50eafc3242b0916e19d9a69" },
     { "path": "src/generated/witness/practice/drills/drill-fix-pair-scores.ts", "sha256": "a7eebc7a542442a25ab0749a61738e37b846f507ae302a90aa5710a38ac7fffa" },
     { "path": "src/generated/witness/practice/drills/drill-fix-stop-word.ts", "sha256": "4c0499ae135be631284921c92aa6b89e125955bad7fec09b47a23a2d87c61687" },
-    { "path": "src/generated/witness/practice/problems/prob-9001.ts", "sha256": "4c8c326e1023963d820ac3486f6ea653712b877e5ecbcc2b9457369c1e9c49ff" }
+    { "path": "src/generated/witness/practice/problems/prob-9001.ts", "sha256": "48a3e436f4b2b2c3021de75b0c54b2a72f1ff86d4bd052c6dce33361a5bd6bbf" }
   ]
 }

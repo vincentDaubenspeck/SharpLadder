@@ -147,6 +147,20 @@ public sealed class ApproachTests
     [InlineData("### First {#build-a approach=\"a\"}\n\nText.\n\n" + Two, "chapters/c/part.md:9: duplicate id \"build-a\" (first used at chapters/c/part.md:7)")]
     public void AnApproachOutsideItsRulesIsRefused(string body, string expected) => Refused(expected, ("chapters/c/part.md", Head + body));
 
+    // A refused block, spoken text or approach heading may be what an absence line is about, so
+    // the refusal is reported alone.
+    [Theory]
+    [InlineData("### First way {#build-one approach=\"one\"}\n\nBad <b>.\n\n" + Two, "chapters/c/part.md:11: raw HTML is not allowed")]
+    [InlineData("### First way {#build-one approach=\"one\"}\n\n&#32;\n\n" + Two, "chapters/c/part.md:11: spoken text is empty")]
+    [InlineData(One + "### Second {#build-two approach=\"\"}\n\nText.\n\n", "chapters/c/part.md:13: " + Form)]
+    public void ARefusalInAnApproachSectionAddsNoAbsenceLine(string body, string expected)
+    {
+        var result = Run(("chapters/c/part.md", Head + body));
+
+        Assert.Equal([expected], result.Diagnostics.Select(d => d.ToString()), StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
+
     [Fact]
     public void OnlyABuildPartTakesApproaches() =>
         Refused(

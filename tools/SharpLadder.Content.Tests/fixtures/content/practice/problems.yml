@@ -2,7 +2,6 @@
 problems:
   - id: prob-9001
     number: 9001
-    link: https://example.com/fixture-problem-9001
     title: Matching ends
     chapter: ch-fixture
     ladders:

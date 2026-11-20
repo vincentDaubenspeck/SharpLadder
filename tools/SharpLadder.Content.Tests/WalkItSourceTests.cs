@@ -307,6 +307,7 @@ public sealed partial class WalkItSourceTests
     [InlineData("title: \"# a\"", "12: walk-it title is one paragraph of inline text")]
     [InlineData("title: \"[a]: #syn-a\"", "12: walk-it title is one paragraph of inline text")]
     [InlineData("title: \"<b>a</b>\"", "12: raw HTML is not allowed")]
+    [InlineData("title: \"a\\nb <b>\"", "12: raw HTML is not allowed")]
     [InlineData("title: \"| a |\"", "12: a line that starts with | is read as a table")]
     [InlineData("title: \"[a](https://example.com)\"", "12: link target")]
     [InlineData("title: \"a \\uD83D\\uDE00\"", "12: walk-it title escapes a surrogate code point")]

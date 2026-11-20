@@ -27,12 +27,12 @@ public sealed class BoundaryTests
             : new[] { "content", "./content", "/a/../content", "/a/./content", "/a/link/../x", "/a//content", "/a/\0b" };
         foreach (var form in forms)
         {
-            for (var position = 0; position < 3; position++)
-            {
-                data.Add(form, position);
-            }
+            data.Add(form, 0);
         }
 
+        // One form check covers every argument, so the other positions need only one form each.
+        data.Add(forms[0], 1);
+        data.Add(forms[0], 2);
         return data;
     }
 
@@ -386,20 +386,27 @@ public sealed class BoundaryTests
         Assert.False(Directory.Exists(inside));
     }
 
+    // A part can share a hints catalogue's output path, so compilation must refuse the collision.
     [Fact]
-    public void ExistingDestinationFileIsNeverOpened()
+    public void TwoRecordsForOneOutputPathAreRefusedWithNothingWritten()
     {
         using var work = new TempFolder();
-        var output = Directory.CreateDirectory(Path.Combine(work.Path, "out")).FullName;
-        using var content = Folder.OpenRoot(Repository.Fixture, Repository.Fixture);
-        var target = OutputTarget.Prepare(output, [(InputTree.Read(content), "content root")]);
-        var planted = work.Write(Path.Combine("out", "b.json"), "planted\n");
+        var content = Copy(Repository.Fixture, Path.Combine(work.Path, "content"));
+        work.Write(
+            Path.Combine("content", "chapters", "fixture-basics", "hints.catalogue.md"),
+            "---\nkind: idioms\nchapter: ch-fixture\norder: 99\n---\n\n## A heading with no body {#idiom-fix-clash}\n");
+        var output = Path.Combine(work.Path, "out");
+        var chapter = Path.Combine(content, "chapters", "fixture-basics");
+        var hints = ContentCompiler.DisplayPath(Environment.CurrentDirectory, Path.Combine(chapter, "hints.md"));
+        var catalogue = ContentCompiler.DisplayPath(Environment.CurrentDirectory, Path.Combine(chapter, "hints.catalogue.md"));
 
-        var problem = OutputWriter.Write(target, [new OutputFile("a.json", [1]), new OutputFile("b.json", [2])]);
+        var (code, text) = Run(Repository.SchemaFolder, content, output);
 
-        Assert.NotNull(problem);
-        Assert.Equal("planted\n", File.ReadAllText(planted));
-        Assert.Equal(["b.json"], Directory.EnumerateFileSystemEntries(output).Select(Path.GetFileName), StringComparer.Ordinal);
+        Assert.Equal(1, code);
+        Assert.Equal(
+            $"  {hints}:1: compiles to \"chapters/fixture-basics/hints.catalogue.json\", which {catalogue} also compiles to\nFAIL content compiler\n",
+            text);
+        Assert.False(Directory.Exists(output));
     }
 
     [Fact]

@@ -2,6 +2,8 @@ using System.Globalization;
 using Markdig;
 using Markdig.Extensions.Yaml;
 using Markdig.Syntax;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 
 namespace SharpLadder.Content;
 
@@ -64,6 +66,49 @@ internal sealed partial class SourceFile
     private static int KeyLine(string yaml, int yamlStart, string key) =>
         yamlStart + 1 + Math.Max(0, Array.FindIndex(yaml.Split('\n'), l => l.StartsWith(key + ":", StringComparison.Ordinal)));
 
+    // Each see item is named on its own line, read from the parser's marks by position; a list
+    // reached through an alias is named where the alias is used. Called only after the typed
+    // read has accepted the front matter, so the events have the shape that read admitted.
+    private static (List<int> Items, int Use) SeeLines(string yaml, int yamlStart, int keyLine)
+    {
+        var items = new List<int>();
+        using var reader = new StringReader(yaml);
+        var events = new Parser(reader);
+        if (!events.TryConsume<StreamStart>(out _) || !events.TryConsume<DocumentStart>(out _) || !events.TryConsume<MappingStart>(out _))
+        {
+            return (items, keyLine);
+        }
+
+        while (!events.Accept<MappingEnd>(out _))
+        {
+            var isSee = events.Current is Scalar { Value: "see" };
+            events.SkipThisAndNestedEvents();
+            if (!isSee)
+            {
+                events.SkipThisAndNestedEvents();
+                continue;
+            }
+
+            if (events.Current is AnchorAlias alias)
+            {
+                return (items, yamlStart + (int)alias.Start.Line);
+            }
+
+            if (events.TryConsume<SequenceStart>(out _))
+            {
+                while (!events.TryConsume<SequenceEnd>(out _))
+                {
+                    items.Add(yamlStart + (int)events.Current!.Start.Line);
+                    events.SkipThisAndNestedEvents();
+                }
+            }
+
+            break;
+        }
+
+        return (items, keyLine);
+    }
+
     // The front matter text, the line of its opening ---, and the blocks after it.
     private (string Yaml, int Start, List<Block> Blocks)? Front(string text)
     {
@@ -93,7 +138,7 @@ internal sealed partial class SourceFile
         var id = OwnId(meta.Id, TermPrefix, "glossary entry", stem, KeyLine(yaml, start, "id"));
         var term = Plain(meta.Term, "term", KeyLine(yaml, start, "term"), null);
         var brief = Plain(meta.Brief, "short", KeyLine(yaml, start, "short"), MaxShort);
-        var see = SeeAlso(meta.See, meta.Id, KeyLine(yaml, start, "see"));
+        var see = SeeAlso(meta.See, meta.Id, SeeLines(yaml, start, KeyLine(yaml, start, "see")));
         var body = id is null ? null : EntryBody(blocks, id);
         if (_diagnostics.Count == before && id is not null && term is not null && brief is not null && body is not null)
         {
@@ -115,7 +160,7 @@ internal sealed partial class SourceFile
         var code = kind is null ? null : ErrorCode(meta.Code, kind, KeyLine(yaml, start, "code"));
         var wrote = Plain(meta.Wrote, "wrote", KeyLine(yaml, start, "wrote"), null);
         var got = Plain(meta.Got, "got", KeyLine(yaml, start, "got"), null);
-        var see = SeeAlso(meta.See, meta.Id, KeyLine(yaml, start, "see"));
+        var see = SeeAlso(meta.See, meta.Id, SeeLines(yaml, start, KeyLine(yaml, start, "see")));
         var fields = id is null ? null : ErrorBody(blocks, id, start);
         if (_diagnostics.Count == before && id is not null && kind is not null && wrote is not null && got is not null && fields is not null)
         {
@@ -213,11 +258,12 @@ internal sealed partial class SourceFile
         return null;
     }
 
-    private List<string> SeeAlso(IList<string?>? see, string? self, int line)
+    private List<string> SeeAlso(IList<string?>? see, string? self, (List<int> Items, int Use) lines)
     {
         var listed = new List<string>();
-        foreach (var id in see ?? [])
+        foreach (var (id, index) in (see ?? []).Select((id, index) => (id, index)))
         {
+            var line = index < lines.Items.Count ? lines.Items[index] : lines.Use;
             if (id is null || !ContentIds.IsValid(id))
             {
                 Error(line, $"see names \"{Shown(id ?? string.Empty)}\", which {ContentIds.FormatRule}");

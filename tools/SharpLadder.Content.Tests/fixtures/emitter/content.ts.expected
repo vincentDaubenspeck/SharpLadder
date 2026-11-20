@@ -298,7 +298,6 @@ export type ProblemFile = {
   id: ProblemId;
   chapter: ChapterId;
   number: number;
-  link: string;
   title: ShownText;
   patternTags: [PatternId, ...PatternId[]];
   ladders: LadderList;

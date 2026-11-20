@@ -189,7 +189,7 @@ internal sealed partial class SourceFile
     // target names a drill of the same chapter, resolved with the drill files.
     private DrillReference? DrillItem(ListItemBlock item, ParagraphBlock paragraph, string blockId, int line, string rung)
     {
-        if (!NoAttributes(item, line) || !NoAttributes(paragraph, line))
+        if (!NoAttributes(item, line) || !NoAttributes(paragraph, paragraph.Line + 1))
         {
             return null;
         }
@@ -200,14 +200,15 @@ internal sealed partial class SourceFile
             return null;
         }
 
-        if (NestedLink(_path, line, link) is { } nested)
+        var linkLine = link.Line + 1;
+        if (NestedLink(_path, linkLine, link) is { } nested)
         {
             _diagnostics.Add(nested);
             return null;
         }
 
-        var target = Target(link.Url, link.Title, line);
-        var content = Inlines(link, line);
+        var target = Target(link.Url, link.Title, linkLine);
+        var content = Inlines(link, InFile);
         if (target is null || content is null)
         {
             return null;
@@ -215,25 +216,28 @@ internal sealed partial class SourceFile
 
         if (target.Chapter is not null || !target.Id.StartsWith(DrillPrefix, StringComparison.Ordinal) || target.Id.Length == DrillPrefix.Length)
         {
-            Error(line, $"drill link target \"{Shown(target.Target)}\" names no drill; write [label](#drill-id)");
+            Error(target.Line, $"drill link target \"{Shown(target.Target)}\" names no drill; write [label](#drill-id)");
             return null;
         }
 
-        var label = SpokenText.Flatten(content).Trim();
-        if (!content.All(s => s is TextSpan) || !Registries.ShowsSomething(label))
+        var flat = SpokenText.Flatten(content);
+        var label = flat.Trim();
+        var styled = content.FirstOrDefault(s => s is not TextSpan);
+        if (styled is not null || !Registries.ShowsSomething(label))
         {
-            Error(line, "a drill label is plain text");
+            Error(styled is null ? line : SpanLine(styled, line), "a drill label is plain text");
             return null;
         }
 
         if (!_drills.Add(target.Id))
         {
-            Error(line, $"drill \"{target.Id}\" is listed twice in this drill part");
+            Error(target.Line, $"drill \"{target.Id}\" is listed twice in this drill part");
             return null;
         }
 
-        Segment(new BlockTarget { BlockId = blockId }, label, line);
-        DrillTargets.Add((target.Id, rung, line));
+        var leading = flat.Length - flat.TrimStart().Length;
+        Segment(new BlockTarget { BlockId = blockId }, label, target.Line, index => LineAt(content, index + leading, target.Line));
+        DrillTargets.Add((target.Id, rung, target.Line));
         return new DrillReference { BlockId = blockId, Id = target.Id, Label = label };
     }
 }

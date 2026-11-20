@@ -74,7 +74,7 @@ internal sealed partial class SourceFile
             return null;
         }
 
-        if (!NoAttributes(item, line) || !NoAttributes(paragraph, line) || !NoReservedPipe(paragraph, line))
+        if (!NoAttributes(item, line) || !NoAttributes(paragraph, paragraph.Line + 1) || !NoReservedPipe(paragraph))
         {
             return null;
         }
@@ -90,9 +90,9 @@ internal sealed partial class SourceFile
                 literal.Remove();
             }
 
-            if (Inlines(paragraph.Inline, line) is { } content)
+            if (Inlines(paragraph.Inline, InFile) is { } content)
             {
-                blocks.Add(new ParagraphNode { BlockId = nextId(), Content = content });
+                blocks.Add(Placed(new ParagraphNode { BlockId = nextId(), Content = content }, paragraph.Line + 1));
             }
         }
 
@@ -100,7 +100,7 @@ internal sealed partial class SourceFile
         {
             if (Body(block, nextId(), block.Line + 1, container) is { } node)
             {
-                blocks.Add(node);
+                blocks.Add(Placed(node, block.Line + 1));
             }
         }
 

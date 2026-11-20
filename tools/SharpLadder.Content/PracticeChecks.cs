@@ -6,12 +6,11 @@ internal static class PracticeChecks
 {
     private const string Foundations = "foundations";
 
-    // Patterns is null when patterns.yml failed, which is reported on its own.
-    public static void Check(IReadOnlyList<ContentCompiler.Parsed> parsed, IEnumerable<string>? patterns, List<Diagnostic> diagnostics)
+    public static void Check(IReadOnlyList<ContentCompiler.Parsed> parsed, IEnumerable<string> patterns, List<Diagnostic> diagnostics)
     {
         var known = new Known(
             parsed.Where(p => ContentCompiler.IsChapter(p.Relative)).Select(p => p.File.ChapterId).OfType<string>().ToHashSet(StringComparer.Ordinal),
-            patterns?.ToHashSet(StringComparer.Ordinal),
+            patterns.ToHashSet(StringComparer.Ordinal),
             parsed.SelectMany(p => p.File.Ladders).GroupBy(l => l.Ladder.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Ladder.Approach, StringComparer.Ordinal),
             parsed.Select(p => p.File.Model).OfType<GlossaryFile>().Select(g => g.Id).ToHashSet(StringComparer.Ordinal),
             Stems(parsed, RecordKind.Problem),
@@ -25,10 +24,7 @@ internal static class PracticeChecks
             if (file.File.Model is ProblemFile problem)
             {
                 Shared(report, problem.Chapter, problem.Ladders, problem.Tests, known);
-                if (known.Patterns is { } ids)
-                {
-                    Names(report, "patternTags", problem.PatternTags, ids.Contains, "pattern in patterns.yml");
-                }
+                Names(report, "patternTags", problem.PatternTags, known.Patterns.Contains, "pattern in patterns.yml");
             }
             else if (file.File.Model is DrillFile drill)
             {
@@ -146,7 +142,13 @@ internal static class PracticeChecks
                     continue;
                 }
 
+                // A drill whose own chapter is no chapter is reported by that chapter check alone.
                 var drill = (DrillFile)source.File.Model!;
+                if (!known.Chapters.Contains(drill.Chapter))
+                {
+                    continue;
+                }
+
                 if (!string.Equals(drill.Chapter, part.File.ChapterId, StringComparison.Ordinal))
                 {
                     diagnostics.Add(new Diagnostic(part.Display, line, $"drill \"{id}\" belongs to the chapter \"{drill.Chapter}\", not \"{part.File.ChapterId}\""));
@@ -178,7 +180,7 @@ internal static class PracticeChecks
 
     private sealed record Known(
         HashSet<string> Chapters,
-        HashSet<string>? Patterns,
+        HashSet<string> Patterns,
         Dictionary<string, string> Ladders,
         HashSet<string> Terms,
         HashSet<string> Problems,

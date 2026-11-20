@@ -15,7 +15,7 @@ internal static class PracticeClosure
 
     public const string IndexPath = "practice/problems.yml";
 
-    public static string Index => ProblemsIndex.Header + "\nproblems:\n  - id: prob-0001\n    number: 1\n    link: https://example.com/fixture-problem-1\n"
+    public static string Index => ProblemsIndex.Header + "\nproblems:\n  - id: prob-0001\n    number: 1\n"
         + "    title: Vowel words\n    chapter: ch-test\n    ladders:\n      - ladder-a\n";
 
     public static (string Path, string Text)[] Support => [("aliases.yml", "slugs: {}\nids: {}\n"), ("patterns.yml", Patterns), ("chapters/c/hints.md", Hints), ("glossary/term-a.md", Term)];
@@ -23,7 +23,7 @@ internal static class PracticeClosure
     public static (string Path, string Text)[] WithProblem =>
     [
         .. Support,
-        ("practice/problems/prob-0001.md", Front("prob-0001", "number: 1\nlink: https://example.com/fixture-problem-1\ntitle: Vowel words\npatternTags: [pat-a]\nladders: [ladder-a]", "paraphraseCheckedAt: 2026-11-01\n")),
+        ("practice/problems/prob-0001.md", Front("prob-0001", "number: 1\ntitle: Vowel words\npatternTags: [pat-a]\nladders: [ladder-a]", "paraphraseCheckedAt: 2026-11-01\n")),
         ("practice/problems/prob-0001.tests.cs", Suite),
         (IndexPath, Index),
     ];

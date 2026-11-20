@@ -143,28 +143,18 @@ public sealed partial class WalkItSourceTests
         Assert.Empty(result.Files);
     }
 
-    // A refused block claims no id, so a valid block may take it on the same page or another one.
-    // Links are checked only on pages with no refusal, so the link sits beside the valid block.
+    // A read refusal stops link checks, so an unresolved link on another page adds no diagnostic.
     [Theory]
     [MemberData(nameof(RefusedBlocks))]
-    public void ARefusedWalkItClaimsNoId(string refused, string expected)
+    public void ARefusedWalkItStopsBeforeLinksAreChecked(string refused, string expected)
     {
         var linked = Chapter.Replace("Intro text.", "Intro [text](#walk-shift).", StringComparison.Ordinal);
         var other = ("chapters/d/chapter.md", Other + Fence(refused));
         var otherPart = ("chapters/d/part.md", OtherPart);
 
-        var samePage = Site(("chapters/c/chapter.md", Chapter + Fence(refused) + "\n" + Fence(Walk())));
-        var otherPage = Site(("chapters/c/chapter.md", linked + Fence(Walk())), other, otherPart);
-
-        Assert.Equal(Path + expected, Shown(samePage));
-        Assert.Empty(samePage.Files);
-        Assert.Equal("chapters/d/chapter.md:" + expected, Shown(otherPage));
-        Assert.Empty(otherPage.Files);
-
-        // Without the valid block the same link is refused, so the link was checked above.
         var noBlock = Site(("chapters/c/chapter.md", linked), other, otherPart);
 
-        Assert.Contains(Path + "9: link target \"#walk-shift\" names no section or block id in this file", Shown(noBlock), StringComparison.Ordinal);
+        Assert.Equal("chapters/d/chapter.md:" + expected, Shown(noBlock));
         Assert.Empty(noBlock.Files);
     }
 

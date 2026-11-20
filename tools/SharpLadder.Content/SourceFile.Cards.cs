@@ -23,7 +23,9 @@ internal sealed partial class SourceFile
     private (string Id, List<Span> Title, int Line)? _card;
     private bool _cardFailed;
     private int _cardBlocks;
-    private int _sectionStart;
+
+    // A ### heading written in the section, accepted or refused, may be the card it lacks.
+    private bool _cardWritten;
 
     // The card IDs this file declares; only these may carry the card prefix.
     public List<string> CardIds { get; } = [];
@@ -42,6 +44,7 @@ internal sealed partial class SourceFile
                     break;
                 case HeadingBlock { Level: 3, IsSetext: false } heading when inSection:
                     CloseCard();
+                    _cardWritten = true;
                     _card = _current is null ? null : CardHeading(heading);
                     _cardFailed = _card is null;
                     break;
@@ -49,7 +52,7 @@ internal sealed partial class SourceFile
                     CloseCards();
                     _cards = [];
                     _cardBlocks = 0;
-                    _sectionStart = _diagnostics.Count;
+                    _cardWritten = false;
                     Open(Heading(heading, partOrder, sections.Count + 1, _cards), line, sections);
                     inSection = true;
                     break;
@@ -84,7 +87,7 @@ internal sealed partial class SourceFile
     private void CloseCards()
     {
         CloseCard();
-        if (_current is not null && _cards.Count == 0 && _diagnostics.Count == _sectionStart)
+        if (_current is not null && _cards.Count == 0 && !_cardWritten)
         {
             Error(_headingLine, "a cards section holds at least one card");
         }
@@ -103,9 +106,9 @@ internal sealed partial class SourceFile
         {
             problem = "a card heading takes its {#id} and nothing else";
         }
-        else if (problem is null && !id!.StartsWith(ContentIds.CardPrefix, StringComparison.Ordinal))
+        else if (problem is null && (!id!.StartsWith(ContentIds.CardPrefix, StringComparison.Ordinal) || id.Length == ContentIds.CardPrefix.Length))
         {
-            problem = $"card id \"{id}\" must start with {ContentIds.CardPrefix}";
+            problem = $"card id \"{id}\" must start with {ContentIds.CardPrefix} and go on after it";
         }
 
         if (problem is not null)
@@ -197,7 +200,8 @@ internal sealed partial class SourceFile
             }
 
             _spokenPrefix = string.Equals(label, "reach", StringComparison.Ordinal) ? $"Card: {title}. {CardSpoken[label]}" : CardSpoken[label];
-            blocks.ForEach(block => Segments(block, line));
+            _spokenPrefixLine = line;
+            blocks.ForEach(block => Segments(block, _constructLines.GetValueOrDefault(block, line)));
             _spokenPrefix = null;
         }
     }

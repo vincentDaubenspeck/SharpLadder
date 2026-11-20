@@ -11,6 +11,7 @@ public sealed class DrillTests
     private const string Head = "---\nkind: drill\nchapter: ch-test\norder: 2\n---\n\n";
     private const string Warm = "## One idea {#ramp-warm rung=warm-up}\n\nEach drill uses one idea.\n\n1. [Count the letters](#drill-count)\n2. [Find a first pair](#drill-pair)\n";
     private const string Easy = "\n## Two ideas {#ramp-easy rung=easy}\n\nFirst paragraph.\n\nSecond paragraph.\n\n1. [Join two lists](#drill-join)\n";
+    private const string Ramp = "## One idea {#ramp-a rung=warm-up}\n\nEach drill uses one idea.\n\n1. [Count letters](#drill-a)\n";
     private const string Part = "chapters/c/drill.md";
     private const string Syntax = "chapters/c/syntax.md";
     private const string SyntaxHead = "---\nkind: syntax\nchapter: ch-test\norder: 1\n---\n\n## Title {#syn-a}\n\n";
@@ -96,6 +97,49 @@ public sealed class DrillTests
     [InlineData("## {#ramp-a rung=easy}\n\nP.\n\n1. [L](#drill-a)\n", "a drill section title holds text")]
     public void ADrillPartOutsideItsRulesIsRefused(string text, string expected) =>
         Refused(expected, (Part, Head + text));
+
+    // Each refusal names the line of the link or span it is about, not the item's first line.
+    [Fact]
+    public void ADrillItemIsRefusedOnTheLineOfItsLinkOrSpan()
+    {
+        var result = Run((Part, Head + "## A {#ramp-a rung=easy}\n\nP.\n\n1. [One\n   <b>](#drill-a)\n2. [Two\n   `code`](#drill-b)\n3.\n   [Three](#drill-c)\n"));
+
+        Assert.Equal($"{Part}:12: raw HTML is not allowed\n{Part}:14: a drill label is plain text", Shown(result));
+        Assert.Empty(result.Files);
+    }
+
+    [Fact]
+    public void ADrillLinkToNoDrillFileIsRefusedOnTheLineOfItsLink()
+    {
+        var result = Run((Part, Head + "## A {#ramp-a rung=easy}\n\nP.\n\n1.\n   [Three](#drill-c)\n"));
+
+        Assert.Equal($"{Part}:12: drill link target \"#drill-c\" names no drill file", Shown(result));
+        Assert.Empty(result.Files);
+    }
+
+    // A part's chapter is a name check, so a part under the wrong chapter stops the run before its
+    // drills are compared with their files.
+    [Fact]
+    public void APartUnderTheWrongChapterStopsBeforeItsDrillsAreChecked()
+    {
+        var head = Head.Replace("chapter: ch-test", "chapter: ch-wrong", StringComparison.Ordinal);
+        var result = Run([(Part, head + Ramp), .. PracticeClosure.WithProblem, .. PracticeClosure.Drill("drill-a", "warm-up")]);
+
+        Assert.Equal($"{Part}:1: chapter \"ch-wrong\" does not match \"ch-test\" in chapter.md", Shown(result));
+        Assert.Empty(result.Files);
+    }
+
+    // A drill whose own chapter is no chapter is not compared with the part that lists it.
+    [Fact]
+    public void ADrillOfNoChapterIsReportedOnlyAsNoChapter()
+    {
+        var drill = PracticeClosure.Drill("drill-a", "warm-up")
+            .Select(f => f.Path.EndsWith(".md", StringComparison.Ordinal) ? (f.Path, f.Text.Replace("chapter: ch-test", "chapter: ch-missing", StringComparison.Ordinal)) : f);
+        var result = Run([(Part, Head + Ramp), .. PracticeClosure.WithProblem, .. drill]);
+
+        Assert.Equal("practice/drills/drill-a.md:3: chapter names \"ch-missing\", which is no chapter", Shown(result));
+        Assert.Empty(result.Files);
+    }
 
     [Fact]
     public void OnlyADrillFileTakesTheDrillPrefix() =>

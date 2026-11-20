@@ -110,6 +110,22 @@ public sealed class CardTests
         Assert.Equal("cards-a/b2", (string?)card["build"]!["blockId"]);
     }
 
+    // A field's block is refused on its own line below the card heading; the title, spoken in
+    // the card's prefix, on the heading's line, not on the first field's.
+    [Theory]
+    [InlineData("### One {#card-one}\n\n- reach: R.\n- build: B.\n- why: W.\n\n  More a￾b.\n", 15)]
+    [InlineData("### One a￾b {#card-one}\n\n- reach: R.\n- build: B.\n- why: W.\n", 9)]
+    public void CardTextThatCannotBeStoredIsRefusedWhereItIsWritten(string card, int line)
+    {
+        var result = Run(("chapters/c/part.md", Head + card));
+
+        Assert.Equal(
+            [$"chapters/c/part.md:{line}: spoken text holds a character that cannot be stored (a lone surrogate or a noncharacter)"],
+            result.Diagnostics.Select(d => d.ToString()),
+            StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
+
     [Fact]
     public void WhyHoldsEveryBlockKindAndEachIsSpoken()
     {
@@ -171,6 +187,7 @@ public sealed class CardTests
     [InlineData("### One\n\n" + Fields, "chapters/c/part.md:9: heading has no {#id}; write exactly one at the end of the heading")]
     [InlineData("### One {#one}\n\n" + Fields, "chapters/c/part.md:9: card id \"one\" must start with card-")]
     [InlineData("### One {#term-one}\n\n" + Fields, "chapters/c/part.md:9: card id \"term-one\" must start with card-")]
+    [InlineData("### One {#card-}\n\n" + Fields, "chapters/c/part.md:9: card id \"card-\" must start with card- and go on after it")]
     [InlineData("### One {#card-one speech=skip spoken=\"S\"}\n\n" + Fields, "chapters/c/part.md:9: a card heading takes its {#id} and nothing else")]
     [InlineData("### One {#card-one .wide}\n\n" + Fields, "chapters/c/part.md:9: heading attributes other than one {#id} are not supported")]
     [InlineData("### One {#card-one} {#card-two}\n\n" + Fields, "chapters/c/part.md:9: heading has more than one {#id}")]
@@ -186,6 +203,22 @@ public sealed class CardTests
     [InlineData(One + "\n## Empty {#cards-b}\n", "chapters/c/part.md:15: a cards section holds at least one card")]
     [InlineData(One + "\n" + One, "chapters/c/part.md:15: duplicate id \"card-one\" (first used at chapters/c/part.md:9)")]
     public void ACardsSectionHoldsCardsAndNothingElse(string cards, string expected) => Refused(expected, ("chapters/c/part.md", Head + cards));
+
+    // A refusal that is no card leaves the empty section's own line standing.
+    [Fact]
+    public void AnEmptySectionIsReportedBesideAnUnrelatedRefusal()
+    {
+        var result = Run(("chapters/c/part.md", Front + "## Empty {#cards-empty}\n\n[bad]: https://example.com\n"));
+
+        Assert.Equal(
+            [
+                "chapters/c/part.md:9: link target \"https://example.com\" is not an internal target; write [text](#id) or [text](ch-chapter#id)",
+                "chapters/c/part.md:7: a cards section holds at least one card",
+            ],
+            result.Diagnostics.Select(d => d.ToString()),
+            StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
 
     [Fact]
     public void ACardBelongsUnderASection() =>

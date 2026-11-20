@@ -68,6 +68,7 @@ public sealed class HintsTests
 
     [Theory]
     [InlineData("## H {#hint-a}\n\ncue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n", "ladder id \"hint-a\" must start with ladder-")]
+    [InlineData("## H {#ladder-}\n\ncue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n", "ladder id \"ladder-\" must start with ladder- and go on after it")]
     [InlineData("## H {#ladder-a spoken=\"S\"}\n\ncue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n", "a ladder heading takes its {#id} and nothing else")]
     [InlineData("## See [it](#syn-a) {#ladder-a}\n\ncue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n", "a ladder heading holds text, code, *em* and **strong** only")]
     [InlineData("Text first.\n\n" + "## H {#ladder-a}\n\ncue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n", "a part file holds nothing before its first ## heading")]
@@ -96,6 +97,22 @@ public sealed class HintsTests
     public void AHintsPartOutsideItsRulesIsRefused(string text, string expected) =>
         Refused(expected, ("glossary/term-a.md", "---\nid: term-a\nterm: A term\nshort: S.\n---\n"), (Part, Head + text));
 
+    // A refusal names the line that holds the offending text, not the first line of its paragraph.
+    [Theory]
+    [InlineData("cue: C.\npattern: pat-other\napproach: *way*\n\n1. {#r1} R.\n", "11: the cue, pattern and approach lines are plain text")]
+    [InlineData("cue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R.\n   Then <b>.\n", "14: raw HTML is not allowed")]
+    [InlineData("cue: C.\npattern: pat-other\napproach: way\n\n1. {#r1} R *and\n   [it](#syn-a)*.\n", "14: a rung holds text, code, *em* and **strong** only")]
+    public void ALaterLineRefusalNamesItsOwnLine(string text, string expected)
+    {
+        var result = Run((Part, Head + "## H {#ladder-a}\n\n" + text));
+
+        Assert.Equal(
+            [$"{Part}:{expected}"],
+            result.Diagnostics.Select(d => d.ToString()),
+            StringComparer.Ordinal);
+        Assert.Empty(result.Files);
+    }
+
     [Fact]
     public void ARungIdLongerThanTheLimitIsRefused() =>
         Refused(
@@ -110,14 +127,19 @@ public sealed class HintsTests
     public void ALadderIdIsUniqueSiteWide() =>
         Refused("duplicate id \"ladder-alpha\"", (Part, Head + Alpha + Alpha.Replace("## Hidden heading", "\n## Again", StringComparison.Ordinal)));
 
-    // The registry refuses the repeated id, and the word rule still reads both of its titles.
+    // A repeated pattern id stops the run at the name checks, so no ladder is read against it.
     [Fact]
     public void ALadderOnARepeatedPatternIdIsReportedWithoutACrash()
     {
         var patterns = "patterns:\n  - { id: pat-twice, title: First, summary: S }\n  - { id: pat-twice, title: Second sweep, summary: S }\n";
         var text = Head + "## H {#ladder-sweep-x}\n\ncue: C.\npattern: pat-twice\napproach: way\n\n1. {#r1} R.\n";
-        Refused("patterns.yml:3: duplicate id \"pat-twice\" (first used at patterns.yml:2)", ("patterns.yml", patterns), (Part, text));
-        Refused("ladder id \"ladder-sweep-x\" shares \"sweep\" with its approach", ("patterns.yml", patterns), (Part, text));
+        var result = Run(("patterns.yml", patterns), (Part, text));
+
+        Assert.Equal(
+            ["patterns.yml:3: duplicate id \"pat-twice\" (first used at patterns.yml:2)"],
+            result.Diagnostics.Select(d => d.ToString()),
+            StringComparer.Ordinal);
+        Assert.Empty(result.Files);
     }
 
     // Opening a ladder is a reveal, so nothing may lead to one until reveals exist.
