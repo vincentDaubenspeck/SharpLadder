@@ -507,6 +507,14 @@ describe("the stepper contract", () => {
     expect(roots.map(count)).toEqual([valid, invalid]);
   });
 
+  it("gives its cell list the list role at Start and after a move", () => {
+    const walk = control(swap, { sequence: 1, step: 0 });
+    expect(screen.getByRole("list").getAttribute("role")).toBe("list");
+    walk.press("Next");
+    expect(screen.getByText("Step 1 of 3").tagName).toBe("P");
+    expect(screen.getByRole("list").getAttribute("role")).toBe("list");
+  });
+
   it.each<[string, WalkPosition, string]>([
     [
       "the intro at Start",
@@ -646,8 +654,14 @@ describe("the test controller", () => {
     const walk = control(swap, { sequence: 2, step: 1 });
     walk.press("Next");
     expect(walk.said()).toBe("Step 2 of 2: Write zero into the second cell.");
+    expect(screen.getByText("Step 2 of 2").tagName).toBe("P");
+    expect(screen.getByText("Write zero into the second cell.").tagName).toBe(
+      "P",
+    );
     walk.press("Prev");
     expect(walk.said()).toBe("Step 1 of 2: Write over the number.");
+    expect(screen.getByText("Step 1 of 2").tagName).toBe("P");
+    expect(screen.getByText("Write over the number.").tagName).toBe("P");
     expect(cellTexts()).toEqual([
       "0: 3 lost 7 ← written",
       "1: “x”",

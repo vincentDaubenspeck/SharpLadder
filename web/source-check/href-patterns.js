@@ -56,6 +56,7 @@ function hrefLiterals(text) {
   return {
     id: regex("idPattern"),
     slug: regex("slugPattern"),
+    drill: regex("drillPattern"),
     slugMaxLength:
       maxInit && ts.isNumericLiteral(maxInit) ? Number(maxInit.text) : null,
     chapterPrefix:
@@ -86,10 +87,25 @@ const refinement = (definition, idRef) => {
   return literalPrefix(prefix.pattern);
 };
 
+// The drill refinement holds a character class, so its raw pattern is compared whole.
+const drillRefinement = (definition) => {
+  const parts = definition?.allOf;
+  if (!Array.isArray(parts) || parts.length !== 2) return null;
+  const [ref, rest] = parts;
+  if (
+    JSON.stringify(ref) !==
+    JSON.stringify({ $ref: "body.schema.json#/definitions/id" })
+  )
+    return null;
+  if (Object.keys(rest ?? {}).join() !== "pattern") return null;
+  return typeof rest.pattern === "string" ? rest.pattern : null;
+};
+
 // What the schema files state for the same rules.
 function schemaRules(body, content) {
   const slug = content.definitions?.chapterFile?.properties?.slug;
   return {
+    drill: drillRefinement(content.definitions?.drillId),
     id: body.definitions?.id?.pattern ?? null,
     slug: slug?.pattern ?? null,
     slugMaxLength: slug?.maxLength ?? null,
@@ -119,6 +135,8 @@ export function hrefPatternProblems(hrefText, body, content) {
   differ("slug pattern", code.slug?.source ?? null, schema.slug);
   differ("slug pattern flags", code.slug?.flags ?? null, "u");
   differ("slug length limit", code.slugMaxLength, schema.slugMaxLength);
+  differ("drill pattern", code.drill?.source ?? null, schema.drill);
+  differ("drill pattern flags", code.drill?.flags ?? null, "u");
   differ("chapter prefix", code.chapterPrefix, schema.chapterRefPrefix);
   differ("content chapter prefix", code.chapterPrefix, schema.chapterIdPrefix);
   if (!code.chapterUsesId)

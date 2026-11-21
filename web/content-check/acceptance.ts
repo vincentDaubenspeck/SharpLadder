@@ -40,6 +40,29 @@ export const roundTripCases: readonly string[] = [
   "mounts only the Terms and links each walk position shows",
 ];
 
+export const practiceSuite = "the practice round trip of ";
+/**
+ * The practice view's record-backed cases: the round-trip cases a practice record can meet, then
+ * one per field group; a test binds this list to the round-trip file's own source.
+ */
+export const practiceCases: readonly string[] = [
+  "renders only after the bytes equal the witness",
+  "writes exactly the compiled anchors as ids, labels apart",
+  "places block ids and labels on their own elements",
+  "builds every link href from its target and chapter only",
+  "leaves no empty wrapper element",
+  "starts headings at h2 and never skips a level",
+  "keeps each list's kind and start",
+  "names every link by its author text, never its address",
+  "binds every spoken segment to one rendered hook, in order",
+  "gives a section hook to sections only",
+  "mounts only the Terms and links each walk position shows",
+  "shows a problem's number and title, or a drill's title and rung",
+  "links each prerequisite by its drill's title to that drill",
+  "shows the statement, the examples and the constraints in that order, each under its field",
+  "shows nothing the record hides or the page does not hold yet",
+];
+
 export const speechFile = "content-check/speech.test.ts";
 export const speechSuite = "the speech of ";
 
@@ -96,7 +119,8 @@ const content: readonly CaseKey[] = [
 ];
 // An entry is rendered like a chapter or part and has no audio slot to recompute.
 const rendered: readonly CaseKey[] = [...content, "glossary", "error"];
-// A practice record is not rendered yet, but its statement speech has a slot.
+// A practice record is shown through its own view, so it is judged apart; its statement speech
+// has a slot.
 const spoken: readonly CaseKey[] = [
   ...content,
   "hints-catalogue",
@@ -111,6 +135,12 @@ export const caseLists: readonly CaseList[] = [
     suite: roundTripSuite,
     kinds: rendered,
     cases: roundTripCases,
+  },
+  {
+    file: roundTripFile,
+    suite: practiceSuite,
+    kinds: ["problem", "drill"],
+    cases: practiceCases,
   },
   {
     file: speechFile,

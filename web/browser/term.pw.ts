@@ -1,4 +1,9 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  type CDPSession,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { test } from "./fixture.ts";
 import { focused, harnessUrl, settle } from "./probe.ts";
 
@@ -317,3 +322,257 @@ test("opening one Term closes another and never opens its definition", async ({
   await expectOpen(second, loop, opened);
   await expectClosed(first, loop, closed);
 });
+
+// The DOM's text node type; the Node global exists only in the page.
+const textNode = 3;
+
+interface Parts {
+  trigger: number;
+  definition: number;
+  link: number;
+  text: number;
+}
+
+interface AXValue {
+  value?: unknown;
+  relatedNodes?: { backendDOMNodeId: number }[];
+}
+
+interface AXNode {
+  ignored: boolean;
+  backendDOMNodeId?: number;
+  role?: AXValue;
+  name?: AXValue;
+  properties?: { name: string; value: AXValue }[];
+}
+
+// A backend node id lasts as long as its node, so each part is matched by identity, never by text.
+async function partsOf(session: CDPSession, trigger: string): Promise<Parts> {
+  const { root } = await session.send("DOM.getDocument", { depth: 0 });
+  const nodeOf = async (from: number, selector: string) => {
+    const { nodeId } = await session.send("DOM.querySelector", {
+      nodeId: from,
+      selector,
+    });
+    if (nodeId === 0) throw new Error(`nothing matches ${selector}`);
+    const { node } = await session.send("DOM.describeNode", {
+      nodeId,
+      depth: 1,
+    });
+    return { nodeId, node };
+  };
+  const button = await nodeOf(root.nodeId, trigger);
+  const attributes = button.node.attributes ?? [];
+  const at = attributes.findIndex(
+    (name, index) => index % 2 === 0 && name === "popovertarget",
+  );
+  const id = attributes[at + 1];
+  if (at < 0 || id === undefined)
+    throw new Error(`${trigger} names no definition`);
+  const definition = await nodeOf(root.nodeId, `[id=${JSON.stringify(id)}]`);
+  const link = await nodeOf(definition.nodeId, "a");
+  const text = definition.node.children?.find(
+    (child) => child.nodeType === textNode,
+  );
+  if (text === undefined) throw new Error(`${trigger} defines no text`);
+  return {
+    trigger: button.node.backendNodeId,
+    definition: definition.node.backendNodeId,
+    link: link.node.backendNodeId,
+    text: text.backendNodeId,
+  };
+}
+
+const trimmed = (value: unknown): unknown =>
+  typeof value === "string" ? value.trim() : value;
+
+// What one tree read exposes of a control's parts; an absent or ignored node is not exposed.
+function viewOf(nodes: readonly AXNode[], parts: Parts) {
+  const exposed = (id: number) =>
+    nodes.filter((node) => node.backendDOMNodeId === id && !node.ignored);
+  const placeOf = (id: number) =>
+    (["trigger", "definition", "link"] as const).find(
+      (place) => parts[place] === id,
+    ) ?? "unresolved";
+  const named = (node: AXNode) => ({
+    role: node.role?.value,
+    name: node.name?.value,
+  });
+  const [trigger] = exposed(parts.trigger);
+  const expanded = trigger?.properties?.find(
+    (found) => found.name === "expanded",
+  );
+  return {
+    trigger: exposed(parts.trigger).map(named),
+    expanded: { present: expanded !== undefined, value: expanded?.value.value },
+    // The protocol marks a relationship only by the related nodes its value carries.
+    relations: (trigger?.properties ?? []).flatMap(({ name, value }) =>
+      value.relatedNodes === undefined
+        ? []
+        : [
+            {
+              kind: name,
+              targets: value.relatedNodes.map((node) =>
+                placeOf(node.backendDOMNodeId),
+              ),
+            },
+          ],
+    ),
+    definition: exposed(parts.definition).length,
+    text: exposed(parts.text).map((node) => trimmed(node.name?.value)),
+    link: exposed(parts.link).map(named),
+  };
+}
+
+// Each state is reached by Enter on the focused trigger and read once: the protocol promises no
+// freshness, so polling would only wait for the expected answer.
+async function statesOf(
+  session: CDPSession,
+  trigger: Locator,
+  definition: Locator,
+  parts: Parts,
+) {
+  const page = trigger.page();
+  const read = async (open: boolean) => {
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    expect(
+      await definition.evaluate((el) => el.matches(":popover-open")),
+      open ? "Enter opens the definition" : "Enter closes the definition",
+    ).toBe(open);
+    await settle(page);
+    const { nodes } = await session.send("Accessibility.getFullAXTree");
+    return viewOf(nodes, parts);
+  };
+  const open = await read(true);
+  const closed = await read(false);
+  return { open, closed };
+}
+
+// A thrown value can be falsy, so the flag keeps the failure apart from its value.
+function rethrow(failed: boolean, failure: unknown, cleanup: unknown[]): void {
+  if (cleanup.length === 0) {
+    if (failed) throw failure;
+    return;
+  }
+  const cause =
+    cleanup.length === 1
+      ? cleanup[0]
+      : new AggregateError(cleanup, "both clean-ups failed");
+  if (!failed) throw cause;
+  throw new AggregateError(
+    [failure, ...cleanup],
+    "the tree measurement and its clean-up failed",
+    { cause },
+  );
+}
+
+// Outside main, so no product locator ever finds the plain control.
+const plainMark = "data-plain-popover";
+const plainRoot = `[${plainMark}]`;
+
+test(
+  "a Term's engine accessibility tree holds its minima and matches a plain popover button",
+  {
+    tag: "@single",
+  },
+  async ({ page }) => {
+    const term = terms(page).first();
+    const definition = await definitionOf(term);
+    const label = ((await term.textContent()) ?? "")
+      .replaceAll(/\s+/gu, " ")
+      .trim();
+    const shown = await definition.evaluate((el) => ({
+      short:
+        [...el.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)
+          ?.textContent ?? "",
+      link: el.querySelector("a")?.textContent ?? "",
+    }));
+    const plainTrigger = page.locator(`${plainRoot} > button`);
+    const plainDefinition = page.locator(`${plainRoot} > [popover]`);
+    const session = await page.context().newCDPSession(page);
+    let failed = false;
+    let failure: unknown;
+    try {
+      await session.send("Accessibility.enable");
+      await page.evaluate(
+        ({ mark, trigger, short, link }) => {
+          const control = document.createElement("div");
+          control.setAttribute(mark, "");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.setAttribute("popovertarget", "plain-definition");
+          button.textContent = trigger;
+          const popover = document.createElement("div");
+          popover.id = "plain-definition";
+          popover.setAttribute("popover", "");
+          const anchor = document.createElement("a");
+          anchor.href = "#x";
+          anchor.textContent = link;
+          popover.append(short, " ", anchor);
+          control.append(button, popover);
+          document.body.append(control);
+        },
+        { mark: plainMark, trigger: label, ...shown },
+      );
+      await settle(page);
+      // The first match, as terms(page).first() finds the Term.
+      const termStates = await statesOf(
+        session,
+        term,
+        definition,
+        await partsOf(session, "main button[popovertarget]"),
+      );
+      const plainStates = await statesOf(
+        session,
+        plainTrigger,
+        plainDefinition,
+        await partsOf(session, `${plainRoot} > button`),
+      );
+      for (const state of ["closed", "open"] as const) {
+        const view = termStates[state];
+        const plain = plainStates[state];
+        expect(view.trigger, `${state}: the trigger`).toEqual([
+          { role: "button", name: label },
+        ]);
+        expect(view.expanded, `${state}: expanded`).toEqual(plain.expanded);
+        for (const relation of plain.relations) {
+          expect(
+            relation.targets,
+            `${state}: the plain ${relation.kind}`,
+          ).not.toContain("unresolved");
+          expect(
+            view.relations.find((found) => found.kind === relation.kind),
+            `${state}: ${relation.kind}`,
+          ).toEqual(relation);
+        }
+      }
+      expect(termStates.closed.definition, "closed: the definition").toBe(0);
+      expect(termStates.closed.link, "closed: the link").toEqual([]);
+      // The engine may add line boxes for the same text node, each named by its own part.
+      expect(termStates.open.text, "open: the definition's text").toContain(
+        loop.short,
+      );
+      expect(termStates.open.link, "open: the link").toEqual([
+        { role: "link", name: "Definition" },
+      ]);
+    } catch (error: unknown) {
+      failed = true;
+      failure = error;
+    }
+    const cleanup: unknown[] = [];
+    try {
+      await page.evaluate((root) => {
+        document.querySelector(root)?.remove();
+      }, plainRoot);
+    } catch (error: unknown) {
+      cleanup.push(error);
+    }
+    try {
+      await session.detach();
+    } catch (error: unknown) {
+      cleanup.push(error);
+    }
+    rethrow(failed, failure, cleanup);
+  },
+);

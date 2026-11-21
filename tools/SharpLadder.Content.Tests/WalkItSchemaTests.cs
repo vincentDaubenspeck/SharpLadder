@@ -64,7 +64,7 @@ public sealed class WalkItSchemaTests
     [Theory]
     [InlineData(Syntax, "sections/0/body/4/items/0/content")]
     [InlineData(Syntax, "sections/0/title")]
-    [InlineData("chapters/fixture-basics/cards.json", "sections/0/cards/0/why/2/rows/0/0")]
+    [InlineData("chapters/fixture-basics/cards.json", "sections/0/cards/0/why/3/rows/0/0")]
     public void RefusedWhereOnlyInlineContentIs(string file, string spans)
     {
         var record = Record(file);

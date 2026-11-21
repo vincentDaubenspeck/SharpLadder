@@ -486,6 +486,17 @@ export const witness = {
                   ],
                   lost: true,
                 },
+                {
+                  blockId: "syn-fix-sizes/b5.2.s2",
+                  dst: 0,
+                  value: 5,
+                  note: [
+                    {
+                      type: "text",
+                      text: "Change the first cell.",
+                    },
+                  ],
+                },
               ],
             },
             {
@@ -589,6 +600,13 @@ export const witness = {
           {
             target: {
               type: "block",
+              blockId: "syn-fix-sizes/b5.2.s2",
+            },
+            text: "Change the first cell.",
+          },
+          {
+            target: {
+              type: "block",
               blockId: "syn-fix-sizes/b5.3.s0",
             },
             text: "Copy the spare.",
@@ -602,7 +620,7 @@ export const witness = {
           },
         ],
         audio:
-          "sha256:54ce06f51bba06f8b1b6602247654a7a1bf998551aa1cdf7dcfdd0553285e412",
+          "sha256:37bb457a089d1ad27c14d26d0bb8f617074977645ab954371c83d0373f61a931",
       },
     },
   ],

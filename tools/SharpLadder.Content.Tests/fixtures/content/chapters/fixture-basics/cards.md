@@ -20,6 +20,10 @@ order: 6
   - The keys arrive in any order.
   - A missing key reads as zero.
 
+  ```csharp {#tally-fix-why1 group=fix-tally-why spoken="Reads a missing key as zero"}
+  var none = new Dictionary<string, int>().GetValueOrDefault("none");
+  ```
+
   | Word                     | Count |
   | ------------------------ | ----- |
   | [set](#term-fixture-set) | 2     |

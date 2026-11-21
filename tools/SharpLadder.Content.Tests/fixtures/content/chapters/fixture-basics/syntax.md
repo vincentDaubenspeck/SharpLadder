@@ -58,6 +58,7 @@ sequences:
     intro: Write first.
     steps:
       - { dst: 1, value: 8, note: The text is gone., lost: true }
+      - { dst: 0, value: 5, note: Change the first cell. }
   - name: spare
     intro: Copy the spare.
     steps:

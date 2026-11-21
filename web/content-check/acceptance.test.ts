@@ -21,6 +21,7 @@ import {
   evidenceProblems,
   hintsFile,
   judges,
+  practiceSuite,
   recordSetProblems,
   registryFile,
   roundTripCases,
@@ -68,6 +69,11 @@ const listFor = (kind: CaseKey): CaseList => {
   return list;
 };
 const roundTrip = listOf(roundTripFile);
+const practice = ((): CaseList => {
+  const list = caseLists.find((l) => l.suite === practiceSuite);
+  if (list === undefined) throw new Error("no practice case list");
+  return list;
+})();
 const speech = listOf(speechFile);
 const hintLists = caseLists.filter((l) => l.file === hintsFile);
 const aliases = listFor("aliases");
@@ -96,18 +102,25 @@ const registryCases = (records: readonly ExpectedRecord[] = all): Case[] => [
 const hintCases = (records: readonly ExpectedRecord[] = expected): Case[] =>
   hintLists.flatMap((list) => cases(records, list));
 
-// The speech, hints and registry files' results are complete unless a test replaces them.
+// The speech, hints and registry files' results, and the practice cases the round-trip file
+// holds beside the given ones, are complete unless a test replaces them.
 const report = (
   assertionResults: unknown,
   name = join(web, roundTripFile),
   spoken: unknown = cases(expected, speech),
   registry: unknown = registryCases(),
   hinted: unknown = hintCases(),
+  practiced: readonly Case[] = cases(expected, practice),
 ) => ({
   success: true,
   testResults: [
     { name: join(web, "src", "App.test.tsx"), assertionResults: [] },
-    { name, assertionResults },
+    {
+      name,
+      assertionResults: Array.isArray(assertionResults)
+        ? [...(assertionResults as unknown[]), ...practiced]
+        : assertionResults,
+    },
     { name: join(web, speechFile), assertionResults: spoken },
     { name: join(web, hintsFile), assertionResults: hinted },
     { name: join(web, registryFile), assertionResults: registry },
@@ -132,12 +145,13 @@ beforeAll(async () => {
   ).map(({ path, kind, part }) => ({ path, kind, part }));
   expected = all.filter((r) => r.kind !== "aliases" && r.kind !== "patterns");
   // Every rendered record makes the round trip, only those with audio slots have a speech
-  // case, and hints records have their own cases.
+  // case, and hints and practice records have their own cases.
   renderedBacked =
     expected.filter((r) => judges(roundTrip, r)).length *
       roundTripCases.length +
     expected.filter((r) => judges(speech, r)).length * speech.cases.length;
-  recordBacked = renderedBacked + hintCases().length;
+  recordBacked =
+    renderedBacked + hintCases().length + cases(expected, practice).length;
   first = expected[0]?.path ?? "";
 }, 40_000);
 const firstCase = roundTripCases[0] ?? "";

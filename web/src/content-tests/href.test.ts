@@ -4,7 +4,16 @@ import type { ChapterFile } from "../generated/content.ts";
 import { witness as basics } from "../generated/witness/chapters/fixture-basics/chapter.ts";
 import { witness as syntax } from "../generated/witness/chapters/fixture-basics/syntax.ts";
 import { witness as second } from "../generated/witness/chapters/fixture-second/chapter.ts";
-import { buildSlugMap, internalHref, termHref } from "../content/href.ts";
+import { witness as countLetters } from "../generated/witness/practice/drills/drill-fix-count-letters.ts";
+import { witness as largest } from "../generated/witness/practice/drills/drill-fix-largest.ts";
+import {
+  buildDrillTitleMap,
+  buildSlugMap,
+  drillHref,
+  drillTitle,
+  internalHref,
+  termHref,
+} from "../content/href.ts";
 
 const slugs = buildSlugMap([basics, second]);
 
@@ -315,6 +324,57 @@ describe("buildSlugMap", () => {
     const record: unknown = { ...second, slug: ["fixture-second"] };
     expect(() => buildSlugMap([record as ChapterFile])).toThrow(
       /Malformed chapter slug/u,
+    );
+  });
+});
+
+describe("drillHref", () => {
+  const titles = buildDrillTitleMap([countLetters, largest]);
+
+  it("sends a known drill to its own page", () => {
+    expect(drillHref(titles, largest.id)).toBe(
+      `/practice/drills/${largest.id}`,
+    );
+  });
+
+  it("throws on a malformed drill id", () => {
+    expect(() => drillHref(titles, "drill-fix/largest")).toThrow(
+      "Malformed drill id",
+    );
+  });
+
+  it("throws on a well-formed drill id the map does not hold", () => {
+    expect(() => drillHref(titles, "drill-fix-unknown")).toThrow(
+      "Unknown drill id",
+    );
+  });
+});
+
+describe("drillTitle", () => {
+  const titles = buildDrillTitleMap([countLetters, largest]);
+
+  it("gives a known drill its own title", () => {
+    expect(drillTitle(titles, largest.id)).toBe(largest.title);
+  });
+
+  it("throws on a malformed drill id", () => {
+    expect(() => drillTitle(titles, "drill-fix/largest")).toThrow(
+      "Malformed drill id",
+    );
+  });
+
+  it("throws on a well-formed drill id the map does not hold", () => {
+    expect(() => drillTitle(titles, "drill-fix-unknown")).toThrow(
+      "Unknown drill id",
+    );
+  });
+});
+
+describe("buildDrillTitleMap", () => {
+  it("throws on a duplicate drill id", () => {
+    const twin = { ...countLetters, id: largest.id };
+    expect(() => buildDrillTitleMap([largest, twin])).toThrow(
+      "Duplicate drill id",
     );
   });
 });

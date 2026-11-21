@@ -218,6 +218,11 @@ export default defineConfig([
     files: [exactUnits("generated/body.ts", "generated/content.ts")],
     rules: { "@typescript-eslint/consistent-type-definitions": "off" },
   },
+  // A browser may drop the list semantics of an ol whose markers the theme hides.
+  {
+    files: [exactUnits("content/WalkStepper.tsx", "content/Blocks.tsx")],
+    rules: { "jsx-a11y-x/no-redundant-roles": ["error", { ol: ["list"] }] },
+  },
   // A default that calls assertNever is kept, but never counts as covering a missing case.
   {
     files: [typedSource],

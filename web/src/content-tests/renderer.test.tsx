@@ -288,4 +288,12 @@ describe("the walk control through the hosts", () => {
       },
     ]);
   });
+
+  it("gives a frozen walk's cell list the list role", () => {
+    const { container } = render(<ContentView doc={syntax} slugs={slugs} />);
+    const walk = container.querySelector('[id="walk-fix-shift"]');
+    expect(walk?.querySelector("[aria-live]")).toBeNull();
+    const lists = [...(walk?.querySelectorAll(":scope > ol") ?? [])];
+    expect(lists.map((list) => list.getAttribute("role"))).toEqual(["list"]);
+  });
 });

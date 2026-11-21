@@ -136,6 +136,18 @@ describe("the href.ts literals against the schema", () => {
       ],
       /^slug length limit: /u,
     ],
+    [
+      "the drill prefix",
+      () => [
+        body,
+        changed(
+          content,
+          ["definitions", "drillId", "allOf", 1, "pattern"],
+          "^drills-[a-z0-9-]",
+        ),
+      ],
+      /^drill pattern: /u,
+    ],
   ])("fails a changed schema rule: %s", (_name, schemas, reason) => {
     const [b, c] = schemas();
     const problems = hrefPatternProblems(href, b, c);

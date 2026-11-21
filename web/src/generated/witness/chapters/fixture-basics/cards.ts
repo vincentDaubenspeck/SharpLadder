@@ -110,8 +110,17 @@ export const witness = {
               ],
             },
             {
-              type: "table",
+              type: "code",
               blockId: "cards-fix-all/b5",
+              id: "tally-fix-why1",
+              group: "fix-tally-why",
+              spoken: "Reads a missing key as zero",
+              source:
+                "var none = new Dictionary\u003Cstring, int\u003E().GetValueOrDefault(\u0022none\u0022);",
+            },
+            {
+              type: "table",
+              blockId: "cards-fix-all/b6",
               headers: [
                 [
                   {
@@ -154,11 +163,11 @@ export const witness = {
           ],
           traps: {
             type: "list",
-            blockId: "cards-fix-all/b6",
+            blockId: "cards-fix-all/b7",
             ordered: false,
             items: [
               {
-                blockId: "cards-fix-all/b6.i1",
+                blockId: "cards-fix-all/b7.i1",
                 content: [
                   {
                     type: "text",
@@ -167,7 +176,7 @@ export const witness = {
                 ],
               },
               {
-                blockId: "cards-fix-all/b6.i2",
+                blockId: "cards-fix-all/b7.i2",
                 content: [
                   {
                     type: "text",
@@ -179,11 +188,11 @@ export const witness = {
           },
           also: {
             type: "list",
-            blockId: "cards-fix-all/b7",
+            blockId: "cards-fix-all/b8",
             ordered: false,
             items: [
               {
-                blockId: "cards-fix-all/b7.i1",
+                blockId: "cards-fix-all/b8.i1",
                 content: [
                   {
                     type: "text",
@@ -204,7 +213,7 @@ export const witness = {
           ],
           reach: {
             type: "paragraph",
-            blockId: "cards-fix-all/b8",
+            blockId: "cards-fix-all/b9",
             content: [
               {
                 type: "text",
@@ -227,7 +236,7 @@ export const witness = {
           },
           build: {
             type: "text",
-            blockId: "cards-fix-all/b9",
+            blockId: "cards-fix-all/b10",
             id: "note-fix-text1",
             spoken: "One line of plain text",
             source: "kept: yes",
@@ -235,7 +244,7 @@ export const witness = {
           why: [
             {
               type: "paragraph",
-              blockId: "cards-fix-all/b10",
+              blockId: "cards-fix-all/b11",
               content: [
                 {
                   type: "text",
@@ -261,11 +270,11 @@ export const witness = {
           ],
           traps: {
             type: "list",
-            blockId: "cards-fix-all/b11",
+            blockId: "cards-fix-all/b12",
             ordered: false,
             items: [
               {
-                blockId: "cards-fix-all/b11.i1",
+                blockId: "cards-fix-all/b12.i1",
                 content: [
                   {
                     type: "text",
@@ -277,11 +286,11 @@ export const witness = {
           },
           also: {
             type: "list",
-            blockId: "cards-fix-all/b12",
+            blockId: "cards-fix-all/b13",
             ordered: false,
             items: [
               {
-                blockId: "cards-fix-all/b12.i1",
+                blockId: "cards-fix-all/b13.i1",
                 content: [
                   {
                     type: "text",
@@ -290,7 +299,7 @@ export const witness = {
                 ],
               },
               {
-                blockId: "cards-fix-all/b12.i2",
+                blockId: "cards-fix-all/b13.i2",
                 content: [
                   {
                     type: "text",
@@ -344,74 +353,81 @@ export const witness = {
               type: "block",
               blockId: "cards-fix-all/b5",
             },
+            text: "Reads a missing key as zero",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-all/b6",
+            },
             text: "Columns: Word, Count. Row 1. Word: set; Count: 2.",
-          },
-          {
-            target: {
-              type: "block",
-              blockId: "cards-fix-all/b6.i1",
-            },
-            text: "Traps: Reading a missing key with the indexer throws.",
-          },
-          {
-            target: {
-              type: "block",
-              blockId: "cards-fix-all/b6.i2",
-            },
-            text: "A key differs by case unless a comparer says otherwise.",
           },
           {
             target: {
               type: "block",
               blockId: "cards-fix-all/b7.i1",
             },
-            text: "Also: Counting characters works the same way.",
+            text: "Traps: Reading a missing key with the indexer throws.",
           },
           {
             target: {
               type: "block",
-              blockId: "cards-fix-all/b8",
+              blockId: "cards-fix-all/b7.i2",
             },
-            text: "Card: Is the note kept?. Reach for: A plain note beside the code.",
+            text: "A key differs by case unless a comparer says otherwise.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-all/b8.i1",
+            },
+            text: "Also: Counting characters works the same way.",
           },
           {
             target: {
               type: "block",
               blockId: "cards-fix-all/b9",
             },
-            text: "Build: One line of plain text",
+            text: "Card: Is the note kept?. Reach for: A plain note beside the code.",
           },
           {
             target: {
               type: "block",
               blockId: "cards-fix-all/b10",
             },
-            text: "Why: The note is read back later; compare the first card.",
+            text: "Build: One line of plain text",
           },
           {
             target: {
               type: "block",
-              blockId: "cards-fix-all/b11.i1",
+              blockId: "cards-fix-all/b11",
             },
-            text: "Traps: A note without an id cannot be linked.",
+            text: "Why: The note is read back later; compare the first card.",
           },
           {
             target: {
               type: "block",
               blockId: "cards-fix-all/b12.i1",
             },
+            text: "Traps: A note without an id cannot be linked.",
+          },
+          {
+            target: {
+              type: "block",
+              blockId: "cards-fix-all/b13.i1",
+            },
             text: "Also: A note may carry a label.",
           },
           {
             target: {
               type: "block",
-              blockId: "cards-fix-all/b12.i2",
+              blockId: "cards-fix-all/b13.i2",
             },
             text: "A note may stand alone.",
           },
         ],
         audio:
-          "sha256:363fafb848db5a8ef40c6c4692b921e81ab6ec6f80dd78d317ee212acd0598f6",
+          "sha256:76767309ecc62088eedc8096cd6f2d6e495d5b6adbfe08bd26e6bd7b26bbc56a",
       },
     },
     {

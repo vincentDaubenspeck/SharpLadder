@@ -901,8 +901,8 @@ const refused = [
     "a frozen intro hook on the cell list",
     blocks,
     mutate(blocks, frozenIntro, "<p>").replace(
-      "<ol>",
-      "<ol data-block-id={block.sequences[0].introBlockId}>",
+      '<ol role="list">',
+      '<ol role="list" data-block-id={block.sequences[0].introBlockId}>',
     ),
     "a frozen walk's intro hook must stand on the <p> at its root that shows sequence 1's intro",
   ],
@@ -1780,6 +1780,16 @@ const refused = [
     "a group role outside the picker",
     blocks,
     mutate(blocks, divId, '<div role="group" id={block.id}>'),
+    notSource("role", "div"),
+  ],
+  [
+    "a list role on another element",
+    blocks,
+    mutate(
+      blocks,
+      `${divId}\n      <p>`,
+      '<div role="list" id={block.id} data-block-id={block.blockId}>\n      <p>',
+    ),
     notSource("role", "div"),
   ],
   [
@@ -3252,13 +3262,16 @@ function Intro({
     [
       "a table in the stepper",
       stepper,
-      mutate(stepper, "<ol>", "<table>").replace("</ol>", "</table>"),
+      mutate(stepper, '<ol role="list">', "<table>").replace(
+        "</ol>",
+        "</table>",
+      ),
       ["element <table> is not admitted in the walk stepper"],
     ],
     [
       "a numbered start on the cell list",
       stepper,
-      mutate(stepper, "<ol>", "<ol start={0}>"),
+      mutate(stepper, '<ol role="list">', '<ol role="list" start={0}>'),
       [notSource("start", "ol")],
     ],
     [

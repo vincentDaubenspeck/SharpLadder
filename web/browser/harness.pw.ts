@@ -86,9 +86,10 @@ async function plainLinkFocusVisible(page: Page): Promise<boolean> {
   return link.evaluate((el) => el.matches(":focus-visible"));
 }
 
-// The paint the focus outline adds, and a floor of half a 2px ring around the link's box.
-async function focusPaint(page: Page) {
-  const link = await focusLink(page);
+// The paint the focus outline adds, and a floor of half a 2px ring around the link's box. A
+// target is one the caller has already focused, so it is measured where the caller left focus.
+async function focusPaint(page: Page, target?: Locator) {
+  const link = target ?? (await focusLink(page));
   await settle(page);
   const box = await link.boundingBox();
   if (box === null) throw new Error("the focused link has no box");
@@ -654,14 +655,14 @@ test(
       sequence: 2,
       step: 1,
     });
-    await expect(stepText(shift)).toHaveText("Step 1 of 1");
+    await expect(stepText(shift)).toHaveText("Step 1 of 2");
     expect(await liveRegion(shift).textContent()).toBe("");
     expect(await pressed()).toEqual(["false", "true", "false"]);
     expect(await stepButton(shift, "Prev").getAttribute("aria-disabled")).toBe(
       "false",
     );
     expect(await stepButton(shift, "Next").getAttribute("aria-disabled")).toBe(
-      "true",
+      "false",
     );
   },
 );
@@ -754,7 +755,7 @@ const markedPositions = [
   },
   {
     sequence: "risky",
-    region: "Step 1 of 1: The text is gone.",
+    region: "Step 1 of 2: The text is gone.",
     cells: [null, "destination", "empty"],
     struck: 1,
   },
@@ -986,3 +987,85 @@ test(
     ).toBeGreaterThan(0);
   },
 );
+
+// Each live target is held to the floor of the helper that measures its kind.
+for (const forced of [false, true])
+  test(
+    forced
+      ? "the Term, its definition link and a picker button show focus and the Term its dotted rule under forced colours"
+      : "the Term, its definition link, Prev and a picker button show focus and the Term its dotted rule in the default state",
+    {
+      tag: "@single",
+    },
+    async ({ page }) => {
+      expect(
+        await plainLinkFocusVisible(page),
+        "a plain link matches :focus-visible",
+      ).toBe(true);
+      expect(
+        await plainButtonFocusVisible(page),
+        "a plain button matches :focus-visible",
+      ).toBe(true);
+      await openHarness(page);
+      if (forced) {
+        await page.emulateMedia({ forcedColors: "active" });
+        await settle(page);
+        expect(
+          await page.evaluate(
+            () => matchMedia("(forced-colors: active)").matches,
+          ),
+        ).toBe(true);
+      }
+      // Found by structure: a Term is the one kind of button that names a definition.
+      const trigger = page.locator("main button[popovertarget]").first();
+      const id = await trigger.getAttribute("popovertarget");
+      if (id === null) throw new Error("a Term button names no definition");
+      const definition = page.locator(`[id=${JSON.stringify(id)}]`);
+      // The rule's paint is read from a viewport screenshot, so the trigger must be in view.
+      await trigger.scrollIntoViewIfNeeded();
+      await settle(page);
+      expect(
+        await trigger.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            style: style.borderBottomStyle,
+            drawn: Number.parseFloat(style.borderBottomWidth) > 0,
+          };
+        }),
+        "the Term's rule",
+      ).toEqual({ style: "dotted", drawn: true });
+      expect(
+        await paintOf(page, trigger, { "border-bottom-style": "solid" }),
+        "the Term's rule paints apart from a solid one",
+      ).toBeGreaterThan(0);
+      const ring = async (target: Locator, name: string) => {
+        const { paint, floor } = await ringPaint(page, target);
+        expect(paint, name).toBeGreaterThanOrEqual(floor);
+      };
+      await ring(trigger, "the Term");
+      // Under forced colours the walk-through's own test already measures Prev's ring.
+      if (!forced) {
+        const shift = stepperOf(page, "walk-fix-shift");
+        await showPosition(shift, markedPositions[0]);
+        await ring(stepButton(shift, "Prev"), "Prev");
+      }
+      await ring(
+        approachButton(buildSection(page, "build-fix-total"), "the library"),
+        "the library",
+      );
+      // Last, so the open definition covers no other target.
+      await trigger.focus();
+      await page.keyboard.press("Enter");
+      expect(
+        await definition.evaluate((el) => el.matches(":popover-open")),
+        "Enter opens the definition",
+      ).toBe(true);
+      const link = definition.getByRole("link");
+      await link.focus();
+      expect(await link.evaluate((el) => el.matches(":focus-visible"))).toBe(
+        true,
+      );
+      const { paint, floor } = await focusPaint(page, link);
+      expect(paint, "the definition link").toBeGreaterThanOrEqual(floor);
+    },
+  );

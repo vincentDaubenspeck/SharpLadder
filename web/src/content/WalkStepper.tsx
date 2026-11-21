@@ -177,7 +177,7 @@ function Announcement({
 // The cues are words, never colour alone: empty, written, read, and a struck original as lost.
 function CellList({ state }: { state: ReplayState }): ReactElement {
   return (
-    <ol>
+    <ol role="list">
       {state.slots.map((slot, index) => (
         <li
           key={index}

@@ -186,7 +186,7 @@ function FrozenWalk({
       <p>
         <Spans spans={block.title} slugs={slugs} />
       </p>
-      <ol>
+      <ol role="list">
         {block.cells.map((cell, index) => (
           <li key={index} data-cell={cell === null ? "empty" : null}>
             {index}: <CellValue value={cell} />

@@ -10,7 +10,16 @@ export const rendererModules = new Map([
   ["content/assertNever.ts", ["assertNever"]],
   [
     "content/href.ts",
-    ["internalHref", "termHref", "buildSlugMap", "type SlugMap"],
+    [
+      "internalHref",
+      "termHref",
+      "buildSlugMap",
+      "type SlugMap",
+      "drillHref",
+      "drillTitle",
+      "buildDrillTitleMap",
+      "type DrillTitleMap",
+    ],
   ],
   ["content/ContentLink.tsx", ["ContentLink"]],
   ["content/Spans.tsx", ["Spans", "LinkContent"]],
@@ -21,6 +30,7 @@ export const rendererModules = new Map([
   ["content/Entries.tsx", ["GlossaryEntryView", "ErrorEntryView"]],
   ["content/Cards.tsx", ["CardsSectionView"]],
   ["content/Drill.tsx", ["DrillSectionView"]],
+  ["content/Practice.tsx", ["PracticeView"]],
   [
     "content/approach.ts",
     [
@@ -95,7 +105,7 @@ export const helperPins = new Map([
   ],
   [
     "content/href.ts",
-    "4592231be603d2db39cdb0e283e688613ee0d9c3ba6c368cffa9765d64b48d88",
+    "59d150cae66d77dc4a5a67feb3c7e1c88a94d303acefa64c4cf91a61df73b154",
   ],
   [
     "content/span-text.ts",
@@ -116,7 +126,7 @@ export const helperPins = new Map([
 export const modulePins = new Map([
   [
     "content/WalkStepper.tsx",
-    "c83f19619b3379548a50d92f8588c6f39adae7f48f622547cd3b3d903fbc248e",
+    "42e492c0b7fcee821675db6702d0792225359c604fd539d693c5cd6bc2cf15ed",
   ],
 ]);
 
@@ -264,7 +274,7 @@ const intrinsics = new Map([
   ["dd", []],
   ["p", [blockHook, "aria-live", "aria-atomic"]],
   ["ul", [blockHook]],
-  ["ol", ["start", blockHook]],
+  ["ol", ["start", blockHook, "role"]],
   ["li", [blockHook, cellStates]],
   ["table", [blockHook]],
   ["thead", []],
@@ -370,6 +380,10 @@ const wholeRecordTypes = new Set([
 // The one module that writes a native popover: a button and its definition, and no handler.
 const termModule = "content/Term.tsx";
 const termButton = ["type", "popoverTarget", "popoverTargetAction"];
+// The practice view writes its own headings, paragraphs and prerequisite links, each link's href
+// from the drill helper alone; every other element it shows comes from Blocks.
+const practiceModule = "content/Practice.tsx";
+const practiceElements = new Set(["h2", "h3", "p", "a"]);
 const badCall = "this call is not admitted in a JSX renderer module";
 // React reads a capitalised JSX name as a component and a lower-case one as an element.
 const isComponentName = (name) => /^[A-Z]/u.test(name);
@@ -703,6 +717,14 @@ export function rendererFindings(
   const isTermHrefCall = (expression) =>
     isHrefHelperCall(expression, "termHref", 1) &&
     isPropParameter(expression.arguments[0], "term", isExported("Term"));
+
+  const isDrillHrefCall = (expression) =>
+    isHrefHelperCall(expression, "drillHref", 2) &&
+    isPropParameter(
+      expression.arguments[0],
+      "drillTitles",
+      isExported("PracticeView"),
+    );
 
   const attributeOf = (opening, name) =>
     opening.attributes.find(
@@ -1581,6 +1603,13 @@ export function rendererFindings(
       );
       return;
     }
+    if (unit === practiceModule && !practiceElements.has(tag)) {
+      report(
+        opening.name,
+        `element <${tag}> is not admitted in the practice view`,
+      );
+      return;
+    }
     const allowed = intrinsics.get(tag);
     if (
       allowed === undefined ||
@@ -1611,6 +1640,13 @@ export function rendererFindings(
       }
       // React consumes key itself, so it never reaches the DOM and has no provenance to check.
       if (name === "key") continue;
+      if (unit === practiceModule && name !== "href") {
+        report(
+          attribute,
+          `attribute ${name} is not admitted in the practice view`,
+        );
+        continue;
+      }
       const expression = expressionOf(attribute);
       if (
         name === blockHook &&
@@ -1634,7 +1670,11 @@ export function rendererFindings(
         ok = isParamMember(expression, "section", "id");
       else if (name === cellStates) ok = isCellStates(opening, expression);
       else if (name === "role")
-        ok = unit === pickerModule && literalValue(attribute) === "group";
+        ok =
+          tag === "ol"
+            ? (unit === stepperModule || unit === blocksModule) &&
+              literalValue(attribute) === "list"
+            : unit === pickerModule && literalValue(attribute) === "group";
       else if (name === "aria-label") ok = isGroupLabel(opening, attribute);
       else if (name === "type") ok = literalValue(attribute) === "button";
       else if (name === "popoverTarget")
@@ -1692,7 +1732,8 @@ export function rendererFindings(
         hrefCount++;
         ok =
           (unit === hrefModule && isHrefCall(expression)) ||
-          (unit === termModule && isTermHrefCall(expression));
+          (unit === termModule && isTermHrefCall(expression)) ||
+          (unit === practiceModule && isDrillHrefCall(expression));
       }
       if (!ok)
         report(
@@ -2271,7 +2312,9 @@ export function rendererFindings(
       ? ["internalHref", "link", "slugs"]
       : unit === termModule
         ? ["termHref", "term", "definition", "useId"]
-        : null;
+        : unit === practiceModule
+          ? ["drillHref", "drillTitle", "drillTitles"]
+          : null;
   if (unit === termModule && popoverCount !== 1)
     report(program, `${termModule} must write exactly one definition`);
   if (bound !== null) {

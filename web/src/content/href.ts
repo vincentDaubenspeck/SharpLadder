@@ -1,11 +1,12 @@
 import type { LinkSpan, TermSpan } from "../generated/body.ts";
-import type { ChapterFile } from "../generated/content.ts";
+import type { ChapterFile, DrillFile } from "../generated/content.ts";
 
 // The same whole-string patterns as the content schema, so a trailing line feed never matches.
 const idPattern = /^[a-z][a-z0-9-]{0,47}(?![\s\S])/u;
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*(?![\s\S])/u;
 const slugMaxLength = 48;
 const termPattern = /^term-[a-z0-9-]/u;
+const drillPattern = /^drill-[a-z0-9-]/u;
 
 // Values may arrive untyped at run time, and a regular expression would coerce a non-string.
 function isString(value: unknown): value is string {
@@ -23,6 +24,10 @@ function isChapterId(value: unknown): value is string {
 // Values may arrive untyped at run time, so a kind the types rule out is still met.
 function isAnchorKind(value: unknown): boolean {
   return value === "anchor";
+}
+
+function isDrillId(value: unknown): value is string {
+  return isString(value) && idPattern.test(value) && drillPattern.test(value);
 }
 
 function isSlug(value: unknown): value is string {
@@ -67,6 +72,55 @@ export type { SlugMap };
 
 export function buildSlugMap(chapters: readonly ChapterFile[]): SlugMap {
   return new SlugMap(chapters);
+}
+
+// Admission runs in the constructor as for the slug map, and a Map answers only its own keys.
+class DrillTitleMap {
+  readonly #titles = new Map<string, string>();
+
+  constructor(drills: readonly DrillFile[]) {
+    for (const drill of drills) {
+      const { id, title } = drill;
+      if (!isDrillId(id)) {
+        throw new Error(`Malformed drill id: ${JSON.stringify(id)}`);
+      }
+      if (this.#titles.has(id)) {
+        throw new Error(`Duplicate drill id: ${id}`);
+      }
+      this.#titles.set(id, title);
+    }
+    Object.freeze(this);
+  }
+
+  get(id: string): string | undefined {
+    return this.#titles.get(id);
+  }
+}
+
+export type { DrillTitleMap };
+
+export function buildDrillTitleMap(
+  drills: readonly DrillFile[],
+): DrillTitleMap {
+  return new DrillTitleMap(drills);
+}
+
+// A well-formed id is not enough: only a drill the map holds has a page and a title.
+export function drillTitle(titles: DrillTitleMap, id: string): string {
+  if (!isDrillId(id)) {
+    throw new Error(`Malformed drill id: ${JSON.stringify(id)}`);
+  }
+  const title = titles.get(id);
+  if (title === undefined) {
+    throw new Error(`Unknown drill id: ${id}`);
+  }
+  return title;
+}
+
+// The href passes the title's check, so no link is written to a drill without a page.
+export function drillHref(titles: DrillTitleMap, id: string): string {
+  drillTitle(titles, id);
+  return `/practice/drills/${id}`;
 }
 
 // The compiler states what a target is; an error entry lives on the one error page and belongs
